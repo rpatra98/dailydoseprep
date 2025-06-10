@@ -5,16 +5,43 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/utils/supabase';
 import { User, UserRole } from '@/types';
+import { 
+  Layout, 
+  Typography, 
+  Button, 
+  Card, 
+  Form, 
+  Input, 
+  Alert, 
+  Table, 
+  Tag, 
+  Spin, 
+  Row, 
+  Col,
+  Space,
+  Divider
+} from 'antd';
+import {
+  LogoutOutlined,
+  PlusOutlined,
+  QuestionCircleOutlined,
+  BookOutlined,
+  UserOutlined,
+  MailOutlined,
+  LockOutlined
+} from '@ant-design/icons';
+
+const { Header, Content } = Layout;
+const { Title, Text, Paragraph } = Typography;
 
 export default function Dashboard() {
   const { user, logout, createQAUTHOR } = useAuth();
   const router = useRouter();
+  const [form] = Form.useForm();
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   
   // For creating new QAUTHOR
-  const [newAuthorEmail, setNewAuthorEmail] = useState('');
-  const [newAuthorPassword, setNewAuthorPassword] = useState('');
   const [creatingAuthor, setCreatingAuthor] = useState(false);
   const [createError, setCreateError] = useState('');
   const [createSuccess, setCreateSuccess] = useState('');
@@ -90,22 +117,21 @@ export default function Dashboard() {
     }
   };
 
-  const handleCreateQAUTHOR = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateQAUTHOR = async (values: { email: string; password: string }) => {
+    const { email, password } = values;
     setCreateError('');
     setCreateSuccess('');
     
-    if (!newAuthorEmail || !newAuthorPassword) {
+    if (!email || !password) {
       setCreateError('Email and password are required');
       return;
     }
 
     try {
       setCreatingAuthor(true);
-      await createQAUTHOR(newAuthorEmail, newAuthorPassword);
-      setCreateSuccess(`QAUTHOR account created for ${newAuthorEmail}`);
-      setNewAuthorEmail('');
-      setNewAuthorPassword('');
+      await createQAUTHOR(email, password);
+      setCreateSuccess(`QAUTHOR account created for ${email}`);
+      form.resetFields();
       
       // Refresh user list
       refreshUsers();
@@ -124,215 +150,203 @@ export default function Dashboard() {
 
   // If not logged in, don't render anything (will redirect in useEffect)
   if (!user) {
-    return <div className="min-h-screen bg-gray-50"></div>;
+    return <div style={{ minHeight: '100vh', background: '#f0f2f5' }}></div>;
   }
 
-  // If role not fetched yet, render minimal content
+  // If role not fetched yet, render minimal content with loading indicator
   if (!userRole) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <button onClick={handleSignOut} className="bg-red-600 text-white px-4 py-2 rounded-md">Sign Out</button>
-          </div>
-          <div className="mt-8 bg-white shadow rounded-lg p-6">
-            <p>Welcome, {user.email}</p>
-          </div>
-        </div>
-      </div>
+      <Layout style={{ minHeight: '100vh' }}>
+        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Title level={3} style={{ margin: 0 }}>Dashboard</Title>
+          <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
+            Sign Out
+          </Button>
+        </Header>
+        <Content style={{ padding: '24px' }}>
+          <Card>
+            <Spin tip="Loading user data..." />
+            <Paragraph style={{ marginTop: 16 }}>Welcome, {user.email}</Paragraph>
+          </Card>
+        </Content>
+      </Layout>
     );
   }
 
-  // If user is not SUPERADMIN, show limited dashboard
+  // User role-specific dashboard
   if (userRole !== 'SUPERADMIN') {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <button
-              onClick={handleSignOut}
-              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-            >
-              Sign Out
-            </button>
-          </div>
-          
-          <div className="mt-8 bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">
-              Welcome, {user.email}
-            </h2>
-            <p className="text-gray-600">
-              Your role: {userRole}
-            </p>
-
+      <Layout style={{ minHeight: '100vh' }}>
+        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Title level={3} style={{ margin: 0 }}>Dashboard</Title>
+          <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
+            Sign Out
+          </Button>
+        </Header>
+        <Content style={{ padding: '24px' }}>
+          <Card>
+            <Title level={4}>Welcome, {user.email}</Title>
+            <Paragraph>
+              <Text strong>Your role:</Text> <Tag color={userRole === 'QAUTHOR' ? 'blue' : 'green'}>{userRole}</Tag>
+            </Paragraph>
+            
             {userRole === 'QAUTHOR' && (
-              <div className="mt-6">
-                <h3 className="text-md font-medium text-gray-700 mb-3">QAUTHOR Features</h3>
-                <p className="text-gray-600 mb-4">
+              <div style={{ marginTop: 24 }}>
+                <Divider orientation="left">QAUTHOR Features</Divider>
+                <Paragraph>
                   As a QAUTHOR, you can create questions for students to practice.
-                </p>
-                <button
+                </Paragraph>
+                <Button 
+                  type="primary" 
+                  icon={<PlusOutlined />}
                   onClick={() => router.push('/questions/create')}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                 >
                   Create Questions
-                </button>
+                </Button>
               </div>
             )}
 
             {userRole === 'STUDENT' && (
-              <div className="mt-6">
-                <h3 className="text-md font-medium text-gray-700 mb-3">Student Features</h3>
-                <p className="text-gray-600 mb-4">
+              <div style={{ marginTop: 24 }}>
+                <Divider orientation="left">Student Features</Divider>
+                <Paragraph>
                   As a student, you can practice questions from various competitive exams.
-                </p>
-                <button
+                </Paragraph>
+                <Button 
+                  type="primary" 
+                  icon={<BookOutlined />}
                   onClick={() => router.push('/practice')}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                 >
                   Practice Questions
-                </button>
+                </Button>
               </div>
             )}
-          </div>
-        </div>
-      </div>
+          </Card>
+        </Content>
+      </Layout>
     );
   }
 
   // SUPERADMIN Dashboard
-  return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">SUPERADMIN Dashboard</h1>
-          <button
-            onClick={handleSignOut}
-            className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-          >
-            Sign Out
-          </button>
-        </div>
+  const columns = [
+    {
+      title: 'Email',
+      dataIndex: 'email',
+      key: 'email',
+    },
+    {
+      title: 'Role',
+      dataIndex: 'role',
+      key: 'role',
+      render: (role: UserRole) => {
+        let color = 'green';
+        if (role === 'SUPERADMIN') color = 'purple';
+        if (role === 'QAUTHOR') color = 'blue';
         
-        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        return <Tag color={color}>{role}</Tag>;
+      },
+    },
+    {
+      title: 'Created At',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (date: string) => new Date(date).toLocaleDateString(),
+    },
+  ];
+
+  return (
+    <Layout style={{ minHeight: '100vh' }}>
+      <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Title level={3} style={{ margin: 0 }}>SUPERADMIN Dashboard</Title>
+        <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
+          Sign Out
+        </Button>
+      </Header>
+      <Content style={{ padding: '24px' }}>
+        <Row gutter={[24, 24]}>
           {/* Create QAUTHOR Section */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">
-              Create QAUTHOR Account
-            </h2>
-            
-            {createError && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                {createError}
-              </div>
-            )}
-            
-            {createSuccess && (
-              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-                {createSuccess}
-              </div>
-            )}
-            
-            <form onSubmit={handleCreateQAUTHOR}>
-              <div className="mb-4">
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={newAuthorEmail}
-                  onChange={(e) => setNewAuthorEmail(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  required
+          <Col xs={24} lg={12}>
+            <Card title="Create QAUTHOR Account" bordered={false}>
+              {createError && (
+                <Alert 
+                  message={createError} 
+                  type="error" 
+                  showIcon 
+                  style={{ marginBottom: 16 }}
                 />
-              </div>
+              )}
               
-              <div className="mb-4">
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={newAuthorPassword}
-                  onChange={(e) => setNewAuthorPassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  required
-                  minLength={6}
+              {createSuccess && (
+                <Alert 
+                  message={createSuccess} 
+                  type="success" 
+                  showIcon 
+                  style={{ marginBottom: 16 }}
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  Password must be at least 6 characters.
-                </p>
-              </div>
+              )}
               
-              <button
-                type="submit"
-                disabled={creatingAuthor}
-                className="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+              <Form
+                form={form}
+                layout="vertical"
+                onFinish={handleCreateQAUTHOR}
               >
-                {creatingAuthor ? 'Creating...' : 'Create QAUTHOR'}
-              </button>
-            </form>
-          </div>
+                <Form.Item
+                  name="email"
+                  label="Email"
+                  rules={[
+                    { required: true, message: 'Please input an email!' },
+                    { type: 'email', message: 'Please enter a valid email' }
+                  ]}
+                >
+                  <Input 
+                    prefix={<MailOutlined />} 
+                    placeholder="Email address" 
+                  />
+                </Form.Item>
+                
+                <Form.Item
+                  name="password"
+                  label="Password"
+                  rules={[
+                    { required: true, message: 'Please input a password!' },
+                    { min: 6, message: 'Password must be at least 6 characters' }
+                  ]}
+                  extra="Password must be at least 6 characters."
+                >
+                  <Input.Password 
+                    prefix={<LockOutlined />} 
+                    placeholder="Password" 
+                  />
+                </Form.Item>
+                
+                <Form.Item>
+                  <Button 
+                    type="primary" 
+                    htmlType="submit" 
+                    loading={creatingAuthor}
+                    block
+                  >
+                    Create QAUTHOR
+                  </Button>
+                </Form.Item>
+              </Form>
+            </Card>
+          </Col>
           
           {/* User Management Section */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">
-              User Management
-            </h2>
-            
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Role
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Created At
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {users.length > 0 ? (
-                    users.map((user) => (
-                      <tr key={user.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {user.email}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            user.role === 'SUPERADMIN' ? 'bg-purple-100 text-purple-800' :
-                            user.role === 'QAUTHOR' ? 'bg-blue-100 text-blue-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {user.role}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(user.createdAt).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">
-                        No users found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          <Col xs={24} lg={12}>
+            <Card title="User Management" bordered={false}>
+              <Table 
+                dataSource={users} 
+                columns={columns} 
+                rowKey="id"
+                pagination={{ pageSize: 10 }}
+                locale={{ emptyText: "No users found" }}
+              />
+            </Card>
+          </Col>
+        </Row>
+      </Content>
+    </Layout>
   );
 } 

@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { AntdRegistry } from '@ant-design/nextjs-registry';
+import { ConfigProvider } from 'antd';
+import theme from '@/theme/themeConfig';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,11 +35,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gray-50`}
       >
-        <AuthProvider>
-          <div className="min-h-screen">
-            {children}
-          </div>
-        </AuthProvider>
+        <AntdRegistry>
+          <ConfigProvider theme={theme}>
+            <AuthProvider>
+              <div className="min-h-screen">
+                {children}
+              </div>
+            </AuthProvider>
+          </ConfigProvider>
+        </AntdRegistry>
       </body>
     </html>
   );

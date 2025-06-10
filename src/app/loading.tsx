@@ -1,8 +1,23 @@
+'use client';
+
+import { Spin, Typography } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
+
+const { Text } = Typography;
+
 export default function Loading() {
+  const antIcon = <LoadingOutlined style={{ fontSize: 40 }} spin />;
+  
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center">
-      <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div>
-      <p className="mt-4 text-gray-600">Loading...</p>
+    <div style={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center' 
+    }}>
+      <Spin indicator={antIcon} />
+      <Text style={{ marginTop: 16 }}>Loading...</Text>
     </div>
   );
 } 

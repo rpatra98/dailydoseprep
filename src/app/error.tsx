@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { Result, Button, Space } from 'antd';
+import { ExclamationCircleOutlined } from '@ant-design/icons';
 
 export default function Error({
   error,
@@ -16,27 +18,28 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <div className="bg-white shadow-md rounded-lg p-6 max-w-md w-full">
-        <h1 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h1>
-        <p className="text-gray-700 mb-6">
-          {error.message || 'An unexpected error occurred. Please try again later.'}
-        </p>
-        <div className="flex space-x-4">
-          <button
-            onClick={reset}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-          >
-            Try again
-          </button>
-          <Link
-            href="/"
-            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-          >
-            Return home
-          </Link>
-        </div>
-      </div>
+    <div style={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      padding: '24px' 
+    }}>
+      <Result
+        status="error"
+        title="Something went wrong"
+        subTitle={error.message || 'An unexpected error occurred. Please try again later.'}
+        extra={
+          <Space>
+            <Button type="primary" onClick={reset}>
+              Try again
+            </Button>
+            <Link href="/" passHref>
+              <Button>Return home</Button>
+            </Link>
+          </Space>
+        }
+      />
     </div>
   );
 } 
