@@ -103,14 +103,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
+      // Make sure we have a session before attempting to sign out
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      if (!sessionData.session) {
+        console.log('No active session found, clearing user state');
+        setUser(null);
+        return;
+      }
+      
       const { error } = await supabase.auth.signOut();
       if (error) {
         setError(error.message);
+        console.error('Logout error:', error);
         throw error;
       }
+      
+      setUser(null);
     } catch (error) {
       console.error('Logout error:', error);
-      throw error;
+      // Even if there's an error, try to clean up the local state
+      setUser(null);
     } finally {
       setLoading(false);
     }

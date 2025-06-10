@@ -63,6 +63,19 @@ export async function POST(request: Request) {
       );
     }
     
+    // Verify that the role was set correctly
+    const { data: verifyData, error: verifyError } = await supabaseAdmin
+      .from('users')
+      .select('role')
+      .eq('id', data.user.id)
+      .single();
+      
+    if (verifyError || verifyData?.role !== 'QAUTHOR') {
+      console.error('Role verification failed:', verifyError || 'Role not set to QAUTHOR');
+    } else {
+      console.log('QAUTHOR role verified for user:', data.user.id);
+    }
+    
     return NextResponse.json({ 
       success: true, 
       userId: data.user.id 

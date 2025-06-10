@@ -89,6 +89,9 @@ export default function Dashboard() {
             setUsers(usersData);
           }
         }
+        
+        // Log for debugging
+        console.log('User role set to:', userData.role);
       }
     }
 
@@ -144,8 +147,16 @@ export default function Dashboard() {
   };
 
   const handleSignOut = async () => {
-    await logout();
-    router.push('/login');
+    try {
+      console.log('Attempting to sign out');
+      await logout();
+      console.log('Sign out successful, redirecting to login');
+      router.push('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      // Even if there's an error, try to redirect to login page
+      router.push('/login');
+    }
   };
 
   // If not logged in, don't render anything (will redirect in useEffect)
@@ -178,7 +189,7 @@ export default function Dashboard() {
     return (
       <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Title level={3} style={{ margin: 0 }}>Dashboard</Title>
+          <Title level={3} style={{ margin: 0 }}>{userRole === 'QAUTHOR' ? 'QAUTHOR Dashboard' : 'Student Dashboard'}</Title>
           <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
             Sign Out
           </Button>
