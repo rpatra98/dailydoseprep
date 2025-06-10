@@ -81,11 +81,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
+      // Check if this is potentially a QAUTHOR trying to log in
+      const { data: possibleQAuthor, error: qaCheckError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('email', email)
+        .single();
+      
+      if (qaCheckError && qaCheckError.code !== 'PGRST116') { // PGRST116 = Not found
+        console.warn('Error checking if user might be QAUTHOR:', qaCheckError);
+      }
+      
+      const mightBeQAuthor = possibleQAuthor?.role === 'QAUTHOR';
+      
+      // Standard login attempt
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       
+      // Handle specific error for email confirmation
       if (error) {
-        setError(error.message);
-        throw error;
+        if (error.message === 'Email not confirmed' && mightBeQAuthor) {
+          console.log('QAUTHOR with unconfirmed email, attempting admin verification...');
+          
+          // Try to handle this through admin API for QAUTHORs
+          const response = await fetch('/api/admin/verify-qauthor', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email }),
+          });
+          
+          if (response.ok) {
+            // Try logging in again after verification
+            const retryLogin = await supabase.auth.signInWithPassword({ email, password });
+            if (retryLogin.error) {
+              setError(retryLogin.error.message);
+              throw retryLogin.error;
+            }
+            return;
+          } else {
+            // If admin verification fails, fall back to the original error
+            setError(error.message);
+            throw error;
+          }
+        } else {
+          setError(error.message);
+          throw error;
+        }
       }
       
       // We don't need to manually set the user here as the onAuthStateChange 

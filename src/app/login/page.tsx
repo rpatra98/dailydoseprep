@@ -45,8 +45,12 @@ export default function LoginPage() {
       setIsSubmitting(true);
       await login(email, password);
       // Successful login will trigger the useEffect to redirect
-    } catch {
-      setLocalError('Invalid email or password');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Email not confirmed')) {
+        setLocalError('Account email not confirmed. If you are a QAUTHOR, please contact the SUPERADMIN.');
+      } else {
+        setLocalError('Invalid email or password');
+      }
     } finally {
       setIsSubmitting(false);
     }

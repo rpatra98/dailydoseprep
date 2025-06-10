@@ -27,6 +27,8 @@ export async function POST(request: Request) {
       }
     );
     
+    console.log(`Creating QAUTHOR account for ${email}`);
+    
     // Create user without email confirmation
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -41,6 +43,19 @@ export async function POST(request: Request) {
         { error: error?.message || 'Failed to create QAUTHOR account' },
         { status: 500 }
       );
+    }
+    
+    console.log('QAUTHOR account created successfully, confirming email status...');
+    
+    // Verify and explicitly update email confirmation status
+    const { error: confirmError } = await supabaseAdmin.auth.admin.updateUserById(
+      data.user.id,
+      { email_confirm: true }
+    );
+    
+    if (confirmError) {
+      console.error('Error confirming email:', confirmError);
+      // Continue anyway as this is a secondary operation
     }
     
     // Set the user role in our custom users table
@@ -74,6 +89,21 @@ export async function POST(request: Request) {
       console.error('Role verification failed:', verifyError || 'Role not set to QAUTHOR');
     } else {
       console.log('QAUTHOR role verified for user:', data.user.id);
+    }
+    
+    // Double-check user's auth status
+    const { data: userCheck, error: userCheckError } = await supabaseAdmin.auth.admin.getUserById(data.user.id);
+    
+    if (userCheckError) {
+      console.error('Error checking user status:', userCheckError);
+    } else {
+      console.log('User status check:', {
+        id: userCheck.user.id,
+        email: userCheck.user.email,
+        emailConfirmed: userCheck.user.email_confirmed_at,
+        role: userCheck.user.role,
+        userMetadata: userCheck.user.user_metadata
+      });
     }
     
     return NextResponse.json({ 
