@@ -46,6 +46,6 @@ export interface AuthContextType {
     error: string | null;
     login: (email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
-    createQAUTHOR: (email: string, password: string) => Promise<void>;
-    registerStudent: (email: string, password: string) => Promise<void>;
+    createQAUTHOR: (email: string, password: string) => Promise<string>;
+    registerStudent: (email: string, password: string) => Promise<string>;
 } 

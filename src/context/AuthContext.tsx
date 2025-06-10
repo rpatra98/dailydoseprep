@@ -139,25 +139,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Only SUPERADMIN can create QAUTHOR accounts');
       }
 
-      // Create the QAUTHOR account
-      const { data: { user: newUser }, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
+      // Use the admin API to create the QAUTHOR account via our server endpoint
+      const response = await fetch('/api/admin/create-qauthor', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (signUpError) throw signUpError;
-      if (!newUser?.id) throw new Error('Failed to create user');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create QAUTHOR account');
+      }
 
-      // Set the user role as QAUTHOR
-      const { error: roleError } = await supabase
-        .from('users')
-        .insert({ 
-          id: newUser.id,
-          email: newUser.email,
-          role: 'QAUTHOR',
-        });
+      const { userId } = await response.json();
 
-      if (roleError) throw roleError;
+      if (!userId) {
+        throw new Error('Failed to create user');
+      }
+
+      return userId;
     } catch (error) {
       console.error('Create QAUTHOR error:', error);
       throw error;
@@ -171,9 +173,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
+      // Create the student account with standard signup flow
+      // For students, we do want email confirmation as per security best practices
       const { data: { user: newUser }, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            role: 'STUDENT'
+          }
+        }
       });
 
       if (signUpError) throw signUpError;
@@ -189,6 +199,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
 
       if (roleError) throw roleError;
+      
+      return newUser.id;
     } catch (error) {
       console.error('Register student error:', error);
       throw error;
