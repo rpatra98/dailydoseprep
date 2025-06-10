@@ -7,7 +7,7 @@ interface AspectRatioLayoutProps {
 }
 
 /**
- * A component that wraps content in a 3:2 aspect ratio container
+ * A component that wraps content in a 7:5 aspect ratio container
  */
 const AspectRatioLayout: React.FC<AspectRatioLayoutProps> = ({ children }) => {
   return (

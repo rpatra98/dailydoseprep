@@ -28,11 +28,11 @@ export default function Home() {
       </Header>
 
       <Content style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 64px - 70px)', overflow: 'visible' }}>
-        {/* Hero Section - adjusted for 3:2 ratio with more vertical space */}
+        {/* Hero Section - adjusted for 7:5 ratio with more vertical space */}
         <div style={{ 
-          flex: '3', 
+          flex: '5', 
           textAlign: 'center', 
-          padding: '60px 50px', 
+          padding: '50px 50px', 
           background: 'linear-gradient(to bottom, #f5f5f5, #fff)', 
           display: 'flex', 
           flexDirection: 'column', 
@@ -53,8 +53,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Features Section - adjusted to take up less vertical space */}
-        <div style={{ flex: '2', padding: '40px 50px', background: '#f7f7f7' }}>
+        {/* Features Section - adjusted for 7:5 aspect ratio */}
+        <div style={{ flex: '7', padding: '40px 50px', background: '#f7f7f7' }}>
           <Title level={2} style={{ textAlign: 'center', marginBottom: '32px' }}>
             Why Choose Daily Dose Prep?
           </Title>

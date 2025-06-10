@@ -339,7 +339,7 @@ export default function Dashboard() {
                 rowKey="id"
                 pagination={{ pageSize: 8 }}
                 locale={{ emptyText: "No users found" }}
-                scroll={{ y: 'calc(100vh - 350px)' }}
+                scroll={{ y: 'calc(80vh * 5/7 - 250px)' }}
                 size="middle"
               />
             </Card>
