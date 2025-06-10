@@ -51,7 +51,8 @@ export default function LoginPage() {
       display: 'flex', 
       justifyContent: 'center', 
       alignItems: 'center', 
-      background: '#f0f2f5'
+      background: '#f0f2f5',
+      overflow: 'visible'
     }}>
       <Card style={{ width: 400, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>

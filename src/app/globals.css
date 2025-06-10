@@ -51,10 +51,25 @@ body {
   max-height: 1200px; /* Maximum height for 3:2 at 1800px width */
   aspect-ratio: 3 / 2;
   position: relative;
-  overflow: auto;
+  overflow: auto; /* Only show scrollbars when needed */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   background-color: #fff;
   margin: 0 auto;
+}
+
+/* Custom scrollbar for better aesthetics */
+.aspect-ratio-content::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.aspect-ratio-content::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.aspect-ratio-content::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* Make sure the aspect ratio is maintained on smaller screens */

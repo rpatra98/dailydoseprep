@@ -8,7 +8,7 @@ const { Title, Text, Paragraph } = Typography;
 
 export default function Home() {
   return (
-    <Layout style={{ height: '100%', overflow: 'auto' }}>
+    <Layout style={{ height: '100%', overflow: 'visible' }}>
       <Header style={{ background: '#fff', padding: '0 50px', borderBottom: '1px solid #f0f0f0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
           <div>
@@ -27,7 +27,7 @@ export default function Home() {
         </div>
       </Header>
 
-      <Content style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 64px - 70px)' }}>
+      <Content style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 64px - 70px)', overflow: 'visible' }}>
         {/* Hero Section - adjusted for 3:2 ratio with more vertical space */}
         <div style={{ 
           flex: '3', 

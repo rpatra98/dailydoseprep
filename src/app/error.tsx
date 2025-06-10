@@ -21,7 +21,8 @@ export default function Error({
       height: '100%', 
       display: 'flex', 
       alignItems: 'center', 
-      justifyContent: 'center'
+      justifyContent: 'center',
+      overflow: 'visible'
     }}>
       <Result
         status="error"

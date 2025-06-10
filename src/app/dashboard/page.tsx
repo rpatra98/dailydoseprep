@@ -259,7 +259,7 @@ export default function Dashboard() {
           Sign Out
         </Button>
       </Header>
-      <Content style={{ padding: '24px', height: 'calc(100% - 64px)', overflow: 'auto' }}>
+      <Content style={{ padding: '24px', height: 'calc(100% - 64px)', overflow: 'visible' }}>
         <Row gutter={[24, 24]}>
           {/* Create QAUTHOR Section */}
           <Col xs={24} lg={12}>
@@ -339,7 +339,7 @@ export default function Dashboard() {
                 rowKey="id"
                 pagination={{ pageSize: 8 }}
                 locale={{ emptyText: "No users found" }}
-                scroll={{ y: 500 }}
+                scroll={{ y: 'calc(100vh - 350px)' }}
                 size="middle"
               />
             </Card>

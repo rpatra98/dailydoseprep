@@ -14,7 +14,8 @@ export default function Loading() {
       display: 'flex', 
       flexDirection: 'column', 
       alignItems: 'center', 
-      justifyContent: 'center' 
+      justifyContent: 'center',
+      overflow: 'visible'
     }}>
       <Spin indicator={antIcon} />
       <Text style={{ marginTop: 16 }}>Loading...</Text>
