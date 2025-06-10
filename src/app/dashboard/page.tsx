@@ -153,14 +153,14 @@ export default function Dashboard() {
   // If role not fetched yet, render minimal content with loading indicator
   if (!userRole) {
     return (
-      <Layout style={{ height: '100%' }}>
+      <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Title level={3} style={{ margin: 0 }}>Dashboard</Title>
           <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
             Sign Out
           </Button>
         </Header>
-        <Content style={{ padding: '24px', height: 'calc(100% - 64px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Card style={{ textAlign: 'center' }}>
             <Spin tip="Loading user data..." />
             <Paragraph style={{ marginTop: 16 }}>Welcome, {user.email}</Paragraph>
@@ -173,14 +173,14 @@ export default function Dashboard() {
   // User role-specific dashboard
   if (userRole !== 'SUPERADMIN') {
     return (
-      <Layout style={{ height: '100%' }}>
+      <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Title level={3} style={{ margin: 0 }}>Dashboard</Title>
           <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
             Sign Out
           </Button>
         </Header>
-        <Content style={{ padding: '24px', height: 'calc(100% - 64px)', overflow: 'auto' }}>
+        <Content style={{ padding: '24px', flex: 1 }}>
           <Card>
             <Title level={4}>Welcome, {user.email}</Title>
             <Paragraph>
@@ -252,14 +252,14 @@ export default function Dashboard() {
   ];
 
   return (
-    <Layout style={{ height: '100%' }}>
+    <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Title level={3} style={{ margin: 0 }}>SUPERADMIN Dashboard</Title>
         <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
           Sign Out
         </Button>
       </Header>
-      <Content style={{ padding: '24px', height: 'calc(100% - 64px)', overflow: 'visible' }}>
+      <Content style={{ padding: '24px', flex: 1 }}>
         <Row gutter={[24, 24]}>
           {/* Create QAUTHOR Section */}
           <Col xs={24} lg={12}>
@@ -339,7 +339,7 @@ export default function Dashboard() {
                 rowKey="id"
                 pagination={{ pageSize: 8 }}
                 locale={{ emptyText: "No users found" }}
-                scroll={{ y: 'calc(80vh * 5/7 - 250px)' }}
+                scroll={{ y: 320 }}
                 size="middle"
               />
             </Card>

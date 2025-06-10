@@ -8,7 +8,7 @@ const { Title, Text, Paragraph } = Typography;
 
 export default function Home() {
   return (
-    <Layout style={{ height: '100%', overflow: 'visible' }}>
+    <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Header style={{ background: '#fff', padding: '0 50px', borderBottom: '1px solid #f0f0f0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
           <div>
@@ -27,16 +27,15 @@ export default function Home() {
         </div>
       </Header>
 
-      <Content style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 64px - 70px)', overflow: 'visible' }}>
-        {/* Hero Section - adjusted for 7:5 ratio with more vertical space */}
+      <Content style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Hero Section */}
         <div style={{ 
-          flex: '5', 
-          textAlign: 'center', 
-          padding: '50px 50px', 
+          padding: '40px 50px', 
           background: 'linear-gradient(to bottom, #f5f5f5, #fff)', 
           display: 'flex', 
           flexDirection: 'column', 
-          justifyContent: 'center' 
+          justifyContent: 'center',
+          textAlign: 'center'
         }}>
           <Title style={{ fontSize: '2.5rem', marginBottom: '24px' }}>
             Prepare for your competitive exams
@@ -53,8 +52,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Features Section - adjusted for 7:5 aspect ratio */}
-        <div style={{ flex: '7', padding: '40px 50px', background: '#f7f7f7' }}>
+        {/* Features Section */}
+        <div style={{ padding: '40px 50px', background: '#f7f7f7', flex: 1 }}>
           <Title level={2} style={{ textAlign: 'center', marginBottom: '32px' }}>
             Why Choose Daily Dose Prep?
           </Title>
@@ -84,7 +83,7 @@ export default function Home() {
         </div>
       </Content>
 
-      <Footer style={{ textAlign: 'center', background: '#fff', height: '70px', padding: '24px' }}>
+      <Footer style={{ textAlign: 'center', background: '#fff', padding: '16px' }}>
         <Text type="secondary">© 2024 Daily Dose Prep. All rights reserved.</Text>
       </Footer>
     </Layout>

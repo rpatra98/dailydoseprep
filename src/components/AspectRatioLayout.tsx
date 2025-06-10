@@ -8,6 +8,7 @@ interface AspectRatioLayoutProps {
 
 /**
  * A component that wraps content in a 7:5 aspect ratio container
+ * with optimized layout to prevent unnecessary scrolling
  */
 const AspectRatioLayout: React.FC<AspectRatioLayoutProps> = ({ children }) => {
   return (
