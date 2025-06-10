@@ -13,7 +13,7 @@ interface Todo {
 }
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTask, setNewTask] = useState('');
@@ -106,7 +106,7 @@ export default function Dashboard() {
   };
 
   const handleSignOut = async () => {
-    await signOut();
+    await logout();
     router.push('/auth');
   };
 
