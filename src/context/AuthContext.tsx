@@ -14,6 +14,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const setData = async () => {
       try {
+        setError(null);
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
@@ -76,26 +77,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+    
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      
+      if (error) {
+        setError(error.message);
+        throw error;
+      }
+      
+      // We don't need to manually set the user here as the onAuthStateChange 
+      // event will handle setting the user after successful authentication
     } catch (error) {
       console.error('Login error:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      if (error) {
+        setError(error.message);
+        throw error;
+      }
     } catch (error) {
       console.error('Logout error:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const createQAUTHOR = async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+    
     try {
       const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
@@ -137,10 +161,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Create QAUTHOR error:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const registerStudent = async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+    
     try {
       const { data: { user: newUser }, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -163,6 +192,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Register student error:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
