@@ -35,7 +35,7 @@ body {
   background: #f5f5f5;
 }
 
-/* 16:9 Aspect Ratio Container */
+/* 3:2 Aspect Ratio Container */
 .aspect-ratio-container {
   display: flex;
   justify-content: center;
@@ -47,9 +47,9 @@ body {
 
 .aspect-ratio-content {
   width: 100%;
-  max-width: 1920px; /* Maximum width for the content */
-  max-height: 1080px; /* Maximum height for 16:9 at 1920px width */
-  aspect-ratio: 16 / 9;
+  max-width: 1800px; /* Maximum width for the content */
+  max-height: 1200px; /* Maximum height for 3:2 at 1800px width */
+  aspect-ratio: 3 / 2;
   position: relative;
   overflow: auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -61,7 +61,7 @@ body {
 @media (max-width: 1200px) {
   .aspect-ratio-content {
     max-width: 90vw;
-    max-height: calc(90vw * 9 / 16);
+    max-height: calc(90vw * 2 / 3);
   }
 }
 
@@ -69,6 +69,6 @@ body {
 @media (max-width: 600px) {
   .aspect-ratio-content {
     max-width: 95vw;
-    max-height: calc(95vw * 9 / 16);
+    max-height: calc(95vw * 2 / 3);
   }
 }

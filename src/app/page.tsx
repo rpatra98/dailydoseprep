@@ -28,12 +28,20 @@ export default function Home() {
       </Header>
 
       <Content style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 64px - 70px)' }}>
-        {/* Hero Section */}
-        <div style={{ flex: '1', textAlign: 'center', padding: '40px 50px', background: 'linear-gradient(to bottom, #f5f5f5, #fff)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <Title style={{ fontSize: '2.5rem', marginBottom: '16px' }}>
+        {/* Hero Section - adjusted for 3:2 ratio with more vertical space */}
+        <div style={{ 
+          flex: '3', 
+          textAlign: 'center', 
+          padding: '60px 50px', 
+          background: 'linear-gradient(to bottom, #f5f5f5, #fff)', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          justifyContent: 'center' 
+        }}>
+          <Title style={{ fontSize: '2.5rem', marginBottom: '24px' }}>
             Prepare for your competitive exams
           </Title>
-          <Paragraph style={{ fontSize: '1.1rem', maxWidth: '800px', margin: '0 auto 24px' }}>
+          <Paragraph style={{ fontSize: '1.1rem', maxWidth: '800px', margin: '0 auto 32px' }}>
             Daily Dose Prep helps you ace your UPSC, JEE, NEET, SSC and other competitive exams with thousands of practice questions.
           </Paragraph>
           <div>
@@ -45,9 +53,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Features Section */}
-        <div style={{ padding: '40px 50px', background: '#f7f7f7' }}>
-          <Title level={2} style={{ textAlign: 'center', marginBottom: '40px' }}>
+        {/* Features Section - adjusted to take up less vertical space */}
+        <div style={{ flex: '2', padding: '40px 50px', background: '#f7f7f7' }}>
+          <Title level={2} style={{ textAlign: 'center', marginBottom: '32px' }}>
             Why Choose Daily Dose Prep?
           </Title>
           

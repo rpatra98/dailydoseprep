@@ -263,7 +263,7 @@ export default function Dashboard() {
         <Row gutter={[24, 24]}>
           {/* Create QAUTHOR Section */}
           <Col xs={24} lg={12}>
-            <Card title="Create QAUTHOR Account" bordered={false}>
+            <Card title="Create QAUTHOR Account" bordered={false} style={{ height: '100%' }}>
               {createError && (
                 <Alert 
                   message={createError} 
@@ -332,14 +332,15 @@ export default function Dashboard() {
           
           {/* User Management Section */}
           <Col xs={24} lg={12}>
-            <Card title="User Management" bordered={false}>
+            <Card title="User Management" bordered={false} style={{ height: '100%' }}>
               <Table 
                 dataSource={users} 
                 columns={columns} 
                 rowKey="id"
-                pagination={{ pageSize: 10 }}
+                pagination={{ pageSize: 8 }}
                 locale={{ emptyText: "No users found" }}
-                scroll={{ y: 400 }}
+                scroll={{ y: 500 }}
+                size="middle"
               />
             </Card>
           </Col>
