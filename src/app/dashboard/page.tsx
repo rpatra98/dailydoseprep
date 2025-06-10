@@ -86,7 +86,7 @@ export default function Dashboard() {
           }
           
           if (usersData) {
-            setUsers(usersData as User[]);
+            setUsers(usersData);
           }
         }
       }
@@ -110,7 +110,7 @@ export default function Dashboard() {
     }
     
     if (data) {
-      setUsers(data as User[]);
+      setUsers(data);
     }
   };
 
@@ -248,9 +248,9 @@ export default function Dashboard() {
     },
     {
       title: 'Created At',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (date: string) => new Date(date).toLocaleDateString(),
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (date: string) => date ? new Date(date).toLocaleDateString() : 'N/A',
     },
   ];
 

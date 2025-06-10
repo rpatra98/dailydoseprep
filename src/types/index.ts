@@ -7,8 +7,8 @@ export interface User {
     id: string;
     email: string;
     role: UserRole;
-    createdAt: Date;
-    updatedAt: Date;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface Question {
