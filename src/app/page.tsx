@@ -84,7 +84,7 @@ export default function Home() {
       </Content>
 
       <Footer style={{ textAlign: 'center', background: '#fff', padding: '16px' }}>
-        <Text type="secondary">© 2024 Daily Dose Prep. All rights reserved.</Text>
+        <Text type="secondary">© 2025 Daily Dose Prep. All rights reserved.</Text>
       </Footer>
     </Layout>
   );
