@@ -4,121 +4,179 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/utils/supabase';
-
-interface Todo {
-  id: string;
-  task: string;
-  is_complete: boolean;
-  created_at: string;
-}
+import { User, UserRole } from '@/types';
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user, logout, createQAUTHOR } = useAuth();
   const router = useRouter();
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [newTask, setNewTask] = useState('');
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  
+  // For creating new QAUTHOR
+  const [newAuthorEmail, setNewAuthorEmail] = useState('');
+  const [newAuthorPassword, setNewAuthorPassword] = useState('');
+  const [creatingAuthor, setCreatingAuthor] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [createSuccess, setCreateSuccess] = useState('');
 
   useEffect(() => {
     if (!user) {
-      router.push('/auth');
-    } else {
-      fetchTodos();
+      router.push('/login');
+      return;
     }
+
+    // Fetch user role and data
+    const fetchUserRole = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+        
+        if (data) {
+          setUserRole(data.role as UserRole);
+          
+          // If SUPERADMIN, fetch all users
+          if (data.role === 'SUPERADMIN') {
+            fetchUsers();
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user role:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserRole();
   }, [user, router]);
 
-  const fetchTodos = async () => {
+  const fetchUsers = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
-        .from('todos')
+        .from('users')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      if (data) setTodos(data);
+      if (data) setUsers(data as User[]);
     } catch (error) {
-      console.error('Error fetching todos:', error);
-      alert('Error fetching todos!');
-    } finally {
-      setLoading(false);
+      console.error('Error fetching users:', error);
     }
   };
 
-  const addTodo = async (e: React.FormEvent) => {
+  const handleCreateQAUTHOR = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTask.trim()) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('todos')
-        .insert([{ task: newTask, user_id: user?.id }])
-        .select();
-
-      if (error) throw error;
-      if (data) {
-        setTodos([...data, ...todos]);
-        setNewTask('');
-      }
-    } catch (error) {
-      console.error('Error adding todo:', error);
-      alert('Error adding todo!');
+    setCreateError('');
+    setCreateSuccess('');
+    
+    if (!newAuthorEmail || !newAuthorPassword) {
+      setCreateError('Email and password are required');
+      return;
     }
-  };
 
-  const toggleTodoCompletion = async (id: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('todos')
-        .update({ is_complete: !currentStatus })
-        .eq('id', id);
-
-      if (error) throw error;
+      setCreatingAuthor(true);
+      await createQAUTHOR(newAuthorEmail, newAuthorPassword);
+      setCreateSuccess(`QAUTHOR account created for ${newAuthorEmail}`);
+      setNewAuthorEmail('');
+      setNewAuthorPassword('');
       
-      setTodos(
-        todos.map((todo) => {
-          if (todo.id === id) {
-            return { ...todo, is_complete: !currentStatus };
-          }
-          return todo;
-        })
-      );
+      // Refresh user list
+      fetchUsers();
     } catch (error) {
-      console.error('Error updating todo:', error);
-      alert('Error updating todo!');
-    }
-  };
-
-  const deleteTodo = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('todos')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      
-      setTodos(todos.filter((todo) => todo.id !== id));
-    } catch (error) {
-      console.error('Error deleting todo:', error);
-      alert('Error deleting todo!');
+      console.error('Error creating QAUTHOR:', error);
+      setCreateError(error instanceof Error ? error.message : 'Failed to create QAUTHOR');
+    } finally {
+      setCreatingAuthor(false);
     }
   };
 
   const handleSignOut = async () => {
     await logout();
-    router.push('/auth');
+    router.push('/login');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-xl text-gray-600">Loading...</p>
+      </div>
+    );
+  }
 
   if (!user) {
     return null; // will redirect in useEffect
   }
 
+  // If user is not SUPERADMIN, show limited dashboard
+  if (userRole !== 'SUPERADMIN') {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <button
+              onClick={handleSignOut}
+              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            >
+              Sign Out
+            </button>
+          </div>
+          
+          <div className="mt-8 bg-white shadow rounded-lg p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">
+              Welcome, {user.email}
+            </h2>
+            <p className="text-gray-600">
+              Your role: {userRole}
+            </p>
+
+            {userRole === 'QAUTHOR' && (
+              <div className="mt-6">
+                <h3 className="text-md font-medium text-gray-700 mb-3">QAUTHOR Features</h3>
+                <p className="text-gray-600 mb-4">
+                  As a QAUTHOR, you can create questions for students to practice.
+                </p>
+                <button
+                  onClick={() => router.push('/questions/create')}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                >
+                  Create Questions
+                </button>
+              </div>
+            )}
+
+            {userRole === 'STUDENT' && (
+              <div className="mt-6">
+                <h3 className="text-md font-medium text-gray-700 mb-3">Student Features</h3>
+                <p className="text-gray-600 mb-4">
+                  As a student, you can practice questions from various competitive exams.
+                </p>
+                <button
+                  onClick={() => router.push('/practice')}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                >
+                  Practice Questions
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // SUPERADMIN Dashboard
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900">SUPERADMIN Dashboard</h1>
           <button
             onClick={handleSignOut}
             className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
@@ -127,64 +185,120 @@ export default function Dashboard() {
           </button>
         </div>
         
-        <div className="mt-8 bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Welcome, {user.email}</h2>
-          
-          <form onSubmit={addTodo} className="flex mb-6">
-            <input
-              type="text"
-              value={newTask}
-              onChange={(e) => setNewTask(e.target.value)}
-              placeholder="Add a new task..."
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              required
-            />
-            <button
-              type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            >
-              Add
-            </button>
-          </form>
-          
-          <div>
-            <h3 className="text-md font-medium text-gray-700 mb-3">Your Tasks</h3>
+        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Create QAUTHOR Section */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">
+              Create QAUTHOR Account
+            </h2>
             
-            {loading ? (
-              <p className="text-gray-500">Loading tasks...</p>
-            ) : todos.length === 0 ? (
-              <p className="text-gray-500">No tasks yet. Add one above!</p>
-            ) : (
-              <ul className="divide-y divide-gray-200">
-                {todos.map((todo) => (
-                  <li key={todo.id} className="py-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={todo.is_complete}
-                          onChange={() => toggleTodoCompletion(todo.id, todo.is_complete)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <span 
-                          className={`ml-3 ${
-                            todo.is_complete ? 'line-through text-gray-500' : 'text-gray-900'
-                          }`}
-                        >
-                          {todo.task}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => deleteTodo(todo.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+            {createError && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                {createError}
+              </div>
             )}
+            
+            {createSuccess && (
+              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+                {createSuccess}
+              </div>
+            )}
+            
+            <form onSubmit={handleCreateQAUTHOR}>
+              <div className="mb-4">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={newAuthorEmail}
+                  onChange={(e) => setNewAuthorEmail(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={newAuthorPassword}
+                  onChange={(e) => setNewAuthorPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                  minLength={6}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Password must be at least 6 characters.
+                </p>
+              </div>
+              
+              <button
+                type="submit"
+                disabled={creatingAuthor}
+                className="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+              >
+                {creatingAuthor ? 'Creating...' : 'Create QAUTHOR'}
+              </button>
+            </form>
+          </div>
+          
+          {/* User Management Section */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">
+              User Management
+            </h2>
+            
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Role
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Created At
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {users.map((user) => (
+                    <tr key={user.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {user.email}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          user.role === 'SUPERADMIN' ? 'bg-purple-100 text-purple-800' :
+                          user.role === 'QAUTHOR' ? 'bg-blue-100 text-blue-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(user.createdAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                  
+                  {users.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">
+                        No users found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
