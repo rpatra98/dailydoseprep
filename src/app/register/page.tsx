@@ -1,23 +1,32 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { Form, Input, Button, Card, Typography, Alert } from 'antd';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 
+const { Title, Text } = Typography;
+
 export default function RegisterPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [form] = Form.useForm();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { registerStudent } = useAuth();
+  const { user, registerStudent } = useAuth();
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      router.push('/dashboard');
+    }
+  }, [user, router]);
+
+  const handleSubmit = async (values: { email: string; password: string; confirmPassword: string }) => {
+    const { email, password, confirmPassword } = values;
     setError('');
     setSuccess('');
     
@@ -27,14 +36,8 @@ export default function RegisterPage() {
       return;
     }
     
-    // Validate password strength
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-    
     try {
-      setLoading(true);
+      setIsSubmitting(true);
       await registerStudent(email, password);
       setSuccess('Registration successful! You can now log in.');
       // After successful registration, redirect to login page after a delay
@@ -44,100 +47,118 @@ export default function RegisterPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
-              sign in to your existing account
-            </Link>
-          </p>
+    <div style={{ 
+      height: '100%', 
+      display: 'flex', 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      background: '#f0f2f5',
+      overflow: 'visible'
+    }}>
+      <Card style={{ width: 400, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <Title level={2}>Create your account</Title>
+          <Text type="secondary">
+            Or <Link href="/login" style={{ color: '#1677ff' }}>sign in to your existing account</Link>
+          </Text>
         </div>
         
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-            <span className="block sm:inline">{error}</span>
-          </div>
+          <Alert
+            message={error}
+            type="error"
+            showIcon
+            style={{ marginBottom: 24 }}
+          />
         )}
         
         {success && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-            <span className="block sm:inline">{success}</span>
-          </div>
+          <Alert
+            message={success}
+            type="success"
+            showIcon
+            style={{ marginBottom: 24 }}
+          />
         )}
         
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email-address" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email-address"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="confirm-password" className="sr-only">
-                Confirm Password
-              </label>
-              <input
-                id="confirm-password"
-                name="confirm-password"
-                type="password"
-                autoComplete="new-password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Confirm Password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        <Form
+          form={form}
+          name="register"
+          onFinish={handleSubmit}
+          layout="vertical"
+          requiredMark={false}
+        >
+          <Form.Item
+            name="email"
+            rules={[
+              { required: true, message: 'Please input your email!' },
+              { type: 'email', message: 'Please enter a valid email address' }
+            ]}
+          >
+            <Input 
+              prefix={<UserOutlined />} 
+              placeholder="Email address" 
+              size="large"
+              disabled={isSubmitting}
+            />
+          </Form.Item>
+          
+          <Form.Item
+            name="password"
+            rules={[
+              { required: true, message: 'Please input your password!' },
+              { min: 6, message: 'Password must be at least 6 characters' }
+            ]}
+          >
+            <Input.Password 
+              prefix={<LockOutlined />} 
+              placeholder="Password" 
+              size="large"
+              disabled={isSubmitting}
+            />
+          </Form.Item>
+          
+          <Form.Item
+            name="confirmPassword"
+            dependencies={['password']}
+            rules={[
+              { required: true, message: 'Please confirm your password!' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('The two passwords do not match!'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password 
+              prefix={<LockOutlined />} 
+              placeholder="Confirm Password" 
+              size="large"
+              disabled={isSubmitting}
+            />
+          </Form.Item>
+          
+          <Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              size="large"
+              block
+              loading={isSubmitting}
             >
-              {loading ? 'Creating Account...' : 'Sign up'}
-            </button>
-          </div>
-        </form>
-      </div>
+              Sign up
+            </Button>
+          </Form.Item>
+        </Form>
+      </Card>
     </div>
   );
 } 
