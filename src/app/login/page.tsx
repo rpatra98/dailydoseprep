@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Form, Input, Button, Card, Typography, Alert, Grid } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, Typography, Alert, Grid, Space } from 'antd';
+import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import Link from 'next/link';
 
 const { Title } = Typography;
 const { useBreakpoint } = Grid;
@@ -58,11 +59,30 @@ export default function LoginPage() {
     <div style={{ 
       height: '100%', 
       display: 'flex', 
+      flexDirection: 'column',
       justifyContent: 'center', 
       alignItems: 'center', 
       background: '#f0f2f5',
-      overflow: 'visible'
+      overflow: 'visible',
+      position: 'relative'
     }}>
+      {/* Back button */}
+      <div style={{ 
+        position: 'absolute', 
+        top: isMobile ? 16 : 24, 
+        left: isMobile ? 16 : 24,
+      }}>
+        <Link href="/">
+          <Button 
+            icon={<ArrowLeftOutlined />} 
+            type="text"
+            size={isMobile ? "middle" : "large"}
+          >
+            Back to Home
+          </Button>
+        </Link>
+      </div>
+
       <Card style={{ 
         width: isMobile ? '100%' : 400, 
         borderRadius: isMobile ? 0 : 8, 
