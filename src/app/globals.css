@@ -34,3 +34,41 @@ body {
 .ant-layout {
   background: #f5f5f5;
 }
+
+/* 16:9 Aspect Ratio Container */
+.aspect-ratio-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.aspect-ratio-content {
+  width: 100%;
+  max-width: 1920px; /* Maximum width for the content */
+  max-height: 1080px; /* Maximum height for 16:9 at 1920px width */
+  aspect-ratio: 16 / 9;
+  position: relative;
+  overflow: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
+  margin: 0 auto;
+}
+
+/* Make sure the aspect ratio is maintained on smaller screens */
+@media (max-width: 1200px) {
+  .aspect-ratio-content {
+    max-width: 90vw;
+    max-height: calc(90vw * 9 / 16);
+  }
+}
+
+/* For extra small screens, allow scrolling but maintain ratio */
+@media (max-width: 600px) {
+  .aspect-ratio-content {
+    max-width: 95vw;
+    max-height: calc(95vw * 9 / 16);
+  }
+}

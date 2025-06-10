@@ -18,11 +18,10 @@ export default function Error({
 
   return (
     <div style={{ 
-      minHeight: '100vh', 
+      height: '100%', 
       display: 'flex', 
       alignItems: 'center', 
-      justifyContent: 'center', 
-      padding: '24px' 
+      justifyContent: 'center'
     }}>
       <Result
         status="error"

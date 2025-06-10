@@ -8,7 +8,7 @@ const { Title, Text, Paragraph } = Typography;
 
 export default function Home() {
   return (
-    <Layout className="min-h-screen">
+    <Layout style={{ height: '100%', overflow: 'auto' }}>
       <Header style={{ background: '#fff', padding: '0 50px', borderBottom: '1px solid #f0f0f0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
           <div>
@@ -27,24 +27,26 @@ export default function Home() {
         </div>
       </Header>
 
-      <Content>
+      <Content style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 64px - 70px)' }}>
         {/* Hero Section */}
-        <div style={{ textAlign: 'center', padding: '60px 50px', background: 'linear-gradient(to bottom, #f5f5f5, #fff)' }}>
+        <div style={{ flex: '1', textAlign: 'center', padding: '40px 50px', background: 'linear-gradient(to bottom, #f5f5f5, #fff)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <Title style={{ fontSize: '2.5rem', marginBottom: '16px' }}>
             Prepare for your competitive exams
           </Title>
           <Paragraph style={{ fontSize: '1.1rem', maxWidth: '800px', margin: '0 auto 24px' }}>
             Daily Dose Prep helps you ace your UPSC, JEE, NEET, SSC and other competitive exams with thousands of practice questions.
           </Paragraph>
-          <Link href="/register" passHref>
-            <Button type="primary" size="large">
-              Get Started
-            </Button>
-          </Link>
+          <div>
+            <Link href="/register" passHref>
+              <Button type="primary" size="large">
+                Get Started
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Features Section */}
-        <div style={{ padding: '60px 50px', background: '#f7f7f7' }}>
+        <div style={{ padding: '40px 50px', background: '#f7f7f7' }}>
           <Title level={2} style={{ textAlign: 'center', marginBottom: '40px' }}>
             Why Choose Daily Dose Prep?
           </Title>
@@ -74,7 +76,7 @@ export default function Home() {
         </div>
       </Content>
 
-      <Footer style={{ textAlign: 'center', background: '#fff' }}>
+      <Footer style={{ textAlign: 'center', background: '#fff', height: '70px', padding: '24px' }}>
         <Text type="secondary">© 2024 Daily Dose Prep. All rights reserved.</Text>
       </Footer>
     </Layout>

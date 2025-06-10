@@ -147,21 +147,21 @@ export default function Dashboard() {
 
   // If not logged in, don't render anything (will redirect in useEffect)
   if (!user) {
-    return <div style={{ minHeight: '100vh', background: '#f0f2f5' }}></div>;
+    return <div style={{ height: '100%', background: '#f0f2f5' }}></div>;
   }
 
   // If role not fetched yet, render minimal content with loading indicator
   if (!userRole) {
     return (
-      <Layout style={{ minHeight: '100vh' }}>
+      <Layout style={{ height: '100%' }}>
         <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Title level={3} style={{ margin: 0 }}>Dashboard</Title>
           <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
             Sign Out
           </Button>
         </Header>
-        <Content style={{ padding: '24px' }}>
-          <Card>
+        <Content style={{ padding: '24px', height: 'calc(100% - 64px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Card style={{ textAlign: 'center' }}>
             <Spin tip="Loading user data..." />
             <Paragraph style={{ marginTop: 16 }}>Welcome, {user.email}</Paragraph>
           </Card>
@@ -173,14 +173,14 @@ export default function Dashboard() {
   // User role-specific dashboard
   if (userRole !== 'SUPERADMIN') {
     return (
-      <Layout style={{ minHeight: '100vh' }}>
+      <Layout style={{ height: '100%' }}>
         <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Title level={3} style={{ margin: 0 }}>Dashboard</Title>
           <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
             Sign Out
           </Button>
         </Header>
-        <Content style={{ padding: '24px' }}>
+        <Content style={{ padding: '24px', height: 'calc(100% - 64px)', overflow: 'auto' }}>
           <Card>
             <Title level={4}>Welcome, {user.email}</Title>
             <Paragraph>
@@ -252,14 +252,14 @@ export default function Dashboard() {
   ];
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ height: '100%' }}>
       <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Title level={3} style={{ margin: 0 }}>SUPERADMIN Dashboard</Title>
         <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
           Sign Out
         </Button>
       </Header>
-      <Content style={{ padding: '24px' }}>
+      <Content style={{ padding: '24px', height: 'calc(100% - 64px)', overflow: 'auto' }}>
         <Row gutter={[24, 24]}>
           {/* Create QAUTHOR Section */}
           <Col xs={24} lg={12}>
@@ -339,6 +339,7 @@ export default function Dashboard() {
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
                 locale={{ emptyText: "No users found" }}
+                scroll={{ y: 400 }}
               />
             </Card>
           </Col>

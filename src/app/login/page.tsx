@@ -47,12 +47,11 @@ export default function LoginPage() {
 
   return (
     <div style={{ 
-      minHeight: '100vh', 
+      height: '100%', 
       display: 'flex', 
       justifyContent: 'center', 
       alignItems: 'center', 
-      background: '#f0f2f5', 
-      padding: '24px' 
+      background: '#f0f2f5'
     }}>
       <Card style={{ width: 400, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>

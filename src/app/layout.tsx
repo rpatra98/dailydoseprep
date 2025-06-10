@@ -33,13 +33,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gray-50`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AntdRegistry>
           <ConfigProvider theme={theme}>
             <AuthProvider>
-              <div className="min-h-screen">
-                {children}
+              <div className="aspect-ratio-container">
+                <div className="aspect-ratio-content">
+                  {children}
+                </div>
               </div>
             </AuthProvider>
           </ConfigProvider>
