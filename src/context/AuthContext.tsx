@@ -1,22 +1,14 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
+import { User as SupabaseUser, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/utils/supabase';
-
-type AuthContextType = {
-  user: User | null;
-  session: Session | null;
-  signUp: (email: string, password: string) => Promise<{ data: { user: User | null; session: Session | null } | null; error: AuthError | null }>;
-  signIn: (email: string, password: string) => Promise<{ data: { user: User | null; session: Session | null } | null; error: AuthError | null }>;
-  signOut: () => Promise<{ error: AuthError | null }>;
-};
+import { AuthContextType, User } from '@/types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,9 +16,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error) {
         console.error(error);
-      } else {
-        setSession(session);
-        setUser(session?.user ?? null);
+      } else if (session?.user) {
+        // Fetch user data from our users table
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (userError) {
+          console.error(userError);
+        } else {
+          setUser(userData as User);
+        }
       }
       
       setLoading(false);
@@ -34,9 +36,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setData();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        // Fetch user data from our users table
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (userError) {
+          console.error(userError);
+        } else {
+          setUser(userData as User);
+        }
+      } else {
+        setUser(null);
+      }
     });
 
     return () => {
@@ -44,14 +60,71 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  const login = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  };
+
+  const logout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+  };
+
+  const createQAUTHOR = async (email: string, password: string) => {
+    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+
+    // Check if current user is SUPERADMIN
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', currentUser?.id)
+      .single();
+
+    if (userError || userData?.role !== 'SUPERADMIN') {
+      throw new Error('Only SUPERADMIN can create QAUTHOR accounts');
+    }
+
+    // Create the QAUTHOR account
+    const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (signUpError) throw signUpError;
+
+    // Set the user role as QAUTHOR
+    const { error: roleError } = await supabase
+      .from('users')
+      .update({ role: 'QAUTHOR' })
+      .eq('id', user?.id);
+
+    if (roleError) throw roleError;
+  };
+
+  const registerStudent = async (email: string, password: string) => {
+    const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (signUpError) throw signUpError;
+
+    // Set the user role as STUDENT
+    const { error: roleError } = await supabase
+      .from('users')
+      .update({ role: 'STUDENT' })
+      .eq('id', user?.id);
+
+    if (roleError) throw roleError;
+  };
+
   const value = {
     user,
-    session,
-    signUp: (email: string, password: string) => 
-      supabase.auth.signUp({ email, password }),
-    signIn: (email: string, password: string) => 
-      supabase.auth.signInWithPassword({ email, password }),
-    signOut: () => supabase.auth.signOut(),
+    login,
+    logout,
+    createQAUTHOR,
+    registerStudent,
   };
 
   return (
