@@ -1,26 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { Layout, Typography, Button, Card, Row, Col, Space } from 'antd';
+import { Layout, Typography, Button, Card, Row, Col, Space, Grid } from 'antd';
+import { useEffect, useState } from "react";
 
 const { Header, Content, Footer } = Layout;
 const { Title, Text, Paragraph } = Typography;
+const { useBreakpoint } = Grid;
 
 export default function Home() {
+  const [isMounted, setIsMounted] = useState(false);
+  const screens = useBreakpoint();
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
+  const isMobile = isMounted ? screens.xs : false;
+  
   return (
     <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Header style={{ background: '#fff', padding: '0 50px', borderBottom: '1px solid #f0f0f0' }}>
+      <Header style={{ 
+        background: '#fff', 
+        padding: isMobile ? '0 16px' : '0 50px', 
+        borderBottom: '1px solid #f0f0f0',
+        height: isMobile ? 56 : 64
+      }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
           <div>
-            <Title level={3} style={{ margin: 0, color: '#1677ff' }}>Daily Dose Prep</Title>
+            <Title level={isMobile ? 4 : 3} style={{ margin: 0, color: '#1677ff' }}>Daily Dose Prep</Title>
           </div>
           <div>
             <Space>
               <Link href="/login" passHref>
-                <Button type="primary">Login</Button>
+                <Button type="primary" size={isMobile ? "middle" : "middle"}>Login</Button>
               </Link>
               <Link href="/register" passHref>
-                <Button>Register</Button>
+                <Button size={isMobile ? "middle" : "middle"}>Register</Button>
               </Link>
             </Space>
           </div>
@@ -30,17 +46,23 @@ export default function Home() {
       <Content style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         {/* Hero Section */}
         <div style={{ 
-          padding: '40px 50px', 
+          padding: isMobile ? '32px 16px' : '40px 50px', 
           background: 'linear-gradient(to bottom, #f5f5f5, #fff)', 
           display: 'flex', 
           flexDirection: 'column', 
           justifyContent: 'center',
-          textAlign: 'center'
+          textAlign: 'center',
+          minHeight: isMobile ? 'calc(100vh - 56px - 48px)' : 'auto' // Fill screen height on mobile minus header and footer
         }}>
-          <Title style={{ fontSize: '2.5rem', marginBottom: '24px' }}>
+          <Title style={{ fontSize: isMobile ? '2rem' : '2.5rem', marginBottom: '24px' }}>
             Prepare for your competitive exams
           </Title>
-          <Paragraph style={{ fontSize: '1.1rem', maxWidth: '800px', margin: '0 auto 32px' }}>
+          <Paragraph style={{ 
+            fontSize: isMobile ? '1rem' : '1.1rem', 
+            maxWidth: '800px', 
+            margin: '0 auto 32px',
+            padding: isMobile ? '0 8px' : 0 
+          }}>
             Daily Dose Prep helps you ace your UPSC, JEE, NEET, SSC and other competitive exams with thousands of practice questions.
           </Paragraph>
           <div>
@@ -53,12 +75,20 @@ export default function Home() {
         </div>
 
         {/* Features Section */}
-        <div style={{ padding: '40px 50px', background: '#f7f7f7', flex: 1 }}>
-          <Title level={2} style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <div style={{ 
+          padding: isMobile ? '32px 16px' : '40px 50px', 
+          background: '#f7f7f7', 
+          flex: 1 
+        }}>
+          <Title level={2} style={{ 
+            textAlign: 'center', 
+            marginBottom: '32px',
+            fontSize: isMobile ? '1.5rem' : undefined
+          }}>
             Why Choose Daily Dose Prep?
           </Title>
           
-          <Row gutter={[24, 24]} justify="center">
+          <Row gutter={[16, 16]} justify="center">
             <Col xs={24} sm={12} md={8}>
               <Card hoverable style={{ height: '100%' }}>
                 <Title level={4}>Comprehensive Question Bank</Title>
@@ -83,7 +113,12 @@ export default function Home() {
         </div>
       </Content>
 
-      <Footer style={{ textAlign: 'center', background: '#fff', padding: '16px' }}>
+      <Footer style={{ 
+        textAlign: 'center', 
+        background: '#fff', 
+        padding: isMobile ? '12px' : '16px',
+        height: isMobile ? '48px' : 'auto'
+      }}>
         <Text type="secondary">© 2025 Daily Dose Prep. All rights reserved.</Text>
       </Footer>
     </Layout>

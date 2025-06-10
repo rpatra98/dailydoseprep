@@ -3,20 +3,29 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Form, Input, Button, Card, Typography, Alert } from 'antd';
+import { Form, Input, Button, Card, Typography, Alert, Grid } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
 export default function RegisterPage() {
   const [form] = Form.useForm();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   
   const { user, registerStudent } = useAuth();
   const router = useRouter();
+  const screens = useBreakpoint();
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
+  const isMobile = isMounted ? screens.xs : false;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -60,9 +69,15 @@ export default function RegisterPage() {
       background: '#f0f2f5',
       overflow: 'visible'
     }}>
-      <Card style={{ width: 400, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+      <Card style={{ 
+        width: isMobile ? '100%' : 400, 
+        borderRadius: isMobile ? 0 : 8, 
+        boxShadow: isMobile ? 'none' : '0 2px 8px rgba(0,0,0,0.15)',
+        margin: isMobile ? 0 : undefined,
+        border: isMobile ? 'none' : undefined
+      }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <Title level={2}>Create your account</Title>
+          <Title level={isMobile ? 3 : 2}>Create your account</Title>
           <Text type="secondary">
             Or <Link href="/login" style={{ color: '#1677ff' }}>sign in to your existing account</Link>
           </Text>

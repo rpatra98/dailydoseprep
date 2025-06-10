@@ -3,17 +3,26 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Form, Input, Button, Card, Typography, Alert } from 'antd';
+import { Form, Input, Button, Card, Typography, Alert, Grid } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
+const { useBreakpoint } = Grid;
 
 export default function LoginPage() {
   const [form] = Form.useForm();
   const [localError, setLocalError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const { user, login, loading, error } = useAuth();
   const router = useRouter();
+  const screens = useBreakpoint();
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
+  const isMobile = isMounted ? screens.xs : false;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -54,9 +63,15 @@ export default function LoginPage() {
       background: '#f0f2f5',
       overflow: 'visible'
     }}>
-      <Card style={{ width: 400, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+      <Card style={{ 
+        width: isMobile ? '100%' : 400, 
+        borderRadius: isMobile ? 0 : 8, 
+        boxShadow: isMobile ? 'none' : '0 2px 8px rgba(0,0,0,0.15)',
+        margin: isMobile ? 0 : undefined,
+        border: isMobile ? 'none' : undefined
+      }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <Title level={2}>Sign in to your account</Title>
+          <Title level={isMobile ? 3 : 2}>Sign in to your account</Title>
         </div>
         
         {displayError && (
