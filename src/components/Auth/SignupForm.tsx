@@ -6,7 +6,7 @@ export default function SignupForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
-  const { signUp } = useAuth();
+  const { registerStudent } = useAuth();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -14,13 +14,10 @@ export default function SignupForm() {
     setMessage(null);
 
     try {
-      const { error } = await signUp(email, password);
-      
-      if (error) throw error;
-      
+      await registerStudent(email, password);
       setMessage({ 
         type: 'success', 
-        text: 'Check your email for the confirmation link!' 
+        text: 'Account created! Check your email for the confirmation link!' 
       });
     } catch (error) {
       console.error('Error signing up:', error);
