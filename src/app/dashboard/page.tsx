@@ -9,7 +9,6 @@ import { User, UserRole } from '@/types';
 export default function Dashboard() {
   const { user, logout, createQAUTHOR } = useAuth();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   
@@ -21,51 +20,73 @@ export default function Dashboard() {
   const [createSuccess, setCreateSuccess] = useState('');
 
   useEffect(() => {
+    // Redirect if not logged in
     if (!user) {
       router.push('/login');
       return;
     }
 
-    // Fetch user role and data
-    const fetchUserRole = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', user.id)
-          .single();
+    // Function to fetch user role and data
+    async function fetchData() {
+      // Get user ID safely
+      const userId = user?.id;
+      if (!userId) {
+        return;
+      }
+      
+      // 1. Get user role
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
 
-        if (error) throw error;
+      if (userError) {
+        console.error('Error fetching user role:', userError);
+        return;
+      }
+      
+      if (userData?.role) {
+        setUserRole(userData.role as UserRole);
         
-        if (data) {
-          setUserRole(data.role as UserRole);
+        // 2. If SUPERADMIN, fetch all users
+        if (userData.role === 'SUPERADMIN') {
+          const { data: usersData, error: usersError } = await supabase
+            .from('users')
+            .select('*')
+            .order('created_at', { ascending: false });
+            
+          if (usersError) {
+            console.error('Error fetching users:', usersError);
+            return;
+          }
           
-          // If SUPERADMIN, fetch all users
-          if (data.role === 'SUPERADMIN') {
-            fetchUsers();
+          if (usersData) {
+            setUsers(usersData as User[]);
           }
         }
-      } catch (error) {
-        console.error('Error fetching user role:', error);
-      } finally {
-        setLoading(false);
       }
-    };
+    }
 
-    fetchUserRole();
+    // Call the fetch function
+    fetchData();
   }, [user, router]);
 
-  const fetchUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
+  const refreshUsers = async () => {
+    if (userRole !== 'SUPERADMIN') return;
+    
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      if (data) setUsers(data as User[]);
-    } catch (error) {
-      console.error('Error fetching users:', error);
+    if (error) {
+      console.error('Error refreshing users:', error);
+      return;
+    }
+    
+    if (data) {
+      setUsers(data as User[]);
     }
   };
 
@@ -87,7 +108,7 @@ export default function Dashboard() {
       setNewAuthorPassword('');
       
       // Refresh user list
-      fetchUsers();
+      refreshUsers();
     } catch (error) {
       console.error('Error creating QAUTHOR:', error);
       setCreateError(error instanceof Error ? error.message : 'Failed to create QAUTHOR');
@@ -101,16 +122,26 @@ export default function Dashboard() {
     router.push('/login');
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-xl text-gray-600">Loading...</p>
-      </div>
-    );
+  // If not logged in, don't render anything (will redirect in useEffect)
+  if (!user) {
+    return <div className="min-h-screen bg-gray-50"></div>;
   }
 
-  if (!user) {
-    return null; // will redirect in useEffect
+  // If role not fetched yet, render minimal content
+  if (!userRole) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <button onClick={handleSignOut} className="bg-red-600 text-white px-4 py-2 rounded-md">Sign Out</button>
+          </div>
+          <div className="mt-8 bg-white shadow rounded-lg p-6">
+            <p>Welcome, {user.email}</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // If user is not SUPERADMIN, show limited dashboard
@@ -269,27 +300,27 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {users.map((user) => (
-                    <tr key={user.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {user.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          user.role === 'SUPERADMIN' ? 'bg-purple-100 text-purple-800' :
-                          user.role === 'QAUTHOR' ? 'bg-blue-100 text-blue-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {user.role}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(user.createdAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                  
-                  {users.length === 0 && (
+                  {users.length > 0 ? (
+                    users.map((user) => (
+                      <tr key={user.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {user.email}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            user.role === 'SUPERADMIN' ? 'bg-purple-100 text-purple-800' :
+                            user.role === 'QAUTHOR' ? 'bg-blue-100 text-blue-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(user.createdAt).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
                     <tr>
                       <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">
                         No users found

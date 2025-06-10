@@ -168,31 +168,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const value = {
     user,
+    loading,
+    error,
     login,
     logout,
     createQAUTHOR,
     registerStudent,
   };
-
-  // Render loading state
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  // Render error state
-  if (error) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded max-w-md">
-          <p className="font-bold">Authentication Error</p>
-          <p>{error}</p>
-          <p className="mt-4 text-sm">
-            Check your environment variables and make sure Supabase is configured correctly.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <AuthContext.Provider value={value}>
