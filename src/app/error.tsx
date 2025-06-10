@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { Result, Button, Space } from 'antd';
-import { ExclamationCircleOutlined } from '@ant-design/icons';
 
 export default function Error({
   error,
