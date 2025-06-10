@@ -32,7 +32,7 @@ export default function LoginPage() {
       setIsSubmitting(true);
       await login(email, password);
       // Successful login will trigger the useEffect to redirect
-    } catch (_) {
+    } catch {
       setLocalError('Invalid email or password');
     } finally {
       setIsSubmitting(false);
