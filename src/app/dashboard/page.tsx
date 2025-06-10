@@ -128,7 +128,7 @@ export default function Dashboard() {
       setCreatingAuthor(true);
       
       // Create the QAUTHOR account
-      const userId = await createQAUTHOR(email, password);
+      const _userId = await createQAUTHOR(email, password);
       
       setCreateSuccess(`QAUTHOR account created for ${email}`);
       form.resetFields();
