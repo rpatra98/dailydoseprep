@@ -6,7 +6,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
-  const { signIn } = useAuth();
+  const { login } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -14,10 +14,7 @@ export default function LoginForm() {
     setMessage(null);
 
     try {
-      const { error } = await signIn(email, password);
-      
-      if (error) throw error;
-      
+      await login(email, password);
       setMessage({ type: 'success', text: 'Logged in successfully!' });
     } catch (error) {
       console.error('Error logging in:', error);
