@@ -3,6 +3,8 @@
 ## Overview
 Daily Dose Prep is a competitive exam preparation platform that provides students with practice questions for various competitive exams in India. The platform allows QAUTHORs to create and manage questions, while students can practice and track their progress.
 
+The system is designed as a multi-role Q&A platform with three user types: SUPERADMIN, QAUTHOR, and STUDENT. Each role has distinct capabilities and views, centered around the creation, distribution, and analysis of multiple-choice questions (MCQs) categorized by subject.
+
 ## User Roles
 
 ### 1. SUPERADMIN
@@ -11,6 +13,8 @@ Daily Dose Prep is a competitive exam preparation platform that provides student
 - Can create QAUTHOR accounts
 - Can manage all users and content
 - Cannot be created through regular signup
+- Can add, edit, and delete subjects
+- Has access to comprehensive system statistics
 
 ### 2. QAUTHOR
 - Created by SUPERADMIN only
@@ -18,12 +22,15 @@ Daily Dose Prep is a competitive exam preparation platform that provides student
 - Can create and manage answers
 - Cannot create other users
 - Cannot access admin features
+- Has a dedicated dashboard upon login
 
 ### 3. STUDENT
 - Can sign up through regular registration
 - Can view and attempt questions
 - Can track their progress
 - Cannot create or modify content
+- Selects primary subject of interest
+- Receives daily sets of practice questions
 
 ## Exam Categories
 The platform supports preparation for various competitive exams in India:
@@ -32,6 +39,13 @@ The platform supports preparation for various competitive exams in India:
 - NEET (National Eligibility cum Entrance Test)
 - SSC (Staff Selection Commission)
 - Other competitive exams
+
+## Subject Management
+- Subjects are managed by the SUPERADMIN
+- Each subject corresponds to a specific exam category
+- SUPERADMINs can add, edit, or delete subjects
+- Each subject has its own database partition
+- Questions are categorized by subject
 
 ## Question Structure
 
@@ -48,26 +62,56 @@ The platform supports preparation for various competitive exams in India:
 - Difficulty Level
 - Year (if applicable)
 - Source/Reference (if applicable)
+- QAUTHOR ID/name who created the question
+- Timestamp of question upload
+- Unique identifier to prevent duplicate questions
 
 ## Features
 
 ### QAUTHOR Features
-- Create and manage questions
+- Dedicated dashboard accessible upon login
+- Button to open question creation page
+- Create and manage questions with complete information:
+  - Question text
+  - Four answer options (A, B, C, D)
+  - Marking one correct answer
+  - Subject selection from predefined list
 - Set difficulty levels
 - Provide detailed explanations
 - Categorize questions by exam and topic
 - Track question performance
+- System prevents submission of incomplete or duplicate questions
 
 ### Student Features
-- Attempt questions
-- Get immediate feedback
-- Track progress
-- Filter questions by:
-  - Exam category
-  - Subject/Topic
-  - Difficulty level
-  - Year
-  - Source
+- Subject selection
+  - Select a primary subject of interest
+  - All other subjects become secondary
+- Daily Question Delivery
+  - Receive 10 new questions daily at 6am
+  - Questions are chronologically selected from their primary subject
+  - If all questions for primary subject are exhausted, system shows: "Congratulations, you solved all questions posted for this Subject."
+- Question answering interface
+  - Four options presented as radio buttons
+  - Options displayed in randomized order to prevent pattern recognition
+  - No revelation of correct answer during or after attempt
+- Result Feedback
+  - Summary after completing all 10 questions
+  - Format: "For [date], you got X questions correct out of 10."
+  - No per-question feedback provided
+- Track overall progress
+
+### SUPERADMIN Features
+- Comprehensive dashboard with system statistics:
+  - Number of questions per subject
+  - Number of QAUTHORs and students
+  - Daily participation statistics
+  - Aggregate performance metrics
+- Subject management capabilities
+  - Add new subjects
+  - Edit existing subjects
+  - Delete subjects (with safeguards for existing questions)
+- Access to all subject databases for review
+- View but not edit questions and answers
 
 ## Authentication Flow
 
@@ -84,12 +128,22 @@ The platform supports preparation for various competitive exams in India:
 ### Student Registration
 1. Any user can sign up as a STUDENT
 2. Student accounts have limited permissions
-3. Students can start using the system immediately after registration
+3. Students select their primary subject during or after registration
+4. Students can start using the system immediately after registration
+
+## Data Integrity & Structure
+- Each question has a unique identifier to prevent duplicates
+- Questions are stored with QAUTHOR information and timestamps
+- Subject databases are maintained separately for better organization
+- Complete audit trail for all question creation and modifications
 
 ## Security Notes
 - SUPERADMIN credentials should be changed after initial setup
 - QAUTHOR accounts should be created with strong passwords
 - Student accounts have restricted access to protect system integrity
+- Only QAUTHORs can create questions
+- Only students can answer questions
+- Only SUPERADMINs can view system-wide stats and manage subjects
 
 ## Future Considerations
 - Role-based access control (RBAC) implementation
