@@ -27,6 +27,8 @@ import {
   MailOutlined,
   LockOutlined
 } from '@ant-design/icons';
+import SubjectSelection from '@/components/Auth/SubjectSelection';
+import SubjectManager from '@/components/Admin/SubjectManager';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -197,40 +199,47 @@ export default function Dashboard() {
         <Content style={{ padding: '24px', flex: 1 }}>
           <Card>
             <Title level={4}>Welcome, {user.email}</Title>
-            <Paragraph>
-              <Text strong>Your role:</Text> <Tag color={userRole === 'QAUTHOR' ? 'blue' : 'green'}>{userRole}</Tag>
-            </Paragraph>
             
+            {/* QAUTHOR Dashboard Content */}
             {userRole === 'QAUTHOR' && (
-              <div style={{ marginTop: 24 }}>
-                <Divider orientation="left">QAUTHOR Features</Divider>
-                <Paragraph>
-                  As a QAUTHOR, you can create questions for students to practice.
-                </Paragraph>
-                <Button 
-                  type="primary" 
-                  icon={<PlusOutlined />}
-                  onClick={() => router.push('/questions/create')}
-                >
-                  Create Questions
-                </Button>
-              </div>
+              <>
+                <Text>
+                  As a QAUTHOR, you can create questions for students to practice with.
+                  Each question you create will be added to the subject database and made available to students.
+                </Text>
+                <div style={{ marginTop: 24 }}>
+                  <Button 
+                    type="primary" 
+                    icon={<PlusOutlined />} 
+                    size="large"
+                    onClick={() => router.push('/create-question')}
+                  >
+                    Create New Question
+                  </Button>
+                </div>
+              </>
             )}
-
+            
+            {/* STUDENT Dashboard Content */}
             {userRole === 'STUDENT' && (
-              <div style={{ marginTop: 24 }}>
-                <Divider orientation="left">Student Features</Divider>
-                <Paragraph>
-                  As a student, you can practice questions from various competitive exams.
-                </Paragraph>
+              <>
+                <Text>
+                  As a student, you'll receive 10 new questions daily at 6am from your primary subject.
+                  Select your primary subject to start practicing.
+                </Text>
+                <div style={{ marginTop: 24 }}>
+                  {user && <SubjectSelection userId={user.id} />}
+                </div>
+                <Divider />
                 <Button 
                   type="primary" 
                   icon={<BookOutlined />}
-                  onClick={() => router.push('/practice')}
+                  size="large"
+                  onClick={() => router.push('/daily-questions')}
                 >
-                  Practice Questions
+                  View Today's Questions
                 </Button>
-              </div>
+              </>
             )}
           </Card>
         </Content>
@@ -273,29 +282,11 @@ export default function Dashboard() {
           Sign Out
         </Button>
       </Header>
-      <Content style={{ padding: '24px', flex: 1 }}>
-        <Row gutter={[24, 24]}>
-          {/* Create QAUTHOR Section */}
-          <Col xs={24} lg={12}>
-            <Card title="Create QAUTHOR Account" bordered={false} style={{ height: '100%' }}>
-              {createError && (
-                <Alert 
-                  message={createError} 
-                  type="error" 
-                  showIcon 
-                  style={{ marginBottom: 16 }}
-                />
-              )}
-              
-              {createSuccess && (
-                <Alert 
-                  message={createSuccess} 
-                  type="success" 
-                  showIcon 
-                  style={{ marginBottom: 16 }}
-                />
-              )}
-              
+      <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={16}>
+            <Card title="User Management">
+              <Title level={4}>Create QAUTHOR Account</Title>
               <Form
                 form={form}
                 layout="vertical"
@@ -305,29 +296,22 @@ export default function Dashboard() {
                   name="email"
                   label="Email"
                   rules={[
-                    { required: true, message: 'Please input an email!' },
-                    { type: 'email', message: 'Please enter a valid email' }
+                    { required: true, message: 'Please enter an email address' },
+                    { type: 'email', message: 'Please enter a valid email address' }
                   ]}
                 >
-                  <Input 
-                    prefix={<MailOutlined />} 
-                    placeholder="Email address" 
-                  />
+                  <Input prefix={<MailOutlined />} placeholder="Enter email address" />
                 </Form.Item>
                 
                 <Form.Item
                   name="password"
                   label="Password"
                   rules={[
-                    { required: true, message: 'Please input a password!' },
+                    { required: true, message: 'Please enter a password' },
                     { min: 6, message: 'Password must be at least 6 characters' }
                   ]}
-                  extra="Password must be at least 6 characters."
                 >
-                  <Input.Password 
-                    prefix={<LockOutlined />} 
-                    placeholder="Password" 
-                  />
+                  <Input.Password prefix={<LockOutlined />} placeholder="Enter password" />
                 </Form.Item>
                 
                 <Form.Item>
@@ -335,27 +319,88 @@ export default function Dashboard() {
                     type="primary" 
                     htmlType="submit" 
                     loading={creatingAuthor}
-                    block
+                    icon={<PlusOutlined />}
                   >
                     Create QAUTHOR
                   </Button>
                 </Form.Item>
               </Form>
+              
+              {createError && (
+                <Alert
+                  message="Error"
+                  description={createError}
+                  type="error"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+              )}
+              
+              {createSuccess && (
+                <Alert
+                  message="Success"
+                  description={createSuccess}
+                  type="success"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+              )}
+              
+              <Divider />
+              
+              <Title level={4}>User Accounts</Title>
+              <Table
+                dataSource={users}
+                rowKey="id"
+                pagination={{ pageSize: 10 }}
+                columns={[
+                  {
+                    title: 'Email',
+                    dataIndex: 'email',
+                    key: 'email',
+                  },
+                  {
+                    title: 'Role',
+                    dataIndex: 'role',
+                    key: 'role',
+                    render: (role) => (
+                      <Tag color={
+                        role === 'SUPERADMIN' ? 'red' :
+                        role === 'QAUTHOR' ? 'blue' :
+                        'green'
+                      }>
+                        {role}
+                      </Tag>
+                    )
+                  },
+                  {
+                    title: 'Created At',
+                    dataIndex: 'created_at',
+                    key: 'created_at',
+                    render: (date) => new Date(date).toLocaleString()
+                  }
+                ]}
+              />
             </Card>
           </Col>
           
-          {/* User Management Section */}
-          <Col xs={24} lg={12}>
-            <Card title="User Management" bordered={false} style={{ height: '100%' }}>
-              <Table 
-                dataSource={users} 
-                columns={columns} 
-                rowKey="id"
-                pagination={{ pageSize: 8 }}
-                locale={{ emptyText: "No users found" }}
-                scroll={{ y: 320 }}
-                size="middle"
-              />
+          <Col xs={24} lg={8}>
+            <Card title="System Statistics">
+              <Paragraph>
+                <Text strong>Total Users:</Text> {users.length}
+              </Paragraph>
+              <Paragraph>
+                <Text strong>QAUTHORs:</Text> {users.filter(u => u.role === 'QAUTHOR').length}
+              </Paragraph>
+              <Paragraph>
+                <Text strong>Students:</Text> {users.filter(u => u.role === 'STUDENT').length}
+              </Paragraph>
+            </Card>
+          </Col>
+          
+          <Col xs={24}>
+            <Card title="Subject Management">
+              <SubjectManager />
             </Card>
           </Col>
         </Row>

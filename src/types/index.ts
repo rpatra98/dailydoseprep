@@ -3,10 +3,20 @@ export type DifficultyLevel = 'EASY' | 'MEDIUM' | 'HARD';
 export type ExamCategory = 'UPSC' | 'JEE' | 'NEET' | 'SSC' | 'OTHER';
 export type Option = 'A' | 'B' | 'C' | 'D';
 
+export interface Subject {
+    id: string;
+    name: string;
+    examCategory: ExamCategory;
+    description?: string;
+    created_at: string;
+    updated_at?: string;
+}
+
 export interface User {
     id: string;
     email: string;
     role: UserRole;
+    primarySubject?: string;  // Subject ID for students
     created_at?: string;
     updated_at?: string;
 }
@@ -23,10 +33,10 @@ export interface Question {
     explanation: string;
     difficulty: DifficultyLevel;
     examCategory: ExamCategory;
-    subject: string;
+    subject: string;  // Subject ID
     year?: number;
     source?: string;
-    createdBy: string;
+    createdBy: string;  // QAUTHOR ID
     createdAt: Date;
     updatedAt: Date;
 }
@@ -38,6 +48,16 @@ export interface StudentAttempt {
     selectedOption: Option;
     isCorrect: boolean;
     attemptedAt: Date;
+}
+
+export interface DailyQuestionSet {
+    id: string;
+    studentId: string;
+    date: string;
+    questions: string[];  // Array of question IDs
+    completed: boolean;
+    score?: number;
+    created_at: Date;
 }
 
 export interface AuthContextType {
