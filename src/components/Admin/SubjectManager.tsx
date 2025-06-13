@@ -10,12 +10,14 @@ import {
   Typography,
   Space,
   Tag,
-  Empty
+  Empty,
+  Alert
 } from 'antd';
 import { 
   PlusOutlined, 
   EditOutlined, 
-  DeleteOutlined 
+  DeleteOutlined,
+  ReloadOutlined 
 } from '@ant-design/icons';
 import { Subject, ExamCategory } from '@/types';
 
@@ -28,26 +30,31 @@ export const SubjectManager = () => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [currentSubject, setCurrentSubject] = useState<Partial<Subject> | null>(null);
   const [form] = Form.useForm();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const fetchSubjects = async () => {
     try {
       setLoading(true);
+      setErrorMessage(null);
+      
+      console.log('Fetching subjects...');
       const response = await fetch('/api/subjects', {
         credentials: 'include', // Include cookies for authentication
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch subjects');
+        const errorData = await response.json();
+        console.error('Error response from API:', errorData);
+        throw new Error(errorData.error || errorData.details || 'Failed to fetch subjects');
       }
       
       const data = await response.json();
+      console.log('Subjects fetched successfully:', data.length);
       setSubjects(data);
     } catch (error) {
       console.error('Error fetching subjects:', error);
-      // Don't show an error message for empty subjects, as we'll handle that in the UI
-      if (error instanceof Error && error.message !== 'No subjects available') {
-        message.error('Failed to load subjects');
-      }
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load subjects');
+      message.error('Failed to load subjects');
     } finally {
       setLoading(false);
     }
@@ -75,29 +82,38 @@ export const SubjectManager = () => {
   
   const handleDelete = async (id: string) => {
     try {
+      setErrorMessage(null);
+      console.log(`Deleting subject ${id}...`);
+      
       const response = await fetch(`/api/subjects/${id}`, {
         method: 'DELETE',
         credentials: 'include', // Include cookies for authentication
       });
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to delete subject');
+        const errorData = await response.json();
+        console.error('Error response from API:', errorData);
+        throw new Error(errorData.error || errorData.details || 'Failed to delete subject');
       }
       
+      console.log(`Subject ${id} deleted successfully`);
       message.success('Subject deleted successfully');
       fetchSubjects();
     } catch (error) {
+      console.error('Error deleting subject:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to delete subject');
       message.error(error instanceof Error ? error.message : 'Failed to delete subject');
     }
   };
   
   const handleModalOk = async () => {
     try {
+      setErrorMessage(null);
       const values = await form.validateFields();
       
       if (isEditing && currentSubject?.id) {
         // Update existing subject
+        console.log(`Updating subject ${currentSubject.id}...`);
         const response = await fetch(`/api/subjects/${currentSubject.id}`, {
           method: 'PUT',
           headers: {
@@ -108,13 +124,16 @@ export const SubjectManager = () => {
         });
         
         if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Failed to update subject');
+          const errorData = await response.json();
+          console.error('Error response from API:', errorData);
+          throw new Error(errorData.error || errorData.details || 'Failed to update subject');
         }
         
+        console.log(`Subject ${currentSubject.id} updated successfully`);
         message.success('Subject updated successfully');
       } else {
         // Create new subject
+        console.log('Creating new subject...');
         const response = await fetch('/api/subjects', {
           method: 'POST',
           headers: {
@@ -125,16 +144,20 @@ export const SubjectManager = () => {
         });
         
         if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Failed to create subject');
+          const errorData = await response.json();
+          console.error('Error response from API:', errorData);
+          throw new Error(errorData.error || errorData.details || 'Failed to create subject');
         }
         
+        console.log('Subject created successfully');
         message.success('Subject created successfully');
       }
       
       setIsModalVisible(false);
       fetchSubjects();
     } catch (error) {
+      console.error('Error saving subject:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to save subject');
       message.error(error instanceof Error ? error.message : 'Failed to save subject');
     }
   };
@@ -197,14 +220,34 @@ export const SubjectManager = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Title level={4}>Subject Management</Title>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleAddNew}
-        >
-          Add New Subject
-        </Button>
+        <Space>
+          <Button
+            onClick={fetchSubjects}
+            icon={<ReloadOutlined />}
+          >
+            Refresh
+          </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleAddNew}
+          >
+            Add New Subject
+          </Button>
+        </Space>
       </div>
+      
+      {errorMessage && (
+        <Alert
+          message="Error"
+          description={errorMessage}
+          type="error"
+          showIcon
+          closable
+          onClose={() => setErrorMessage(null)}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       
       <Table
         dataSource={subjects}
