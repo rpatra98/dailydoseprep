@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase, createBrowserClient } from '@/utils/supabase';
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import { createBrowserClient } from '@/utils/supabase';
 import { AuthContextType, User } from '@/types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -12,8 +12,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  // Use the browser client for client components
-  const browserSupabase = createBrowserClient();
+  // Use memoized browser client to prevent multiple instances
+  const browserSupabase = useMemo(() => createBrowserClient(), []);
 
   useEffect(() => {
     const setData = async () => {
@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [browserSupabase]);
 
   const login = async (email: string, password: string) => {
     setLoading(true);

@@ -32,10 +32,26 @@ export const supabase = createClient(
   }
 );
 
-// Create a browser client that handles cookies properly
+// Singleton pattern for browser client
+let browserClientInstance: ReturnType<typeof createClientComponentClient> | null = null;
+
+// Create a browser client that handles cookies properly - singleton implementation
 export const createBrowserClient = () => {
-  return createClientComponentClient({
-    supabaseUrl: supabaseUrl || '',
-    supabaseKey: supabaseAnonKey || '',
-  });
+  if (typeof window === 'undefined') {
+    // Server-side - create a new instance each time
+    return createClientComponentClient({
+      supabaseUrl: supabaseUrl || '',
+      supabaseKey: supabaseAnonKey || '',
+    });
+  }
+  
+  // Client-side - use singleton pattern
+  if (!browserClientInstance) {
+    browserClientInstance = createClientComponentClient({
+      supabaseUrl: supabaseUrl || '',
+      supabaseKey: supabaseAnonKey || '',
+    });
+  }
+  
+  return browserClientInstance;
 }; 
