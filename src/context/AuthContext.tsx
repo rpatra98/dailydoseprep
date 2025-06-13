@@ -15,16 +15,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [initError, setInitError] = useState<Error | null>(null);
   
   // Get the singleton browser client instance
-  let browserSupabase: SupabaseClient | null = null;
+  const [browserSupabase, setBrowserSupabase] = useState<SupabaseClient | null>(null);
   
-  try {
-    console.log("Getting browser client...");
-    browserSupabase = getBrowserClient();
-    console.log("Browser client initialized successfully");
-  } catch (err) {
-    console.error("Failed to initialize Supabase client:", err);
-    setInitError(err instanceof Error ? err : new Error(String(err)));
-  }
+  useEffect(() => {
+    try {
+      console.log("Getting browser client...");
+      const client = getBrowserClient();
+      setBrowserSupabase(client);
+      console.log("Browser client initialized successfully");
+    } catch (err) {
+      console.error("Failed to initialize Supabase client:", err);
+      setInitError(err instanceof Error ? err : new Error(String(err)));
+    }
+  }, []);
 
   useEffect(() => {
     if (initError || !browserSupabase) {
@@ -130,6 +133,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     
+    // Check if Supabase client is available
+    if (!browserSupabase) {
+      const errorMsg = 'Authentication client not initialized';
+      setError(errorMsg);
+      setLoading(false);
+      throw new Error(errorMsg);
+    }
+    
     try {
       // Check if this is potentially a QAUTHOR trying to log in
       const { data: possibleQAuthor, error: qaCheckError } = await browserSupabase
@@ -202,6 +213,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     
+    // Check if Supabase client is available
+    if (!browserSupabase) {
+      const errorMsg = 'Authentication client not initialized';
+      setError(errorMsg);
+      setLoading(false);
+      throw new Error(errorMsg);
+    }
+    
     try {
       // Make sure we have a session before attempting to sign out
       const { data: sessionData } = await browserSupabase.auth.getSession();
@@ -232,6 +251,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const createQAUTHOR = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
+    
+    // Check if Supabase client is available
+    if (!browserSupabase) {
+      const errorMsg = 'Authentication client not initialized';
+      setError(errorMsg);
+      setLoading(false);
+      throw new Error(errorMsg);
+    }
     
     try {
       const { data: { user: currentUser }, error: authError } = await browserSupabase.auth.getUser();
@@ -285,6 +312,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const registerStudent = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
+    
+    // Check if Supabase client is available
+    if (!browserSupabase) {
+      const errorMsg = 'Authentication client not initialized';
+      setError(errorMsg);
+      setLoading(false);
+      throw new Error(errorMsg);
+    }
     
     try {
       // Create the student account with standard signup flow
