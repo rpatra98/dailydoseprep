@@ -61,14 +61,25 @@ export interface DailyQuestionSet {
 }
 
 // Supabase auth data types
+export interface SupabaseUser {
+    id: string;
+    email?: string;
+    app_metadata: {
+        provider?: string;
+        [key: string]: any;
+    };
+    user_metadata: {
+        [key: string]: any;
+    };
+    aud: string;
+    created_at?: string;
+}
+
 export interface Session {
     access_token: string;
     refresh_token: string;
     expires_at: number;
-    user: {
-        id: string;
-        email: string;
-    };
+    user: SupabaseUser;
 }
 
 export interface WeakPassword {
@@ -77,7 +88,7 @@ export interface WeakPassword {
 }
 
 export interface LoginResponse {
-    user: User;
+    user: SupabaseUser;
     session: Session;
     weakPassword?: WeakPassword;
 }

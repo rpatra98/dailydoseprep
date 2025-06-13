@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getBrowserClient } from '@/lib/supabase-browser';
-import { AuthContextType, User } from '@/types';
+import { AuthContextType, User, LoginResponse } from '@/types';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -143,7 +143,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [browserSupabase, initError]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<LoginResponse | void> => {
     console.log(`Attempting to login user: ${email}`);
     setLoading(true);
     setError(null);
@@ -205,7 +205,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Error fetching user data after login:", userFetchErr);
       }
       
-      return data;
+      // Return the login response
+      return data as LoginResponse;
     } catch (error) {
       console.error('Login error:', error);
       throw error;
