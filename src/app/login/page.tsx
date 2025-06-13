@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [localError, setLocalError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [loginAttempts, setLoginAttempts] = useState(0);
   const { user, login, loading, error, authInitialized } = useAuth();
   const router = useRouter();
   
@@ -42,6 +43,7 @@ export default function LoginPage() {
   const handleSubmit = async (values: { email: string; password: string }) => {
     const { email, password } = values;
     setLocalError('');
+    setLoginAttempts(prev => prev + 1);
     
     if (!email || !password) {
       setLocalError('Email and password are required');
@@ -50,20 +52,35 @@ export default function LoginPage() {
 
     try {
       setIsSubmitting(true);
-      await login(email, password);
-      // Successful login will trigger the useEffect to redirect
+      console.log(`Login attempt ${loginAttempts + 1} for ${email}`);
+      
+      const result = await login(email, password);
+      
+      // If we get here, login was successful
+      console.log("Login successful, result:", result ? "Data returned" : "No data");
+      
+      // Force redirect to dashboard
+      router.push('/dashboard');
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("Login error in page component:", error);
+      
       if (error instanceof Error) {
         if (error.message.includes('Email not confirmed')) {
           setLocalError('Account email not confirmed. If you are a QAUTHOR, please contact the SUPERADMIN.');
         } else if (error.message.includes('Authentication client not initialized')) {
           setLocalError('Authentication service is initializing. Please try again in a moment.');
+        } else if (error.message.includes('Invalid login credentials')) {
+          setLocalError('Invalid email or password. Please check your credentials and try again.');
         } else {
           setLocalError(`Login failed: ${error.message}`);
         }
       } else {
-        setLocalError('Invalid email or password');
+        setLocalError('An unexpected error occurred. Please try again.');
+      }
+      
+      // If multiple login attempts fail, suggest refreshing the page
+      if (loginAttempts >= 2) {
+        setLocalError(prev => `${prev} You may need to refresh the page if the problem persists.`);
       }
     } finally {
       setIsSubmitting(false);
@@ -127,6 +144,7 @@ export default function LoginPage() {
           onFinish={handleSubmit}
           layout="vertical"
           requiredMark={false}
+          initialValues={{ email: 'superadmin@ddp.com' }}
         >
           <Form.Item
             name="email"
@@ -166,6 +184,17 @@ export default function LoginPage() {
               Sign in
             </Button>
           </Form.Item>
+          
+          {loginAttempts > 0 && (
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <Button 
+                type="link" 
+                onClick={() => window.location.reload()}
+              >
+                Refresh page
+              </Button>
+            </div>
+          )}
         </Form>
       </Card>
     </div>

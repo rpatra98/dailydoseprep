@@ -60,12 +60,34 @@ export interface DailyQuestionSet {
     created_at: Date;
 }
 
+// Supabase auth data types
+export interface Session {
+    access_token: string;
+    refresh_token: string;
+    expires_at: number;
+    user: {
+        id: string;
+        email: string;
+    };
+}
+
+export interface WeakPassword {
+    message: string;
+    is_weak: boolean;
+}
+
+export interface LoginResponse {
+    user: User;
+    session: Session;
+    weakPassword?: WeakPassword;
+}
+
 export interface AuthContextType {
     user: User | null;
     loading: boolean;
     error: string | null;
     authInitialized: boolean;
-    login: (email: string, password: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<LoginResponse | void>;
     logout: () => Promise<void>;
     createQAUTHOR: (email: string, password: string) => Promise<string>;
     registerStudent: (email: string, password: string) => Promise<string>;

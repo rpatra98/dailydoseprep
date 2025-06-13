@@ -13,10 +13,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
+  const [loginInProgress, setLoginInProgress] = useState(false);
   
   // Get the singleton browser client instance
   const [browserSupabase, setBrowserSupabase] = useState<SupabaseClient | null>(null);
   
+  // Initialize the Supabase client
   useEffect(() => {
     try {
       console.log("Getting browser client...");
@@ -29,8 +31,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Setup authentication
   useEffect(() => {
-    if (initError || !browserSupabase) {
+    if (!browserSupabase) {
+      console.log("Browser client not available yet, skipping auth setup");
+      return;
+    }
+
+    if (initError) {
       console.error("Skipping auth initialization due to client init error");
       setLoading(false);
       setAuthInitialized(true);
@@ -56,7 +64,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (session?.user) {
           console.log("User found in session, fetching user data");
-          // Fetch user data from our users table
           try {
             const { data: userData, error: userError } = await browserSupabase
               .from('users')
@@ -68,7 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               console.warn('User exists in Auth but not in users table:', userError);
               // Don't throw here, just set user to null and continue
             } else {
-              console.log("User data fetched successfully");
+              console.log("User data fetched successfully:", userData);
               setUser(userData as User);
             }
           } catch (userFetchErr) {
@@ -87,31 +94,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setData();
 
+    // Set up auth state change listener
     let subscription: { unsubscribe: () => void } | undefined;
     try {
       console.log("Setting up auth state change listener");
       const { data } = browserSupabase.auth.onAuthStateChange(async (event: string, session: any) => {
-        console.log('Auth state changed:', event);
-        try {
-          if (session?.user) {
-            // Fetch user data from our users table
-            const { data: userData, error: userError } = await browserSupabase
-              .from('users')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
+        console.log('Auth state changed:', event, session ? 'Session exists' : 'No session');
+        
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          try {
+            if (session?.user) {
+              console.log("User signed in, fetching user data");
+              // Fetch user data from our users table
+              const { data: userData, error: userError } = await browserSupabase
+                .from('users')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
 
-            if (userError) {
-              console.warn('User exists in Auth but not in users table:', userError);
-              setUser(null);
-            } else {
-              setUser(userData as User);
+              if (userError) {
+                console.warn('User exists in Auth but not in users table:', userError);
+                setUser(null);
+              } else {
+                console.log("User data fetched on auth change:", userData);
+                setUser(userData as User);
+              }
             }
-          } else {
+          } catch (err) {
+            console.error('Error in auth state change:', err);
             setUser(null);
           }
-        } catch (err) {
-          console.error('Error in auth state change:', err);
+        } else if (event === 'SIGNED_OUT') {
+          console.log("User signed out, clearing user data");
           setUser(null);
         }
       });
@@ -130,82 +144,74 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [browserSupabase, initError]);
 
   const login = async (email: string, password: string) => {
+    console.log(`Attempting to login user: ${email}`);
     setLoading(true);
     setError(null);
+    setLoginInProgress(true);
     
     // Check if Supabase client is available
     if (!browserSupabase) {
       const errorMsg = 'Authentication client not initialized';
+      console.error(errorMsg);
       setError(errorMsg);
       setLoading(false);
+      setLoginInProgress(false);
       throw new Error(errorMsg);
     }
     
     try {
-      // Check if this is potentially a QAUTHOR trying to log in
-      const { data: possibleQAuthor, error: qaCheckError } = await browserSupabase
-        .from('users')
-        .select('role')
-        .eq('email', email)
-        .single();
-      
-      if (qaCheckError && qaCheckError.code !== 'PGRST116') { // PGRST116 = Not found
-        console.warn('Error checking if user might be QAUTHOR:', qaCheckError);
-      }
-      
-      const mightBeQAuthor = possibleQAuthor?.role === 'QAUTHOR';
-      
       // Standard login attempt
-      const { data, error } = await browserSupabase.auth.signInWithPassword({ email, password });
+      console.log("Calling signInWithPassword...");
+      const { data, error } = await browserSupabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
+      
+      console.log("Login response received:", data ? "Success" : "Failed");
       
       // Handle specific error for email confirmation
       if (error) {
-        if (error.message === 'Email not confirmed' && mightBeQAuthor) {
-          console.log('QAUTHOR with unconfirmed email, attempting admin verification...');
-          
-          // Try to handle this through admin API for QAUTHORs
-          const response = await fetch('/api/admin/verify-qauthor', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({ email }),
-          });
-          
-          if (response.ok) {
-            // Try logging in again after verification
-            const retryLogin = await browserSupabase.auth.signInWithPassword({ email, password });
-            if (retryLogin.error) {
-              setError(retryLogin.error.message);
-              throw retryLogin.error;
-            }
-            return;
-          } else {
-            // If admin verification fails, fall back to the original error
-            setError(error.message);
-            throw error;
-          }
-        } else {
-          setError(error.message);
-          throw error;
-        }
+        console.error("Login error:", error.message);
+        setError(error.message);
+        throw error;
       }
       
       // Check if we got a session and user back
       if (!data.session || !data.user) {
         const errorMsg = 'Login failed: No session created';
+        console.error(errorMsg);
         setError(errorMsg);
         throw new Error(errorMsg);
       }
       
-      // We don't need to manually set the user here as the onAuthStateChange 
-      // event will handle setting the user after successful authentication
+      console.log("Login successful, user authenticated:", data.user.id);
+      
+      // Fetch user data from our users table
+      try {
+        console.log("Fetching user data after login");
+        const { data: userData, error: userError } = await browserSupabase
+          .from('users')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (userError) {
+          console.warn('User exists in Auth but not in users table:', userError);
+        } else {
+          console.log("User data fetched after login:", userData);
+          setUser(userData as User);
+        }
+      } catch (userFetchErr) {
+        console.error("Error fetching user data after login:", userFetchErr);
+      }
+      
+      return data;
     } catch (error) {
       console.error('Login error:', error);
       throw error;
     } finally {
       setLoading(false);
+      setLoginInProgress(false);
     }
   };
 
@@ -222,15 +228,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
     try {
-      // Make sure we have a session before attempting to sign out
-      const { data: sessionData } = await browserSupabase.auth.getSession();
-      
-      if (!sessionData.session) {
-        console.log('No active session found, clearing user state');
-        setUser(null);
-        return;
-      }
-      
+      console.log("Attempting to sign out");
       const { error } = await browserSupabase.auth.signOut();
       if (error) {
         setError(error.message);
@@ -238,6 +236,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw error;
       }
       
+      console.log("Sign out successful, clearing user state");
       setUser(null);
     } catch (error) {
       console.error('Logout error:', error);

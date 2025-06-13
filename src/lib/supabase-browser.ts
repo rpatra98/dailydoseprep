@@ -31,17 +31,42 @@ export function getBrowserClient(): SupabaseClient {
   try {
     if (!browserClientInstance) {
       console.log('Initializing Supabase browser client');
+      
+      // Check for environment variables
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       
       if (!supabaseUrl || !supabaseKey) {
+        console.error('Supabase environment variables missing:', {
+          NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ? 'Set' : 'Missing',
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseKey ? 'Set' : 'Missing'
+        });
         throw new Error('Supabase URL or key is missing. Check your environment variables.');
       }
       
+      console.log('Supabase environment variables found');
+      
+      // Create the client with correct options structure
       browserClientInstance = createClientComponentClient({
         supabaseUrl,
         supabaseKey,
+        options: {
+          db: {
+            schema: 'public',
+          },
+          global: {
+            headers: {
+              'X-Client-Info': 'dailydoseprep-browser',
+            },
+          }
+        }
       });
+      
+      // Verify the client was created
+      if (!browserClientInstance) {
+        throw new Error('Failed to initialize Supabase client');
+      }
+      
       console.log('Supabase browser client initialized successfully');
     }
     
