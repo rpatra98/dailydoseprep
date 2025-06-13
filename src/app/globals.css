@@ -1,4 +1,9 @@
-@import "tailwindcss";
+/* Tailwind CSS v3 imports */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ant Design styles */
 @import 'antd/dist/reset.css';
 
 :root {

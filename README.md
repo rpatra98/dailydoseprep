@@ -22,10 +22,10 @@ The application requires a Supabase database with the correct schema. If you're 
    NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
    SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
-   ```
+```
 
 2. Run the setup script:
-   ```bash
+```bash
    npm run setup-db
    ```
 
