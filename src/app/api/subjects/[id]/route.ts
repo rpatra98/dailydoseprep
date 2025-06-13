@@ -4,10 +4,10 @@ import { supabase } from '@/utils/supabase';
 // GET a specific subject by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
     
     const { data, error } = await supabase
       .from('subjects')
@@ -32,9 +32,10 @@ export async function GET(
 // PUT to update a subject - SUPERADMIN only
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { data: authData, error: authError } = await supabase.auth.getSession();
     
     if (authError || !authData.session) {
@@ -61,7 +62,6 @@ export async function PUT(
     }
     
     // Check if subject exists
-    const id = params.id;
     const { data: existingSubject, error: checkError } = await supabase
       .from('subjects')
       .select('*')
@@ -100,9 +100,10 @@ export async function PUT(
 // DELETE a subject - SUPERADMIN only
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { data: authData, error: authError } = await supabase.auth.getSession();
     
     if (authError || !authData.session) {
@@ -119,8 +120,6 @@ export async function DELETE(
     if (userError || userData?.role !== 'SUPERADMIN') {
       return NextResponse.json({ error: 'Unauthorized. Only SUPERADMIN can delete subjects' }, { status: 403 });
     }
-    
-    const id = params.id;
     
     // Check if subject exists
     const { data: existingSubject, error: checkError } = await supabase
