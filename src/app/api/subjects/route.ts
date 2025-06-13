@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/utils/supabase';
-import { Subject } from '@/types';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import { Subject } from '@/types';
 
 // GET all subjects
 export async function GET() {
   try {
+    const supabase = createRouteHandlerClient({ cookies });
+    
     const { data, error } = await supabase
       .from('subjects')
       .select('*')
@@ -26,9 +28,13 @@ export async function GET() {
 // POST a new subject - protected for SUPERADMIN only
 export async function POST(req: NextRequest) {
   try {
-    const { data: authData, error: authError } = await supabase.auth.getSession();
+    const supabase = createRouteHandlerClient({ cookies });
     
-    if (authError || !authData.session) {
+    // Get the session from cookies
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      console.error('Authentication error:', sessionError);
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
     
@@ -36,10 +42,15 @@ export async function POST(req: NextRequest) {
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('role')
-      .eq('id', authData.session.user.id)
+      .eq('id', session.user.id)
       .single();
     
-    if (userError || userData?.role !== 'SUPERADMIN') {
+    if (userError) {
+      console.error('Error fetching user role:', userError);
+      return NextResponse.json({ error: 'Failed to verify user role' }, { status: 500 });
+    }
+    
+    if (userData?.role !== 'SUPERADMIN') {
       return NextResponse.json({ error: 'Unauthorized. Only SUPERADMIN can create subjects' }, { status: 403 });
     }
     

@@ -32,7 +32,9 @@ export const SubjectManager = () => {
   const fetchSubjects = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/subjects');
+      const response = await fetch('/api/subjects', {
+        credentials: 'include', // Include cookies for authentication
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch subjects');
@@ -75,6 +77,7 @@ export const SubjectManager = () => {
     try {
       const response = await fetch(`/api/subjects/${id}`, {
         method: 'DELETE',
+        credentials: 'include', // Include cookies for authentication
       });
       
       if (!response.ok) {
@@ -100,6 +103,7 @@ export const SubjectManager = () => {
           headers: {
             'Content-Type': 'application/json',
           },
+          credentials: 'include', // Include cookies for authentication
           body: JSON.stringify(values),
         });
         
@@ -116,6 +120,7 @@ export const SubjectManager = () => {
           headers: {
             'Content-Type': 'application/json',
           },
+          credentials: 'include', // Include cookies for authentication
           body: JSON.stringify(values),
         });
         

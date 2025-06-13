@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/utils/supabase';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 // GET a specific subject by ID
 export async function GET(
@@ -8,6 +9,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const supabase = createRouteHandlerClient({ cookies });
     
     const { data, error } = await supabase
       .from('subjects')
@@ -36,9 +38,13 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const { data: authData, error: authError } = await supabase.auth.getSession();
+    const supabase = createRouteHandlerClient({ cookies });
     
-    if (authError || !authData.session) {
+    // Get the session from cookies
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      console.error('Authentication error:', sessionError);
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
     
@@ -46,10 +52,15 @@ export async function PUT(
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('role')
-      .eq('id', authData.session.user.id)
+      .eq('id', session.user.id)
       .single();
     
-    if (userError || userData?.role !== 'SUPERADMIN') {
+    if (userError) {
+      console.error('Error fetching user role:', userError);
+      return NextResponse.json({ error: 'Failed to verify user role' }, { status: 500 });
+    }
+    
+    if (userData?.role !== 'SUPERADMIN') {
       return NextResponse.json({ error: 'Unauthorized. Only SUPERADMIN can update subjects' }, { status: 403 });
     }
     
@@ -102,9 +113,13 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { data: authData, error: authError } = await supabase.auth.getSession();
+    const supabase = createRouteHandlerClient({ cookies });
     
-    if (authError || !authData.session) {
+    // Get the session from cookies
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      console.error('Authentication error:', sessionError);
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
     
@@ -112,10 +127,15 @@ export async function DELETE(
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('role')
-      .eq('id', authData.session.user.id)
+      .eq('id', session.user.id)
       .single();
     
-    if (userError || userData?.role !== 'SUPERADMIN') {
+    if (userError) {
+      console.error('Error fetching user role:', userError);
+      return NextResponse.json({ error: 'Failed to verify user role' }, { status: 500 });
+    }
+    
+    if (userData?.role !== 'SUPERADMIN') {
       return NextResponse.json({ error: 'Unauthorized. Only SUPERADMIN can delete subjects' }, { status: 403 });
     }
     
