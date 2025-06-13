@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
+import { getRouteHandlerClient, getServiceRoleClient } from '@/lib/supabase-server';
 import { Subject } from '@/types';
 
 // GET all subjects
 export async function GET() {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = getRouteHandlerClient();
     
     const { data, error } = await supabase
       .from('subjects')
@@ -44,20 +42,11 @@ export async function POST(req: NextRequest) {
   try {
     console.log('POST /api/subjects: Starting request');
     
-    // Use direct Supabase client with service role for admin operations
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    // Use service role client for admin operations
+    const supabaseAdmin = getServiceRoleClient();
     
     // Also create route handler client for session management
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = getRouteHandlerClient();
     
     // Get the session from cookies
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();

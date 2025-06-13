@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { getRouteHandlerClient, getServiceRoleClient } from '@/lib/supabase-server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
@@ -25,7 +25,7 @@ export async function GET(
     const { id } = await params;
     console.log(`GET /api/subjects/${id}: Starting request`);
     
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = getRouteHandlerClient();
     
     const { data, error } = await supabase
       .from('subjects')
@@ -58,20 +58,11 @@ export async function PUT(
     const { id } = await params;
     console.log(`PUT /api/subjects/${id}: Starting request`);
     
-    // Use direct Supabase client with service role for admin operations
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    // Use service role client for admin operations
+    const supabaseAdmin = getServiceRoleClient();
     
     // Also create route handler client for session management
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = getRouteHandlerClient();
     
     // Get the session from cookies
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -163,20 +154,11 @@ export async function DELETE(
     const { id } = await params;
     console.log(`DELETE /api/subjects/${id}: Starting request`);
     
-    // Use direct Supabase client with service role for admin operations
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    // Use service role client for admin operations
+    const supabaseAdmin = getServiceRoleClient();
     
     // Also create route handler client for session management
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = getRouteHandlerClient();
     
     // Get the session from cookies
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();

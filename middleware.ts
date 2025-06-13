@@ -2,9 +2,6 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 
-// Map to store middleware clients by request URL to minimize client creation
-const middlewareClientCache = new Map();
-
 export async function middleware(request: NextRequest) {
   // Get the origin header from the request
   const origin = request.headers.get('origin') || '';

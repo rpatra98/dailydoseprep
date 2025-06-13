@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -32,26 +31,5 @@ export const supabase = createClient(
   }
 );
 
-// Singleton pattern for browser client
-let browserClientInstance: ReturnType<typeof createClientComponentClient> | null = null;
-
-// Create a browser client that handles cookies properly - singleton implementation
-export const createBrowserClient = () => {
-  if (typeof window === 'undefined') {
-    // Server-side - create a new instance each time
-    return createClientComponentClient({
-      supabaseUrl: supabaseUrl || '',
-      supabaseKey: supabaseAnonKey || '',
-    });
-  }
-  
-  // Client-side - use singleton pattern
-  if (!browserClientInstance) {
-    browserClientInstance = createClientComponentClient({
-      supabaseUrl: supabaseUrl || '',
-      supabaseKey: supabaseAnonKey || '',
-    });
-  }
-  
-  return browserClientInstance;
-}; 
+// For browser usage, import getBrowserClient from @/lib/supabase-browser
+// For server route handlers, import getRouteHandlerClient from @/lib/supabase-server 

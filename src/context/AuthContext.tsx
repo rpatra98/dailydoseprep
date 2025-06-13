@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
-import { createBrowserClient } from '@/utils/supabase';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { getBrowserClient } from '@/lib/supabase-browser';
 import { AuthContextType, User } from '@/types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -12,8 +12,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  // Use memoized browser client to prevent multiple instances
-  const browserSupabase = useMemo(() => createBrowserClient(), []);
+  // Get the singleton browser client instance
+  const browserSupabase = getBrowserClient();
 
   useEffect(() => {
     const setData = async () => {
@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setData();
 
-    const { data: { subscription } } = browserSupabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = browserSupabase.auth.onAuthStateChange(async (event: string, session: any) => {
       console.log('Auth state changed:', event);
       try {
         if (session?.user) {
