@@ -4,10 +4,10 @@ import { supabase } from '@/utils/supabase';
 // GET a specific subject by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const id = params.id;
+    const id = context.params.id;
     
     const { data, error } = await supabase
       .from('subjects')
@@ -32,7 +32,7 @@ export async function GET(
 // PUT to update a subject - SUPERADMIN only
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     const { data: authData, error: authError } = await supabase.auth.getSession();
@@ -61,7 +61,7 @@ export async function PUT(
     }
     
     // Check if subject exists
-    const id = params.id;
+    const id = context.params.id;
     const { data: existingSubject, error: checkError } = await supabase
       .from('subjects')
       .select('*')
@@ -100,7 +100,7 @@ export async function PUT(
 // DELETE a subject - SUPERADMIN only
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     const { data: authData, error: authError } = await supabase.auth.getSession();
@@ -120,7 +120,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized. Only SUPERADMIN can delete subjects' }, { status: 403 });
     }
     
-    const id = params.id;
+    const id = context.params.id;
     
     // Check if subject exists
     const { data: existingSubject, error: checkError } = await supabase
