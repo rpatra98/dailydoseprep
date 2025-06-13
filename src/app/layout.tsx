@@ -3,8 +3,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
-import { AntdRegistry } from '@ant-design/nextjs-registry';
 import { ConfigProvider } from 'antd';
+import { AntdRegistry } from '@ant-design/nextjs-registry';
 import theme from '@/theme/themeConfig';
 import { useState, useEffect } from "react";
 
@@ -23,30 +23,17 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [error, setError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    try {
-      console.log("Root layout mounted");
-    } catch (err) {
-      console.error("Error in RootLayout:", err);
-      setError(err instanceof Error ? err : new Error(String(err)));
-    }
+    console.log("Root layout mounted");
+    // Short timeout to ensure CSS is applied
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, []);
-
-  if (error) {
-    return (
-      <html lang="en">
-        <body>
-          <div style={{ padding: '20px', textAlign: 'center' }}>
-            <h1>Something went wrong in the application</h1>
-            <p>{error.message}</p>
-            <button onClick={() => window.location.reload()}>Reload</button>
-          </div>
-        </body>
-      </html>
-    );
-  }
 
   return (
     <html lang="en">
@@ -56,20 +43,28 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <AntdRegistry>
-          <ConfigProvider theme={theme}>
-            <AuthProvider>
-              <div className="aspect-ratio-container">
-                <div className="aspect-ratio-content">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        {loading ? (
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            width: '100vw'
+          }}>
+            <p>Loading application...</p>
+          </div>
+        ) : (
+          <AntdRegistry>
+            <ConfigProvider theme={theme}>
+              <AuthProvider>
+                <div className="app-container">
                   {children}
                 </div>
-              </div>
-            </AuthProvider>
-          </ConfigProvider>
-        </AntdRegistry>
+              </AuthProvider>
+            </ConfigProvider>
+          </AntdRegistry>
+        )}
       </body>
     </html>
   );
