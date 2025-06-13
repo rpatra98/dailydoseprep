@@ -5,7 +5,6 @@ import {
   Modal, 
   Form, 
   Input, 
-  Select, 
   Popconfirm, 
   message,
   Typography,
@@ -20,7 +19,6 @@ import {
 import { Subject, ExamCategory } from '@/types';
 
 const { Title } = Typography;
-const { Option } = Select;
 
 export const SubjectManager = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -62,9 +60,7 @@ export const SubjectManager = () => {
   
   const handleEdit = (subject: Subject) => {
     form.setFieldsValue({
-      name: subject.name,
-      examCategory: subject.examCategory,
-      description: subject.description
+      name: subject.name
     });
     setCurrentSubject(subject);
     setIsEditing(true);
@@ -226,30 +222,6 @@ export const SubjectManager = () => {
             rules={[{ required: true, message: 'Please enter subject name' }]}
           >
             <Input placeholder="Enter subject name" />
-          </Form.Item>
-          
-          <Form.Item
-            name="examCategory"
-            label="Exam Category"
-            rules={[{ required: true, message: 'Please select exam category' }]}
-          >
-            <Select placeholder="Select exam category">
-              <Option value="UPSC">UPSC</Option>
-              <Option value="JEE">JEE</Option>
-              <Option value="NEET">NEET</Option>
-              <Option value="SSC">SSC</Option>
-              <Option value="OTHER">OTHER</Option>
-            </Select>
-          </Form.Item>
-          
-          <Form.Item
-            name="description"
-            label="Description"
-          >
-            <Input.TextArea
-              placeholder="Enter subject description (optional)"
-              rows={4}
-            />
           </Form.Item>
         </Form>
       </Modal>

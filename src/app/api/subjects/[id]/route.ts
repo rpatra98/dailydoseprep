@@ -55,10 +55,10 @@ export async function PUT(
     
     // Parse request body
     const body = await req.json();
-    const { name, examCategory, description } = body;
+    const { name } = body;
     
-    if (!name || !examCategory) {
-      return NextResponse.json({ error: 'Name and exam category are required' }, { status: 400 });
+    if (!name) {
+      return NextResponse.json({ error: 'Subject name is required' }, { status: 400 });
     }
     
     // Check if subject exists
@@ -72,13 +72,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
     }
     
-    // Update subject
+    // Update subject - keep existing examCategory and description
     const { data, error } = await supabase
       .from('subjects')
       .update({
         name,
-        examCategory,
-        description: description || null,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)

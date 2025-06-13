@@ -45,10 +45,10 @@ export async function POST(req: NextRequest) {
     
     // Parse request body
     const body = await req.json();
-    const { name, examCategory, description } = body;
+    const { name } = body;
     
-    if (!name || !examCategory) {
-      return NextResponse.json({ error: 'Name and exam category are required' }, { status: 400 });
+    if (!name) {
+      return NextResponse.json({ error: 'Subject name is required' }, { status: 400 });
     }
     
     // Check if subject already exists
@@ -56,20 +56,19 @@ export async function POST(req: NextRequest) {
       .from('subjects')
       .select('id')
       .eq('name', name)
-      .eq('examCategory', examCategory)
       .single();
       
     if (existingSubject) {
-      return NextResponse.json({ error: 'Subject with this name already exists for this exam category' }, { status: 409 });
+      return NextResponse.json({ error: 'Subject with this name already exists' }, { status: 409 });
     }
     
-    // Create new subject
+    // Create new subject with default values
     const { data, error } = await supabase
       .from('subjects')
       .insert({
         name,
-        examCategory,
-        description: description || null
+        examCategory: 'OTHER', // Default exam category
+        description: null
       })
       .select()
       .single();
