@@ -3,7 +3,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Ant Design styles */
+/* Ant Design styles - for Ant Design 5.x */
 @import 'antd/dist/reset.css';
 
 :root {
@@ -44,26 +44,22 @@ body {
   background: #f5f5f5;
 }
 
-/* 7:5 Aspect Ratio Container */
+/* Fix aspect ratio container */
 .aspect-ratio-container {
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100vh;
-  padding: 20px;
+  padding: 0;
   box-sizing: border-box;
 }
 
 .aspect-ratio-content {
   width: 100%;
-  max-width: 1750px; /* Maximum width for the content */
-  height: auto;
-  min-height: 0;
-  max-height: min(1250px, calc(100vh - 40px)); /* Maximum height for 7:5 at 1750px width, but not exceeding viewport */
-  aspect-ratio: 7 / 5;
-  position: relative;
-  overflow: auto; /* Only show scrollbars when needed */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
   background-color: #fff;
   margin: 0 auto;
   display: flex;
@@ -85,15 +81,7 @@ body {
   background: transparent;
 }
 
-/* Make sure the aspect ratio is maintained on smaller screens */
-@media (max-width: 1200px) {
-  .aspect-ratio-content {
-    max-width: 90vw;
-    max-height: min(calc(90vw * 5 / 7), calc(100vh - 40px));
-  }
-}
-
-/* For mobile devices, fill the entire screen and remove padding */
+/* For mobile devices */
 @media (max-width: 768px) {
   .aspect-ratio-container {
     padding: 0;

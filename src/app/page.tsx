@@ -10,11 +10,30 @@ const { useBreakpoint } = Grid;
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
   const screens = useBreakpoint();
   
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    try {
+      console.log("Home component mounting...");
+      setIsMounted(true);
+      console.log("Screens object:", screens);
+    } catch (err) {
+      console.error("Error in Home component mount:", err);
+      setError(err instanceof Error ? err : new Error(String(err)));
+    }
+  }, [screens]);
+  
+  // If there's an error, show it
+  if (error) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <h1>Something went wrong</h1>
+        <p>{error.message}</p>
+        <button onClick={() => window.location.reload()}>Try again</button>
+      </div>
+    );
+  }
   
   const isMobile = isMounted ? screens.xs : false;
   
