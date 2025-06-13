@@ -5,8 +5,21 @@ let browserClientInstance: any = null;
 
 export function getBrowserClient() {
   if (typeof window === 'undefined') {
-    // We're on the server, throw an error to prevent usage
-    throw new Error('getBrowserClient() cannot be used on the server. Use getServerClient() instead.');
+    // We're on the server, return a dummy client that won't be used
+    // This prevents errors during SSR/SSG
+    return {
+      auth: {
+        getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
+      },
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            single: () => Promise.resolve({ data: null, error: null })
+          })
+        })
+      })
+    };
   }
   
   if (!browserClientInstance) {
