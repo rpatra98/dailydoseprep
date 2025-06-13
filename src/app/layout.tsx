@@ -90,10 +90,10 @@ export default function RootLayout({
       console.log("Supabase environment variables found");
     }
     
-    // Longer timeout to ensure everything is loaded
+    // Shorter timeout to improve user experience
     const timer = setTimeout(() => {
       setLoading(false);
-    }, 1000);
+    }, 500);
     
     return () => clearTimeout(timer);
   }, []);
@@ -114,7 +114,7 @@ export default function RootLayout({
             justifyContent: 'center', 
             alignItems: 'center', 
             height: '100vh',
-            width: '100vw',
+            width: '100%',
             backgroundColor: '#f5f5f5'
           }}>
             <div className="loading-spinner"></div>
@@ -125,9 +125,7 @@ export default function RootLayout({
             <AntdRegistry>
               <ConfigProvider theme={theme}>
                 <AuthProvider>
-                  <div className="app-container">
-                    {children}
-                  </div>
+                  {children}
                 </AuthProvider>
               </ConfigProvider>
             </AntdRegistry>

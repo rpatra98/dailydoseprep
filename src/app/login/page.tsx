@@ -3,27 +3,33 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Form, Input, Button, Card, Typography, Alert, Grid, Spin } from 'antd';
+import { Form, Input, Button, Card, Typography, Alert, Spin } from 'antd';
 import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 
 const { Title } = Typography;
-const { useBreakpoint } = Grid;
 
 export default function LoginPage() {
   const [form] = Form.useForm();
   const [localError, setLocalError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const { user, login, loading, error, authInitialized } = useAuth();
   const router = useRouter();
-  const screens = useBreakpoint();
   
+  // Check if we're on mobile
   useEffect(() => {
-    setIsMounted(true);
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
   }, []);
-  
-  const isMobile = isMounted ? screens.xs : false;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -47,8 +53,15 @@ export default function LoginPage() {
       await login(email, password);
       // Successful login will trigger the useEffect to redirect
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Email not confirmed')) {
-        setLocalError('Account email not confirmed. If you are a QAUTHOR, please contact the SUPERADMIN.');
+      console.error("Login error:", error);
+      if (error instanceof Error) {
+        if (error.message.includes('Email not confirmed')) {
+          setLocalError('Account email not confirmed. If you are a QAUTHOR, please contact the SUPERADMIN.');
+        } else if (error.message.includes('Authentication client not initialized')) {
+          setLocalError('Authentication service is initializing. Please try again in a moment.');
+        } else {
+          setLocalError(`Login failed: ${error.message}`);
+        }
       } else {
         setLocalError('Invalid email or password');
       }
@@ -61,31 +74,17 @@ export default function LoginPage() {
   const displayError = localError || error;
 
   // If auth is still initializing, show loading
-  if (!authInitialized) {
+  if (!authInitialized && loading) {
     return (
-      <div style={{ 
-        height: '100%', 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        background: '#f0f2f5' 
-      }}>
-        <Spin size="large" tip="Initializing..." />
+      <div className="auth-page-container">
+        <Spin size="large" />
+        <p style={{ marginTop: 16 }}>Initializing authentication...</p>
       </div>
     );
   }
 
   return (
-    <div style={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      justifyContent: 'center', 
-      alignItems: 'center', 
-      background: '#f0f2f5',
-      overflow: 'visible',
-      position: 'relative'
-    }}>
+    <div className="auth-page-container">
       {/* Back button */}
       <div style={{ 
         position: 'absolute', 
@@ -105,10 +104,9 @@ export default function LoginPage() {
 
       <Card style={{ 
         width: isMobile ? '100%' : 400, 
-        borderRadius: isMobile ? 0 : 8, 
-        boxShadow: isMobile ? 'none' : '0 2px 8px rgba(0,0,0,0.15)',
-        margin: isMobile ? 0 : undefined,
-        border: isMobile ? 'none' : undefined
+        borderRadius: 8, 
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        marginTop: '60px'
       }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <Title level={isMobile ? 3 : 2}>Sign in to your account</Title>
