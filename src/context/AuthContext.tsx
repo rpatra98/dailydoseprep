@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/utils/supabase';
+import { supabase, createBrowserClient } from '@/utils/supabase';
 import { AuthContextType, User } from '@/types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -11,12 +11,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
+  
+  // Use the browser client for client components
+  const browserSupabase = createBrowserClient();
 
   useEffect(() => {
     const setData = async () => {
       try {
         setError(null);
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await browserSupabase.auth.getSession();
         
         if (sessionError) {
           console.error('Session error:', sessionError);
@@ -27,7 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (session?.user) {
           // Fetch user data from our users table
-          const { data: userData, error: userError } = await supabase
+          const { data: userData, error: userError } = await browserSupabase
             .from('users')
             .select('*')
             .eq('id', session.user.id)
@@ -51,12 +54,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setData();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = browserSupabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event);
       try {
         if (session?.user) {
           // Fetch user data from our users table
-          const { data: userData, error: userError } = await supabase
+          const { data: userData, error: userError } = await browserSupabase
             .from('users')
             .select('*')
             .eq('id', session.user.id)
@@ -88,7 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       // Check if this is potentially a QAUTHOR trying to log in
-      const { data: possibleQAuthor, error: qaCheckError } = await supabase
+      const { data: possibleQAuthor, error: qaCheckError } = await browserSupabase
         .from('users')
         .select('role')
         .eq('email', email)
@@ -101,7 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const mightBeQAuthor = possibleQAuthor?.role === 'QAUTHOR';
       
       // Standard login attempt
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await browserSupabase.auth.signInWithPassword({ email, password });
       
       // Handle specific error for email confirmation
       if (error) {
@@ -114,12 +117,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             headers: {
               'Content-Type': 'application/json',
             },
+            credentials: 'include',
             body: JSON.stringify({ email }),
           });
           
           if (response.ok) {
             // Try logging in again after verification
-            const retryLogin = await supabase.auth.signInWithPassword({ email, password });
+            const retryLogin = await browserSupabase.auth.signInWithPassword({ email, password });
             if (retryLogin.error) {
               setError(retryLogin.error.message);
               throw retryLogin.error;
@@ -159,7 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       // Make sure we have a session before attempting to sign out
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData } = await browserSupabase.auth.getSession();
       
       if (!sessionData.session) {
         console.log('No active session found, clearing user state');
@@ -167,7 +171,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       
-      const { error } = await supabase.auth.signOut();
+      const { error } = await browserSupabase.auth.signOut();
       if (error) {
         setError(error.message);
         console.error('Logout error:', error);
@@ -189,11 +193,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
-      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      const { data: { user: currentUser }, error: authError } = await browserSupabase.auth.getUser();
       if (authError) throw authError;
 
       // Check if current user is SUPERADMIN
-      const { data: userData, error: userError } = await supabase
+      const { data: userData, error: userError } = await browserSupabase
         .from('users')
         .select('role')
         .eq('id', currentUser?.id)
@@ -213,6 +217,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -243,7 +248,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       // Create the student account with standard signup flow
       // For students, we do want email confirmation as per security best practices
-      const { data: { user: newUser }, error: signUpError } = await supabase.auth.signUp({
+      const { data: { user: newUser }, error: signUpError } = await browserSupabase.auth.signUp({
         email,
         password,
         options: {
@@ -258,7 +263,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!newUser?.id) throw new Error('Failed to create user');
 
       // Set the user role as STUDENT
-      const { error: roleError } = await supabase
+      const { error: roleError } = await browserSupabase
         .from('users')
         .insert({
           id: newUser.id,
