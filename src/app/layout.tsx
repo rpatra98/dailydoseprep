@@ -18,6 +18,61 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Simple error boundary component
+function ErrorBoundary({ children }: { children: React.ReactNode }) {
+  const [hasError, setHasError] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    // Add global error handler
+    const handleError = (event: ErrorEvent) => {
+      console.error("Global error caught:", event.error);
+      setError(event.error);
+      setHasError(true);
+      event.preventDefault();
+    };
+
+    window.addEventListener('error', handleError);
+    
+    return () => {
+      window.removeEventListener('error', handleError);
+    };
+  }, []);
+
+  if (hasError) {
+    return (
+      <div style={{ 
+        padding: '20px', 
+        textAlign: 'center', 
+        maxWidth: '600px', 
+        margin: '40px auto',
+        backgroundColor: '#fff',
+        border: '1px solid #f0f0f0',
+        borderRadius: '8px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+      }}>
+        <h1>Something went wrong</h1>
+        <p>{error?.message || "An unexpected error occurred"}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          style={{
+            backgroundColor: '#1677ff',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          Reload the application
+        </button>
+      </div>
+    );
+  }
+
+  return children;
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,10 +82,18 @@ export default function RootLayout({
   
   useEffect(() => {
     console.log("Root layout mounted");
-    // Short timeout to ensure CSS is applied
+    
+    // Check if environment variables are available
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      console.error("Missing Supabase environment variables");
+    } else {
+      console.log("Supabase environment variables found");
+    }
+    
+    // Longer timeout to ensure everything is loaded
     const timer = setTimeout(() => {
       setLoading(false);
-    }, 100);
+    }, 1000);
     
     return () => clearTimeout(timer);
   }, []);
@@ -47,23 +110,28 @@ export default function RootLayout({
         {loading ? (
           <div style={{ 
             display: 'flex', 
+            flexDirection: 'column',
             justifyContent: 'center', 
             alignItems: 'center', 
             height: '100vh',
-            width: '100vw'
+            width: '100vw',
+            backgroundColor: '#f5f5f5'
           }}>
-            <p>Loading application...</p>
+            <div className="loading-spinner"></div>
+            <p style={{ marginTop: '20px' }}>Loading Daily Dose Prep...</p>
           </div>
         ) : (
-          <AntdRegistry>
-            <ConfigProvider theme={theme}>
-              <AuthProvider>
-                <div className="app-container">
-                  {children}
-                </div>
-              </AuthProvider>
-            </ConfigProvider>
-          </AntdRegistry>
+          <ErrorBoundary>
+            <AntdRegistry>
+              <ConfigProvider theme={theme}>
+                <AuthProvider>
+                  <div className="app-container">
+                    {children}
+                  </div>
+                </AuthProvider>
+              </ConfigProvider>
+            </AntdRegistry>
+          </ErrorBoundary>
         )}
       </body>
     </html>

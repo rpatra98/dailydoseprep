@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getBrowserClient } from '@/lib/supabase-browser';
 import { AuthContextType, User } from '@/types';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -11,13 +12,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
+  const [initError, setInitError] = useState<Error | null>(null);
   
   // Get the singleton browser client instance
-  const browserSupabase = getBrowserClient();
+  let browserSupabase: SupabaseClient | null = null;
+  
+  try {
+    console.log("Getting browser client...");
+    browserSupabase = getBrowserClient();
+    console.log("Browser client initialized successfully");
+  } catch (err) {
+    console.error("Failed to initialize Supabase client:", err);
+    setInitError(err instanceof Error ? err : new Error(String(err)));
+  }
 
   useEffect(() => {
+    if (initError || !browserSupabase) {
+      console.error("Skipping auth initialization due to client init error");
+      setLoading(false);
+      setAuthInitialized(true);
+      return;
+    }
+
+    console.log("Running auth effect");
+    
     const setData = async () => {
       try {
+        console.log("Fetching session...");
         setError(null);
         const { data: { session }, error: sessionError } = await browserSupabase.auth.getSession();
         
@@ -28,25 +49,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
         
+        console.log("Session fetched:", session ? "Found" : "Not found");
+        
         if (session?.user) {
+          console.log("User found in session, fetching user data");
           // Fetch user data from our users table
-          const { data: userData, error: userError } = await browserSupabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+          try {
+            const { data: userData, error: userError } = await browserSupabase
+              .from('users')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
 
-          if (userError) {
-            console.warn('User exists in Auth but not in users table:', userError);
-            // Don't throw here, just set user to null and continue
-          } else {
-            setUser(userData as User);
+            if (userError) {
+              console.warn('User exists in Auth but not in users table:', userError);
+              // Don't throw here, just set user to null and continue
+            } else {
+              console.log("User data fetched successfully");
+              setUser(userData as User);
+            }
+          } catch (userFetchErr) {
+            console.error("Error fetching user data:", userFetchErr);
           }
         }
       } catch (err) {
         console.error('Error in AuthContext:', err);
         setError(err instanceof Error ? err.message : 'Authentication error');
       } finally {
+        console.log("Auth initialization complete");
         setAuthInitialized(true);
         setLoading(false);
       }
@@ -54,36 +84,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setData();
 
-    const { data: { subscription } } = browserSupabase.auth.onAuthStateChange(async (event: string, session: any) => {
-      console.log('Auth state changed:', event);
-      try {
-        if (session?.user) {
-          // Fetch user data from our users table
-          const { data: userData, error: userError } = await browserSupabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+    let subscription: { unsubscribe: () => void } | undefined;
+    try {
+      console.log("Setting up auth state change listener");
+      const { data } = browserSupabase.auth.onAuthStateChange(async (event: string, session: any) => {
+        console.log('Auth state changed:', event);
+        try {
+          if (session?.user) {
+            // Fetch user data from our users table
+            const { data: userData, error: userError } = await browserSupabase
+              .from('users')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
 
-          if (userError) {
-            console.warn('User exists in Auth but not in users table:', userError);
-            setUser(null);
+            if (userError) {
+              console.warn('User exists in Auth but not in users table:', userError);
+              setUser(null);
+            } else {
+              setUser(userData as User);
+            }
           } else {
-            setUser(userData as User);
+            setUser(null);
           }
-        } else {
+        } catch (err) {
+          console.error('Error in auth state change:', err);
           setUser(null);
         }
-      } catch (err) {
-        console.error('Error in auth state change:', err);
-        setUser(null);
-      }
-    });
+      });
+      
+      subscription = data.subscription;
+    } catch (subErr) {
+      console.error("Error setting up auth state change listener:", subErr);
+    }
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription) {
+        console.log("Cleaning up auth subscription");
+        subscription.unsubscribe();
+      }
     };
-  }, [browserSupabase]);
+  }, [browserSupabase, initError]);
 
   const login = async (email: string, password: string) => {
     setLoading(true);
