@@ -13,7 +13,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+// Create Supabase client with additional options
 export const supabase = createClient(
   supabaseUrl || '',
-  supabaseAnonKey || ''
+  supabaseAnonKey || '',
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'dailydoseprep',
+      },
+    }
+  }
 ); 
