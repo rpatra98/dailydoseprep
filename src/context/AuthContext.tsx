@@ -10,6 +10,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   useEffect(() => {
     const setData = async () => {
@@ -18,7 +19,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
-          throw sessionError;
+          console.error('Session error:', sessionError);
+          setAuthInitialized(true);
+          setLoading(false);
+          return;
         }
         
         if (session?.user) {
@@ -40,6 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error('Error in AuthContext:', err);
         setError(err instanceof Error ? err.message : 'Authentication error');
       } finally {
+        setAuthInitialized(true);
         setLoading(false);
       }
     };
@@ -47,6 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setData();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event);
       try {
         if (session?.user) {
           // Fetch user data from our users table
@@ -95,7 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const mightBeQAuthor = possibleQAuthor?.role === 'QAUTHOR';
       
       // Standard login attempt
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       // Handle specific error for email confirmation
       if (error) {
@@ -128,6 +134,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setError(error.message);
           throw error;
         }
+      }
+      
+      // Check if we got a session and user back
+      if (!data.session || !data.user) {
+        const errorMsg = 'Login failed: No session created';
+        setError(errorMsg);
+        throw new Error(errorMsg);
       }
       
       // We don't need to manually set the user here as the onAuthStateChange 
@@ -272,6 +285,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logout,
     createQAUTHOR,
     registerStudent,
+    authInitialized
   };
 
   return (

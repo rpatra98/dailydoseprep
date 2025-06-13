@@ -34,7 +34,7 @@ const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 
 export default function Dashboard() {
-  const { user, logout, createQAUTHOR } = useAuth();
+  const { user, logout, createQAUTHOR, authInitialized } = useAuth();
   const router = useRouter();
   const [form] = Form.useForm();
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -46,8 +46,9 @@ export default function Dashboard() {
   const [createSuccess, setCreateSuccess] = useState('');
 
   useEffect(() => {
-    // Redirect if not logged in
-    if (!user) {
+    // Redirect if not logged in (only after auth is initialized)
+    if (!user && authInitialized) {
+      console.log('User not logged in, redirecting to login page');
       router.push('/login');
       return;
     }
@@ -97,9 +98,11 @@ export default function Dashboard() {
       }
     }
 
-    // Call the fetch function
-    fetchData();
-  }, [user, router]);
+    // Call the fetch function only if user is logged in
+    if (user) {
+      fetchData();
+    }
+  }, [user, router, authInitialized]);
 
   const refreshUsers = async () => {
     if (userRole !== 'SUPERADMIN') return;
@@ -160,6 +163,21 @@ export default function Dashboard() {
       router.push('/login');
     }
   };
+
+  // If auth is still initializing, show loading
+  if (!authInitialized) {
+    return (
+      <div style={{ 
+        height: '100%', 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        background: '#f0f2f5' 
+      }}>
+        <Spin size="large" tip="Initializing..." />
+      </div>
+    );
+  }
 
   // If not logged in, don't render anything (will redirect in useEffect)
   if (!user) {

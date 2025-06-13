@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Form, Input, Button, Card, Typography, Alert, Grid } from 'antd';
+import { Form, Input, Button, Card, Typography, Alert, Grid, Spin } from 'antd';
 import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 
@@ -15,7 +15,7 @@ export default function LoginPage() {
   const [localError, setLocalError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const { user, login, loading, error } = useAuth();
+  const { user, login, loading, error, authInitialized } = useAuth();
   const router = useRouter();
   const screens = useBreakpoint();
   
@@ -27,10 +27,11 @@ export default function LoginPage() {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) {
+    if (user && authInitialized) {
+      console.log('User is logged in, redirecting to dashboard');
       router.push('/dashboard');
     }
-  }, [user, router]);
+  }, [user, router, authInitialized]);
 
   const handleSubmit = async (values: { email: string; password: string }) => {
     const { email, password } = values;
@@ -58,6 +59,21 @@ export default function LoginPage() {
 
   // Show any contextual errors from the auth provider
   const displayError = localError || error;
+
+  // If auth is still initializing, show loading
+  if (!authInitialized) {
+    return (
+      <div style={{ 
+        height: '100%', 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        background: '#f0f2f5' 
+      }}>
+        <Spin size="large" tip="Initializing..." />
+      </div>
+    );
+  }
 
   return (
     <div style={{ 

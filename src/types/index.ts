@@ -64,6 +64,7 @@ export interface AuthContextType {
     user: User | null;
     loading: boolean;
     error: string | null;
+    authInitialized: boolean;
     login: (email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
     createQAUTHOR: (email: string, password: string) => Promise<string>;
