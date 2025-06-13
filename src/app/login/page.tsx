@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
+  const [connectionIssue, setConnectionIssue] = useState(false);
   const { user, login, loading, error, authInitialized } = useAuth();
   const router = useRouter();
   
@@ -40,10 +41,24 @@ export default function LoginPage() {
     }
   }, [user, router, authInitialized]);
 
+  // Monitor for timeout issues
+  useEffect(() => {
+    if (loginAttempts > 0 && !isSubmitting && !user) {
+      const timeoutId = setTimeout(() => {
+        if (!user && localError.includes('timeout')) {
+          setConnectionIssue(true);
+        }
+      }, 5000);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [loginAttempts, isSubmitting, user, localError]);
+
   const handleSubmit = async (values: { email: string; password: string }) => {
     const { email, password } = values;
     setLocalError('');
     setLoginAttempts(prev => prev + 1);
+    setConnectionIssue(false);
     
     if (!email || !password) {
       setLocalError('Email and password are required');
@@ -71,6 +86,9 @@ export default function LoginPage() {
           setLocalError('Authentication service is initializing. Please try again in a moment.');
         } else if (error.message.includes('Invalid login credentials')) {
           setLocalError('Invalid email or password. Please check your credentials and try again.');
+        } else if (error.message.includes('timeout') || error.message.includes('fetch')) {
+          setLocalError('Connection timeout. The server is not responding. Please check your internet connection and try again.');
+          setConnectionIssue(true);
         } else {
           setLocalError(`Login failed: ${error.message}`);
         }
@@ -85,6 +103,11 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Handle manual page refresh
+  const handleRefresh = () => {
+    window.location.reload();
   };
 
   // Show any contextual errors from the auth provider
@@ -138,6 +161,16 @@ export default function LoginPage() {
           />
         )}
         
+        {connectionIssue && (
+          <Alert
+            message="Database Connection Issue"
+            description="We're having trouble connecting to our database. This could be due to server maintenance or network issues."
+            type="warning"
+            showIcon
+            style={{ marginBottom: 24 }}
+          />
+        )}
+        
         <Form
           form={form}
           name="login"
@@ -185,11 +218,11 @@ export default function LoginPage() {
             </Button>
           </Form.Item>
           
-          {loginAttempts > 0 && (
+          {(loginAttempts > 0 || connectionIssue) && (
             <div style={{ textAlign: 'center', marginTop: 16 }}>
               <Button 
                 type="link" 
-                onClick={() => window.location.reload()}
+                onClick={handleRefresh}
               >
                 Refresh page
               </Button>

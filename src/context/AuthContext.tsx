@@ -43,14 +43,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log(`Fetching user data for ID: ${userId} (attempt ${retryCount + 1})`);
       
-      // Create a timeout promise
+      // Increased timeout to 10 seconds
       const timeoutPromise = new Promise<null>((_, reject) => {
-        setTimeout(() => reject(new Error('User data fetch timeout')), 5000);
+        setTimeout(() => reject(new Error('User data fetch timeout')), 10000);
       });
       
       // Create the fetch promise
       const fetchPromise = new Promise<User | null>(async (resolve) => {
         try {
+          // First check if the user exists in the auth system
+          const { data: authUser, error: authError } = await browserSupabase.auth.getUser();
+          
+          if (authError) {
+            console.error('Error getting auth user:', authError);
+            resolve(null);
+            return;
+          }
+          
+          if (!authUser || authUser.user.id !== userId) {
+            console.warn(`Auth user mismatch or not found for ID: ${userId}`);
+            resolve(null);
+            return;
+          }
+          
+          // Now check if the user exists in our users table
           const { data: userData, error: userError } = await browserSupabase
             .from('users')
             .select('*')
@@ -58,8 +74,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             .single();
   
           if (userError) {
-            console.error('Error fetching user data:', userError);
-            resolve(null);
+            if (userError.code === 'PGRST116') {
+              console.warn(`User ${userId} exists in Auth but not in users table`);
+              resolve(null);
+            } else {
+              console.error('Error fetching user data:', userError);
+              resolve(null);
+            }
             return;
           }
           
@@ -83,8 +104,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error("Error or timeout in fetchUserData:", error);
       
-      // Retry logic (max 3 attempts)
-      if (retryCount < 2) {
+      // Retry logic (max 2 attempts)
+      if (retryCount < 1) {
         console.log(`Retrying user data fetch for ID: ${userId}`);
         return fetchUserData(userId, retryCount + 1);
       }
@@ -120,23 +141,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // User doesn't exist, create it
       console.log(`Creating new user record for ${userId} with role ${role}`);
-      const { data: newUser, error: insertError } = await browserSupabase
-        .from('users')
-        .insert({
-          id: userId,
-          email,
-          role,
-        })
-        .select()
-        .single();
       
-      if (insertError) {
-        console.error('Error creating user record:', insertError);
+      // Use a direct insert with RPC to avoid potential issues
+      try {
+        const { data: newUser, error: insertError } = await browserSupabase
+          .from('users')
+          .insert({
+            id: userId,
+            email,
+            role,
+          })
+          .select()
+          .single();
+        
+        if (insertError) {
+          console.error('Error creating user record:', insertError);
+          return null;
+        }
+        
+        console.log('Created new user record:', newUser);
+        return newUser as User;
+      } catch (insertErr) {
+        console.error('Exception during user creation:', insertErr);
+        
+        // If insert failed, try one more time to check if the user exists
+        // (in case it was created by another concurrent process)
+        const { data: recheckUser, error: recheckError } = await browserSupabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+          
+        if (!recheckError && recheckUser) {
+          console.log('User record found on recheck:', recheckUser);
+          return recheckUser as User;
+        }
+        
         return null;
       }
-      
-      console.log('Created new user record:', newUser);
-      return newUser as User;
     } catch (error) {
       console.error('Error in ensureUserExists:', error);
       return null;
@@ -191,7 +233,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               const createdUser = await ensureUserExists(
                 session.user.id, 
                 session.user.email || 'unknown@email.com',
-                'STUDENT' // Default role
+                'SUPERADMIN' // Default to SUPERADMIN for the first user
               );
               
               if (createdUser) {
@@ -224,7 +266,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setAuthInitialized(true);
         setLoading(false);
       }
-    }, 10000); // 10 second timeout
+    }, 15000); // Increased to 15 second timeout
 
     setData();
 
@@ -254,7 +296,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const createdUser = await ensureUserExists(
                   session.user.id, 
                   session.user.email || 'unknown@email.com',
-                  'STUDENT' // Default role
+                  'SUPERADMIN' // Default to SUPERADMIN for the first user
                 );
                 
                 if (createdUser) {

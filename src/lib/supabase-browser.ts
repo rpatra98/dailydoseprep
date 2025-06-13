@@ -3,6 +3,8 @@ import { SupabaseClient } from '@supabase/supabase-js';
 
 // Singleton pattern for browser client
 let browserClientInstance: SupabaseClient | null = null;
+let initializationAttempts = 0;
+const MAX_INIT_ATTEMPTS = 3;
 
 export function getBrowserClient(): SupabaseClient {
   if (typeof window === 'undefined') {
@@ -30,7 +32,8 @@ export function getBrowserClient(): SupabaseClient {
   
   try {
     if (!browserClientInstance) {
-      console.log('Initializing Supabase browser client');
+      initializationAttempts++;
+      console.log(`Initializing Supabase browser client (attempt ${initializationAttempts}/${MAX_INIT_ATTEMPTS})`);
       
       // Check for environment variables
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -46,7 +49,7 @@ export function getBrowserClient(): SupabaseClient {
       
       console.log('Supabase environment variables found');
       
-      // Create the client with correct options structure
+      // Create the client with correct options structure and improved timeouts
       browserClientInstance = createClientComponentClient({
         supabaseUrl,
         supabaseKey,
@@ -58,7 +61,18 @@ export function getBrowserClient(): SupabaseClient {
             headers: {
               'X-Client-Info': 'dailydoseprep-browser',
             },
+          },
+          realtime: {
+            timeout: 60000, // 60 seconds
           }
+        },
+        // Cookie options for auth persistence
+        cookieOptions: {
+          name: 'dailydoseprep-auth',
+          path: '/',
+          domain: '',
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production'
         }
       });
       
@@ -67,12 +81,47 @@ export function getBrowserClient(): SupabaseClient {
         throw new Error('Failed to initialize Supabase client');
       }
       
+      // Test the connection
+      testConnection(browserClientInstance)
+        .then(isConnected => {
+          if (isConnected) {
+            console.log('Supabase connection test successful');
+          } else {
+            console.error('Supabase connection test failed');
+            // Don't reset the client here, as it might work for some operations
+          }
+        })
+        .catch(err => {
+          console.error('Supabase connection test error:', err);
+        });
+      
       console.log('Supabase browser client initialized successfully');
     }
     
     return browserClientInstance;
   } catch (error) {
     console.error('Error initializing Supabase client:', error);
-    throw error;
+    
+    // If we've tried too many times, throw the error
+    if (initializationAttempts >= MAX_INIT_ATTEMPTS) {
+      throw error;
+    }
+    
+    // Otherwise, reset the client and try again
+    browserClientInstance = null;
+    return getBrowserClient();
+  }
+}
+
+// Test the connection to Supabase
+async function testConnection(client: SupabaseClient): Promise<boolean> {
+  try {
+    // Use a simple query that should always work if connected
+    const { error } = await client.from('users').select('count', { count: 'exact', head: true });
+    
+    return !error;
+  } catch (err) {
+    console.error('Connection test error:', err);
+    return false;
   }
 } 
