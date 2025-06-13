@@ -1,6 +1,6 @@
-# Next.js + Supabase Starter
+# Daily Dose Prep
 
-A modern full-stack application starter template using Next.js and Supabase.
+A web application for competitive exam preparation with daily practice questions.
 
 ## Features
 
@@ -11,87 +11,71 @@ A modern full-stack application starter template using Next.js and Supabase.
 - Protected Routes
 - Todo Application Example
 
-## Getting Started
+## Database Setup
 
-### Prerequisites
+The application requires a Supabase database with the correct schema. If you're seeing the error `relation "public.subjects" does not exist`, you need to set up your database schema:
 
-- Node.js 18.17 or later
-- npm or yarn
-- A Supabase account (free tier available)
+### Option 1: Using the Setup Script
 
-### Setup
+1. Make sure your `.env.local` file contains the correct Supabase credentials:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+   ```
 
-1. Clone this repository
+2. Run the setup script:
+   ```bash
+   npm run setup-db
+   ```
 
-```bash
-git clone <repository-url>
-cd <repository-name>
-```
+### Option 2: Manual Setup
 
-2. Install dependencies
+1. Create a new Supabase project at [https://app.supabase.com/](https://app.supabase.com/)
 
-```bash
-npm install
-# or
-yarn install
-```
+2. Once your project is created, navigate to the SQL Editor in the Supabase dashboard
 
-3. Create a Supabase project
+3. Create a new query and paste the contents of `src/db/schema.sql`
 
-   - Go to [Supabase](https://supabase.com) and create a new project
-   - Once your project is ready, go to Settings > API and copy your URL and anon key
+4. Run the SQL query to create all necessary tables and policies
 
-4. Create a `.env.local` file in the root directory with the following variables:
+5. Update your environment variables with your Supabase project URL and keys
+
+## Environment Variables
+
+Create a `.env.local` file in the root directory with the following variables:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 ```
 
-5. Set up the database schema
-
-   - In your Supabase project, navigate to the SQL Editor
-   - Create a new query and paste the following SQL:
-
-```sql
--- Create a table for todos
-CREATE TABLE todos (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  task TEXT NOT NULL,
-  is_complete BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Set up Row Level Security
-ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
-
--- Create policy to allow users to see only their own todos
-CREATE POLICY "Users can view their own todos" ON todos
-  FOR SELECT USING (auth.uid() = user_id);
-
--- Create policy to allow users to insert their own todos
-CREATE POLICY "Users can insert their own todos" ON todos
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
--- Create policy to allow users to update their own todos
-CREATE POLICY "Users can update their own todos" ON todos
-  FOR UPDATE USING (auth.uid() = user_id);
-
--- Create policy to allow users to delete their own todos
-CREATE POLICY "Users can delete their own todos" ON todos
-  FOR DELETE USING (auth.uid() = user_id);
-```
-
-6. Run the development server
+## Development
 
 ```bash
+# Install dependencies
+npm install
+
+# Run the development server
 npm run dev
-# or
-yarn dev
 ```
 
-7. Open [http://localhost:3000](http://localhost:3000) in your browser
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Deployment
+
+This application is deployed on Vercel. Connect your GitHub repository to Vercel and configure the environment variables in the Vercel dashboard.
+
+## Troubleshooting
+
+### Error: relation "public.subjects" does not exist
+
+This error occurs when the database schema hasn't been properly set up. Follow the Database Setup instructions above to create the required tables.
+
+### Multiple GoTrueClient instances detected
+
+This warning is normal during development and doesn't affect functionality. We've implemented a singleton pattern for the Supabase client to minimize this issue.
 
 ## Usage
 

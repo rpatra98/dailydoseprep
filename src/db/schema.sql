@@ -1,41 +1,99 @@
--- Enable UUID extension
+-- Create extension for UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create enum types
-CREATE TYPE user_role AS ENUM ('SUPERADMIN', 'QAUTHOR', 'STUDENT');
-CREATE TYPE difficulty_level AS ENUM ('EASY', 'MEDIUM', 'HARD');
-CREATE TYPE exam_category AS ENUM ('UPSC', 'JEE', 'NEET', 'SSC', 'OTHER');
-
--- Users table
-CREATE TABLE users (
+-- Create subjects table
+CREATE TABLE IF NOT EXISTS public.subjects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    role user_role NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    name TEXT NOT NULL UNIQUE,
+    examCategory TEXT DEFAULT 'OTHER',
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- Questions table
-CREATE TABLE questions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    option_a TEXT NOT NULL,
-    option_b TEXT NOT NULL,
-    option_c TEXT NOT NULL,
-    option_d TEXT NOT NULL,
-    correct_option CHAR(1) NOT NULL CHECK (correct_option IN ('A', 'B', 'C', 'D')),
-    explanation TEXT NOT NULL,
-    difficulty difficulty_level NOT NULL,
-    exam_category exam_category NOT NULL,
-    subject TEXT NOT NULL,
-    year INTEGER,
-    source TEXT,
-    created_by UUID REFERENCES users(id) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- Create users table if not exists (Supabase Auth creates this, but we'll add our custom fields)
+CREATE TABLE IF NOT EXISTS public.users (
+    id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'STUDENT',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+-- Create questions table
+CREATE TABLE IF NOT EXISTS public.questions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    subject UUID REFERENCES public.subjects(id),
+    question_text TEXT NOT NULL,
+    options JSONB,
+    correct_answer TEXT,
+    explanation TEXT,
+    difficulty TEXT,
+    created_by UUID REFERENCES public.users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Add RLS policies
+ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.questions ENABLE ROW LEVEL SECURITY;
+
+-- Subjects policies
+CREATE POLICY "Allow public read access to subjects" 
+    ON public.subjects FOR SELECT 
+    USING (true);
+
+CREATE POLICY "Allow SUPERADMIN to create subjects" 
+    ON public.subjects FOR INSERT 
+    TO authenticated 
+    USING ((SELECT role FROM public.users WHERE id = auth.uid()) = 'SUPERADMIN');
+
+CREATE POLICY "Allow SUPERADMIN to update subjects" 
+    ON public.subjects FOR UPDATE 
+    TO authenticated 
+    USING ((SELECT role FROM public.users WHERE id = auth.uid()) = 'SUPERADMIN');
+
+CREATE POLICY "Allow SUPERADMIN to delete subjects" 
+    ON public.subjects FOR DELETE 
+    TO authenticated 
+    USING ((SELECT role FROM public.users WHERE id = auth.uid()) = 'SUPERADMIN');
+
+-- Users policies
+CREATE POLICY "Allow users to read their own data" 
+    ON public.users FOR SELECT 
+    TO authenticated 
+    USING (auth.uid() = id);
+
+CREATE POLICY "Allow SUPERADMIN to read all users" 
+    ON public.users FOR SELECT 
+    TO authenticated 
+    USING ((SELECT role FROM public.users WHERE id = auth.uid()) = 'SUPERADMIN');
+
+-- Questions policies
+CREATE POLICY "Allow public read access to questions" 
+    ON public.questions FOR SELECT 
+    USING (true);
+
+CREATE POLICY "Allow QAUTHOR and SUPERADMIN to create questions" 
+    ON public.questions FOR INSERT 
+    TO authenticated 
+    USING ((SELECT role FROM public.users WHERE id = auth.uid()) IN ('QAUTHOR', 'SUPERADMIN'));
+
+CREATE POLICY "Allow question creator to update their questions" 
+    ON public.questions FOR UPDATE 
+    TO authenticated 
+    USING (auth.uid() = created_by);
+
+CREATE POLICY "Allow SUPERADMIN to update any question" 
+    ON public.questions FOR UPDATE 
+    TO authenticated 
+    USING ((SELECT role FROM public.users WHERE id = auth.uid()) = 'SUPERADMIN');
+
+CREATE POLICY "Allow SUPERADMIN to delete questions" 
+    ON public.questions FOR DELETE 
+    TO authenticated 
+    USING ((SELECT role FROM public.users WHERE id = auth.uid()) = 'SUPERADMIN');
 
 -- Student attempts table
 CREATE TABLE student_attempts (
