@@ -39,25 +39,54 @@ export default function Dashboard() {
   const [form] = Form.useForm();
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // For creating new QAUTHOR
   const [creatingAuthor, setCreatingAuthor] = useState(false);
   const [createError, setCreateError] = useState('');
   const [createSuccess, setCreateSuccess] = useState('');
 
+  // Handle authentication and data loading
   useEffect(() => {
-    // Redirect if not logged in (only after auth is initialized)
-    if (!user && authInitialized) {
+    console.log('Dashboard useEffect - Auth state:', { 
+      authInitialized, 
+      userExists: !!user,
+      userRole
+    });
+
+    // Wait for auth to initialize before doing anything
+    if (!authInitialized) {
+      console.log('Auth not initialized yet, waiting...');
+      return;
+    }
+
+    // Redirect if not logged in
+    if (!user) {
       console.log('User not logged in, redirecting to login page');
       router.push('/login');
       return;
     }
 
-    // Function to fetch user role and data
-    async function fetchData() {
+    // If we have a user but no role yet, fetch user data
+    if (user && !userRole) {
+      fetchUserData();
+    } else {
+      // If we have both user and role, we're done loading
+      setIsLoading(false);
+    }
+  }, [user, authInitialized, userRole, router]);
+
+  // Function to fetch user role and data
+  const fetchUserData = async () => {
+    try {
+      console.log('Fetching user data for dashboard');
+      setIsLoading(true);
+      
       // Get user ID safely
       const userId = user?.id;
       if (!userId) {
+        console.error('No user ID available for fetching data');
+        setIsLoading(false);
         return;
       }
       
@@ -70,14 +99,17 @@ export default function Dashboard() {
 
       if (userError) {
         console.error('Error fetching user role:', userError);
+        setIsLoading(false);
         return;
       }
       
       if (userData?.role) {
+        console.log('User role fetched:', userData.role);
         setUserRole(userData.role as UserRole);
         
         // 2. If SUPERADMIN, fetch all users
         if (userData.role === 'SUPERADMIN') {
+          console.log('Fetching all users for SUPERADMIN');
           const { data: usersData, error: usersError } = await supabase
             .from('users')
             .select('*')
@@ -85,40 +117,40 @@ export default function Dashboard() {
             
           if (usersError) {
             console.error('Error fetching users:', usersError);
-            return;
-          }
-          
-          if (usersData) {
+          } else if (usersData) {
             setUsers(usersData);
+            console.log(`Fetched ${usersData.length} users`);
           }
         }
-        
-        // Log for debugging
-        console.log('User role set to:', userData.role);
       }
+    } catch (error) {
+      console.error('Error in fetchUserData:', error);
+    } finally {
+      setIsLoading(false);
     }
-
-    // Call the fetch function only if user is logged in
-    if (user) {
-      fetchData();
-    }
-  }, [user, router, authInitialized]);
+  };
 
   const refreshUsers = async () => {
     if (userRole !== 'SUPERADMIN') return;
     
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      console.log('Refreshing users list');
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error refreshing users:', error);
-      return;
-    }
-    
-    if (data) {
-      setUsers(data);
+      if (error) {
+        console.error('Error refreshing users:', error);
+        return;
+      }
+      
+      if (data) {
+        setUsers(data);
+        console.log(`Refreshed ${data.length} users`);
+      }
+    } catch (error) {
+      console.error('Error in refreshUsers:', error);
     }
   };
 
@@ -155,8 +187,7 @@ export default function Dashboard() {
     try {
       console.log('Attempting to sign out');
       await logout();
-      console.log('Sign out successful, redirecting to login');
-      router.push('/login');
+      // No need to manually redirect, AuthContext will handle it
     } catch (error) {
       console.error('Error signing out:', error);
       // Even if there's an error, try to redirect to login page
@@ -164,8 +195,8 @@ export default function Dashboard() {
     }
   };
 
-  // If auth is still initializing, show loading
-  if (!authInitialized) {
+  // If auth is still initializing or we're loading data, show loading spinner
+  if (!authInitialized || isLoading) {
     return (
       <div style={{ 
         height: '100%', 
@@ -174,7 +205,7 @@ export default function Dashboard() {
         alignItems: 'center', 
         background: '#f0f2f5' 
       }}>
-        <Spin size="large" tip="Initializing..." />
+        <Spin size="large" tip={authInitialized ? "Loading user data..." : "Initializing..."} />
       </div>
     );
   }
@@ -184,7 +215,7 @@ export default function Dashboard() {
     return <div style={{ height: '100%', background: '#f0f2f5' }}></div>;
   }
 
-  // If role not fetched yet, render minimal content with loading indicator
+  // If we have a user but no role yet, show basic loading state
   if (!userRole) {
     return (
       <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

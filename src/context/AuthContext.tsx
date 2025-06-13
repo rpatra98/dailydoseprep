@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { getBrowserClient } from '@/lib/supabase-browser';
 import { AuthContextType, User, LoginResponse } from '@/types';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -14,6 +15,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authInitialized, setAuthInitialized] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
   const [loginInProgress, setLoginInProgress] = useState(false);
+  const router = useRouter();
   
   // Get the singleton browser client instance
   const [browserSupabase, setBrowserSupabase] = useState<SupabaseClient | null>(null);
@@ -31,6 +33,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Fetch user data from the database
+  const fetchUserData = async (userId: string) => {
+    if (!browserSupabase) return null;
+    
+    try {
+      console.log(`Fetching user data for ID: ${userId}`);
+      const { data: userData, error: userError } = await browserSupabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (userError) {
+        console.error('Error fetching user data:', userError);
+        return null;
+      }
+      
+      console.log("User data fetched successfully:", userData);
+      return userData as User;
+    } catch (error) {
+      console.error("Error in fetchUserData:", error);
+      return null;
+    }
+  };
+
   // Setup authentication
   useEffect(() => {
     if (!browserSupabase) {
@@ -46,6 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     console.log("Running auth effect");
+    let isActive = true;
     
     const setData = async () => {
       try {
@@ -55,8 +83,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (sessionError) {
           console.error('Session error:', sessionError);
-          setAuthInitialized(true);
-          setLoading(false);
+          if (isActive) {
+            setAuthInitialized(true);
+            setLoading(false);
+          }
           return;
         }
         
@@ -64,31 +94,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (session?.user) {
           console.log("User found in session, fetching user data");
-          try {
-            const { data: userData, error: userError } = await browserSupabase
-              .from('users')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-
-            if (userError) {
-              console.warn('User exists in Auth but not in users table:', userError);
-              // Don't throw here, just set user to null and continue
+          const userData = await fetchUserData(session.user.id);
+          
+          if (isActive) {
+            if (userData) {
+              setUser(userData);
             } else {
-              console.log("User data fetched successfully:", userData);
-              setUser(userData as User);
+              console.warn('User exists in Auth but not in users table');
             }
-          } catch (userFetchErr) {
-            console.error("Error fetching user data:", userFetchErr);
           }
         }
       } catch (err) {
         console.error('Error in AuthContext:', err);
-        setError(err instanceof Error ? err.message : 'Authentication error');
+        if (isActive) {
+          setError(err instanceof Error ? err.message : 'Authentication error');
+        }
       } finally {
-        console.log("Auth initialization complete");
-        setAuthInitialized(true);
-        setLoading(false);
+        if (isActive) {
+          console.log("Auth initialization complete");
+          setAuthInitialized(true);
+          setLoading(false);
+        }
       }
     };
 
@@ -102,31 +128,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('Auth state changed:', event, session ? 'Session exists' : 'No session');
         
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          try {
-            if (session?.user) {
-              console.log("User signed in, fetching user data");
-              // Fetch user data from our users table
-              const { data: userData, error: userError } = await browserSupabase
-                .from('users')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-
-              if (userError) {
-                console.warn('User exists in Auth but not in users table:', userError);
-                setUser(null);
+          if (session?.user) {
+            console.log("User signed in, fetching user data");
+            const userData = await fetchUserData(session.user.id);
+            
+            if (isActive) {
+              if (userData) {
+                setUser(userData);
+                // Force navigation to dashboard if we're on the login page
+                if (window.location.pathname.includes('/login')) {
+                  console.log('Redirecting to dashboard after successful auth');
+                  router.push('/dashboard');
+                }
               } else {
-                console.log("User data fetched on auth change:", userData);
-                setUser(userData as User);
+                console.warn('User exists in Auth but not in users table');
+                setUser(null);
               }
             }
-          } catch (err) {
-            console.error('Error in auth state change:', err);
-            setUser(null);
           }
         } else if (event === 'SIGNED_OUT') {
           console.log("User signed out, clearing user data");
-          setUser(null);
+          if (isActive) {
+            setUser(null);
+          }
         }
       });
       
@@ -136,12 +160,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     return () => {
+      isActive = false;
       if (subscription) {
         console.log("Cleaning up auth subscription");
         subscription.unsubscribe();
       }
     };
-  }, [browserSupabase, initError]);
+  }, [browserSupabase, initError, router]);
 
   const login = async (email: string, password: string): Promise<LoginResponse | void> => {
     console.log(`Attempting to login user: ${email}`);
@@ -187,22 +212,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log("Login successful, user authenticated:", data.user.id);
       
       // Fetch user data from our users table
-      try {
-        console.log("Fetching user data after login");
-        const { data: userData, error: userError } = await browserSupabase
-          .from('users')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-
-        if (userError) {
-          console.warn('User exists in Auth but not in users table:', userError);
-        } else {
-          console.log("User data fetched after login:", userData);
-          setUser(userData as User);
-        }
-      } catch (userFetchErr) {
-        console.error("Error fetching user data after login:", userFetchErr);
+      const userData = await fetchUserData(data.user.id);
+      
+      if (userData) {
+        console.log("User data fetched after login:", userData);
+        setUser(userData);
+        
+        // Force navigation to dashboard
+        router.push('/dashboard');
       }
       
       // Return the login response
@@ -239,6 +256,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       console.log("Sign out successful, clearing user state");
       setUser(null);
+      
+      // Force navigation to login page
+      router.push('/login');
     } catch (error) {
       console.error('Logout error:', error);
       // Even if there's an error, try to clean up the local state
