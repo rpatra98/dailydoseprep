@@ -33,27 +33,112 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Fetch user data from the database
-  const fetchUserData = async (userId: string) => {
+  // Fetch user data from the database with timeout and retry
+  const fetchUserData = async (userId: string, retryCount = 0): Promise<User | null> => {
+    if (!browserSupabase) {
+      console.error("Cannot fetch user data: browser client not available");
+      return null;
+    }
+    
+    try {
+      console.log(`Fetching user data for ID: ${userId} (attempt ${retryCount + 1})`);
+      
+      // Create a timeout promise
+      const timeoutPromise = new Promise<null>((_, reject) => {
+        setTimeout(() => reject(new Error('User data fetch timeout')), 5000);
+      });
+      
+      // Create the fetch promise
+      const fetchPromise = new Promise<User | null>(async (resolve) => {
+        try {
+          const { data: userData, error: userError } = await browserSupabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+  
+          if (userError) {
+            console.error('Error fetching user data:', userError);
+            resolve(null);
+            return;
+          }
+          
+          if (!userData) {
+            console.warn(`No user data found for ID: ${userId}`);
+            resolve(null);
+            return;
+          }
+          
+          console.log("User data fetched successfully:", userData);
+          resolve(userData as User);
+        } catch (error) {
+          console.error("Error in fetchUserData:", error);
+          resolve(null);
+        }
+      });
+      
+      // Race the fetch against the timeout
+      const result = await Promise.race([fetchPromise, timeoutPromise]) as User | null;
+      return result;
+    } catch (error) {
+      console.error("Error or timeout in fetchUserData:", error);
+      
+      // Retry logic (max 3 attempts)
+      if (retryCount < 2) {
+        console.log(`Retrying user data fetch for ID: ${userId}`);
+        return fetchUserData(userId, retryCount + 1);
+      }
+      
+      return null;
+    }
+  };
+
+  // Create user record if it doesn't exist
+  const ensureUserExists = async (userId: string, email: string, role: string = 'STUDENT'): Promise<User | null> => {
     if (!browserSupabase) return null;
     
     try {
-      console.log(`Fetching user data for ID: ${userId}`);
-      const { data: userData, error: userError } = await browserSupabase
+      console.log(`Checking if user ${userId} exists in users table`);
+      
+      // First check if user exists
+      const { data: existingUser, error: checkError } = await browserSupabase
         .from('users')
         .select('*')
         .eq('id', userId)
         .single();
-
-      if (userError) {
-        console.error('Error fetching user data:', userError);
+      
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = not found
+        console.error('Error checking user existence:', checkError);
         return null;
       }
       
-      console.log("User data fetched successfully:", userData);
-      return userData as User;
+      // If user exists, return it
+      if (existingUser) {
+        console.log('User record found:', existingUser);
+        return existingUser as User;
+      }
+      
+      // User doesn't exist, create it
+      console.log(`Creating new user record for ${userId} with role ${role}`);
+      const { data: newUser, error: insertError } = await browserSupabase
+        .from('users')
+        .insert({
+          id: userId,
+          email,
+          role,
+        })
+        .select()
+        .single();
+      
+      if (insertError) {
+        console.error('Error creating user record:', insertError);
+        return null;
+      }
+      
+      console.log('Created new user record:', newUser);
+      return newUser as User;
     } catch (error) {
-      console.error("Error in fetchUserData:", error);
+      console.error('Error in ensureUserExists:', error);
       return null;
     }
   };
@@ -99,8 +184,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (isActive) {
             if (userData) {
               setUser(userData);
+              console.log("User data set from session");
             } else {
-              console.warn('User exists in Auth but not in users table');
+              console.warn('User exists in Auth but not in users table, creating record');
+              // Try to create the user record
+              const createdUser = await ensureUserExists(
+                session.user.id, 
+                session.user.email || 'unknown@email.com',
+                'STUDENT' // Default role
+              );
+              
+              if (createdUser) {
+                setUser(createdUser);
+                console.log("User record created and set");
+              } else {
+                console.error("Failed to create user record");
+              }
             }
           }
         }
@@ -117,6 +216,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     };
+
+    // Set a timeout to ensure we don't get stuck forever
+    const initTimeout = setTimeout(() => {
+      if (isActive && !authInitialized) {
+        console.warn("Auth initialization timed out, forcing completion");
+        setAuthInitialized(true);
+        setLoading(false);
+      }
+    }, 10000); // 10 second timeout
 
     setData();
 
@@ -141,8 +249,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   router.push('/dashboard');
                 }
               } else {
-                console.warn('User exists in Auth but not in users table');
-                setUser(null);
+                console.warn('User exists in Auth but not in users table, creating record');
+                // Try to create the user record
+                const createdUser = await ensureUserExists(
+                  session.user.id, 
+                  session.user.email || 'unknown@email.com',
+                  'STUDENT' // Default role
+                );
+                
+                if (createdUser) {
+                  setUser(createdUser);
+                  console.log("User record created and set");
+                  
+                  // Redirect if on login page
+                  if (window.location.pathname.includes('/login')) {
+                    console.log('Redirecting to dashboard after user creation');
+                    router.push('/dashboard');
+                  }
+                } else {
+                  console.error("Failed to create user record");
+                  setUser(null);
+                }
               }
             }
           }
@@ -161,6 +288,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       isActive = false;
+      clearTimeout(initTimeout);
       if (subscription) {
         console.log("Cleaning up auth subscription");
         subscription.unsubscribe();

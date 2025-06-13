@@ -18,14 +18,16 @@ import {
   Spin, 
   Row, 
   Col,
-  Divider
+  Divider,
+  message
 } from 'antd';
 import {
   LogoutOutlined,
   PlusOutlined,
   BookOutlined,
   MailOutlined,
-  LockOutlined
+  LockOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
 import SubjectSelection from '@/components/Auth/SubjectSelection';
 import SubjectManager from '@/components/Admin/SubjectManager';
@@ -40,6 +42,8 @@ export default function Dashboard() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadAttempts, setLoadAttempts] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   // For creating new QAUTHOR
   const [creatingAuthor, setCreatingAuthor] = useState(false);
@@ -51,7 +55,8 @@ export default function Dashboard() {
     console.log('Dashboard useEffect - Auth state:', { 
       authInitialized, 
       userExists: !!user,
-      userRole
+      userRole,
+      loadAttempts
     });
 
     // Wait for auth to initialize before doing anything
@@ -74,18 +79,32 @@ export default function Dashboard() {
       // If we have both user and role, we're done loading
       setIsLoading(false);
     }
-  }, [user, authInitialized, userRole, router]);
+
+    // Set a timeout to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      if (isLoading && loadAttempts > 0 && !userRole) {
+        console.warn('Loading user data timed out, showing fallback UI');
+        setIsLoading(false);
+        setLoadError('Failed to load user data. Please try refreshing the page.');
+      }
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(loadingTimeout);
+  }, [user, authInitialized, userRole, router, loadAttempts, isLoading]);
 
   // Function to fetch user role and data
   const fetchUserData = async () => {
     try {
       console.log('Fetching user data for dashboard');
       setIsLoading(true);
+      setLoadError(null);
+      setLoadAttempts(prev => prev + 1);
       
       // Get user ID safely
       const userId = user?.id;
       if (!userId) {
         console.error('No user ID available for fetching data');
+        setLoadError('User ID not available');
         setIsLoading(false);
         return;
       }
@@ -99,6 +118,7 @@ export default function Dashboard() {
 
       if (userError) {
         console.error('Error fetching user role:', userError);
+        setLoadError(`Error fetching user role: ${userError.message}`);
         setIsLoading(false);
         return;
       }
@@ -117,14 +137,19 @@ export default function Dashboard() {
             
           if (usersError) {
             console.error('Error fetching users:', usersError);
+            message.error('Failed to load users list');
           } else if (usersData) {
             setUsers(usersData);
             console.log(`Fetched ${usersData.length} users`);
           }
         }
+      } else {
+        console.warn('User record found but role is missing');
+        setLoadError('Your user account is missing role information');
       }
     } catch (error) {
       console.error('Error in fetchUserData:', error);
+      setLoadError('An unexpected error occurred while loading user data');
     } finally {
       setIsLoading(false);
     }
@@ -142,15 +167,18 @@ export default function Dashboard() {
 
       if (error) {
         console.error('Error refreshing users:', error);
+        message.error('Failed to refresh users list');
         return;
       }
       
       if (data) {
         setUsers(data);
         console.log(`Refreshed ${data.length} users`);
+        message.success('Users list refreshed');
       }
     } catch (error) {
       console.error('Error in refreshUsers:', error);
+      message.error('Failed to refresh users list');
     }
   };
 
@@ -195,6 +223,11 @@ export default function Dashboard() {
     }
   };
 
+  const handleRetry = () => {
+    console.log('Retrying data fetch');
+    fetchUserData();
+  };
+
   // If auth is still initializing or we're loading data, show loading spinner
   if (!authInitialized || isLoading) {
     return (
@@ -215,7 +248,43 @@ export default function Dashboard() {
     return <div style={{ height: '100%', background: '#f0f2f5' }}></div>;
   }
 
-  // If we have a user but no role yet, show basic loading state
+  // If we have a user but encountered an error or couldn't load role
+  if (loadError || (!userRole && loadAttempts > 0)) {
+    return (
+      <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Title level={3} style={{ margin: 0 }}>Dashboard</Title>
+          <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
+            Sign Out
+          </Button>
+        </Header>
+        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Card style={{ textAlign: 'center', maxWidth: 500 }}>
+            <Alert
+              message="Error Loading Dashboard"
+              description={loadError || "Failed to load your user data. Please try again."}
+              type="error"
+              showIcon
+              style={{ marginBottom: 24 }}
+            />
+            <Paragraph>
+              Welcome, {user.email}. We encountered an issue while loading your dashboard.
+            </Paragraph>
+            <Button 
+              type="primary" 
+              icon={<ReloadOutlined />} 
+              onClick={handleRetry}
+              style={{ marginTop: 16 }}
+            >
+              Retry
+            </Button>
+          </Card>
+        </Content>
+      </Layout>
+    );
+  }
+
+  // If we have a user but no role yet, show basic loading state (this should rarely happen with the improvements)
   if (!userRole) {
     return (
       <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -229,6 +298,14 @@ export default function Dashboard() {
           <Card style={{ textAlign: 'center' }}>
             <Spin tip="Loading user data..." />
             <Paragraph style={{ marginTop: 16 }}>Welcome, {user.email}</Paragraph>
+            <Button 
+              type="link" 
+              icon={<ReloadOutlined />} 
+              onClick={handleRetry}
+              style={{ marginTop: 16 }}
+            >
+              Retry Loading
+            </Button>
           </Card>
         </Content>
       </Layout>
