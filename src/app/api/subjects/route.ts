@@ -16,7 +16,7 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(data || []);
   } catch (err) {
     console.error('Exception in subjects GET:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

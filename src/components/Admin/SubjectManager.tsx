@@ -9,7 +9,8 @@ import {
   message,
   Typography,
   Space,
-  Tag
+  Tag,
+  Empty
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -40,8 +41,11 @@ export const SubjectManager = () => {
       const data = await response.json();
       setSubjects(data);
     } catch (error) {
-      message.error('Failed to load subjects');
       console.error('Error fetching subjects:', error);
+      // Don't show an error message for empty subjects, as we'll handle that in the UI
+      if (error instanceof Error && error.message !== 'No subjects available') {
+        message.error('Failed to load subjects');
+      }
     } finally {
       setLoading(false);
     }
@@ -203,6 +207,9 @@ export const SubjectManager = () => {
         rowKey="id"
         loading={loading}
         pagination={{ pageSize: 10 }}
+        locale={{
+          emptyText: <Empty description="No subjects available yet" />
+        }}
       />
       
       <Modal
