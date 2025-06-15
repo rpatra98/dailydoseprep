@@ -1,7 +1,5 @@
-// Script to completely reset the database and create a clean setup
+// Simplified reset script that works with Supabase limitations
 const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
-const path = require('path');
 
 // Load environment variables
 require('dotenv').config({ path: '.env.local' });
@@ -22,11 +20,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
-async function resetDatabase() {
+async function simpleReset() {
   try {
-    console.log('🧹 Starting database reset...');
+    console.log('🧹 Starting simplified database reset...');
     
-    // Step 1: Delete all existing users from auth (this will cascade to our users table)
+    // Step 1: Delete all existing users from auth
     console.log('🗑️  Deleting all existing users...');
     const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers();
     
@@ -39,15 +37,12 @@ async function resetDatabase() {
       }
     }
     
-    // Step 2: Drop all custom tables (in reverse dependency order)
-    console.log('🗂️  Dropping existing tables...');
-    
-    // We'll use individual table operations since exec_sql isn't available
+    // Step 2: Clear existing data from tables (if they exist)
+    console.log('🗂️  Clearing existing data...');
     const tables = ['student_attempts', 'daily_question_sets', 'questions', 'users', 'subjects'];
     
     for (const table of tables) {
       try {
-        // Try to delete all records first, then we don't need to drop tables
         const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
         if (error && !error.message.includes('does not exist')) {
           console.warn(`Warning clearing table ${table}:`, error.message);
@@ -55,25 +50,11 @@ async function resetDatabase() {
           console.log(`✓ Cleared table: ${table}`);
         }
       } catch (err) {
-        console.warn(`Table ${table} might not exist:`, err.message);
+        console.warn(`Table ${table} might not exist yet:`, err.message);
       }
     }
     
-    // Step 3: Create tables manually since we can't use exec_sql
-    console.log('🏗️  Creating fresh database schema...');
-    
-    // Create subjects table
-    try {
-      console.log('Creating subjects table...');
-      // We'll rely on the migration to create tables properly
-    } catch (error) {
-      console.warn('Note: Tables might already exist from Supabase setup');
-    }
-    
-    // Step 4: Skip migration for now since we can't execute raw SQL
-    console.log('🔄 Skipping migrations (tables should exist from Supabase setup)...');
-    
-    // Step 5: Create SUPERADMIN user
+    // Step 3: Create SUPERADMIN user
     console.log('👑 Creating SUPERADMIN user...');
     const adminEmail = 'superadmin@ddp.com';
     const adminPassword = '05tattva';
@@ -96,7 +77,7 @@ async function resetDatabase() {
     
     console.log('✅ SUPERADMIN auth user created with ID:', authData.user.id);
     
-    // Step 6: Create the user record in our users table
+    // Step 4: Create the user record in our users table
     const { error: userError } = await supabase
       .from('users')
       .insert({
@@ -112,7 +93,7 @@ async function resetDatabase() {
       throw userError;
     }
     
-    // Step 7: Verify the user was created correctly
+    // Step 5: Verify the user was created correctly
     console.log('🔍 Verifying SUPERADMIN user...');
     const { data: verifyUser, error: verifyError } = await supabase
       .from('users')
@@ -131,7 +112,7 @@ async function resetDatabase() {
       role: verifyUser.role
     });
     
-    // Step 8: Create some default subjects
+    // Step 6: Create some default subjects (if subjects table exists)
     console.log('📚 Creating default subjects...');
     const defaultSubjects = [
       { name: 'General Studies', examCategory: 'UPSC', description: 'General Studies for UPSC preparation' },
@@ -147,20 +128,25 @@ async function resetDatabase() {
     
     if (subjectsError) {
       console.warn('Warning creating default subjects:', subjectsError.message);
+      console.log('📝 Note: You may need to create the subjects table manually in Supabase');
     } else {
       console.log('✅ Default subjects created');
     }
     
-    console.log('\n🎉 Database reset completed successfully!');
+    console.log('\n🎉 Simplified reset completed successfully!');
     console.log('\n📋 SUPERADMIN Credentials:');
     console.log(`   Email: ${adminEmail}`);
     console.log(`   Password: ${adminPassword}`);
     console.log('\n⚠️  Please change the password after first login for security!');
+    console.log('\n📝 Next Steps:');
+    console.log('1. If tables don\'t exist, create them manually in Supabase dashboard');
+    console.log('2. Test login at your application URL');
+    console.log('3. Change the SUPERADMIN password after first login');
     
   } catch (error) {
-    console.error('❌ Database reset failed:', error);
+    console.error('❌ Simplified reset failed:', error);
     process.exit(1);
   }
 }
 
-resetDatabase(); 
+simpleReset(); 
