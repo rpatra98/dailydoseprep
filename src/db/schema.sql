@@ -75,7 +75,7 @@ CREATE POLICY "Allow public read access to questions"
     ON public.questions FOR SELECT 
     USING (true);
 
-CREATE POLICY "Allow QAUTHOR and SUPERADMIN to create questions" 
+CREATE POLICY "Allow QAUTHOR and SUPERADMIN tocreate questions" 
     ON public.questions FOR INSERT 
     TO authenticated 
     USING ((SELECT role FROM public.users WHERE id = auth.uid()) IN ('QAUTHOR', 'SUPERADMIN'));
@@ -113,6 +113,4 @@ CREATE INDEX idx_questions_subject ON questions(subject);
 CREATE INDEX idx_student_attempts_student_id ON student_attempts(student_id);
 CREATE INDEX idx_student_attempts_question_id ON student_attempts(question_id);
 
--- Create initial SUPERADMIN user
-INSERT INTO users (email, password_hash, role)
-VALUES ('admin@dailydoseprep.com', 'CHANGE_THIS_PASSWORD_HASH', 'SUPERADMIN'); 
+-- Note: SUPERADMIN user will be created programmatically using the reset script 

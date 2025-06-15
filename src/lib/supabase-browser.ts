@@ -49,10 +49,8 @@ export function getBrowserClient(): SupabaseClient {
       
       console.log('Supabase environment variables found');
       
-      // Create the client with correct options structure and improved timeouts
+      // Create the client with improved configuration
       browserClientInstance = createClientComponentClient({
-        supabaseUrl,
-        supabaseKey,
         options: {
           db: {
             schema: 'public',
@@ -65,14 +63,6 @@ export function getBrowserClient(): SupabaseClient {
           realtime: {
             timeout: 60000, // 60 seconds
           }
-        },
-        // Cookie options for auth persistence
-        cookieOptions: {
-          name: 'dailydoseprep-auth',
-          path: '/',
-          domain: '',
-          sameSite: 'lax',
-          secure: process.env.NODE_ENV === 'production'
         }
       });
       

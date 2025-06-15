@@ -388,12 +388,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log("User data fetched after login:", userData);
         setUser(userData);
         
-        // Force navigation to dashboard
-        router.push('/dashboard');
+        // Return the login response immediately - let useEffect handle navigation
+        return data as LoginResponse;
+      } else {
+        // User exists in auth but not in users table - try to create the record
+        console.log("User exists in auth but not in users table, creating record...");
+        const createdUser = await ensureUserExists(data.user.id, data.user.email || '', 'STUDENT');
+        
+        if (createdUser) {
+          console.log("User record created:", createdUser);
+          setUser(createdUser);
+          return data as LoginResponse;
+        } else {
+          throw new Error('Failed to create user record. Please contact support.');
+        }
       }
-      
-      // Return the login response
-      return data as LoginResponse;
     } catch (error) {
       console.error('Login error:', error);
       throw error;
