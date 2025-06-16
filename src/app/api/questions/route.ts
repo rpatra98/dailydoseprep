@@ -144,10 +144,7 @@ async function testDatabaseConnectivity(supabase: any) {
 
 // Test question insertion with exact schema
 async function testQuestionInsertion(supabase: any, user: any, subjects: any[]) {
-  console.log('🧪 Testing question insertion...');
-  
   const testSubject = subjects[0];
-  console.log('📋 Using test subject:', testSubject.name, '(', testSubject.id, ')');
   
   // Test data matching actual database schema
   const testData = {
@@ -168,17 +165,13 @@ async function testQuestionInsertion(supabase: any, user: any, subjects: any[]) 
     created_by: user.id                      // UUID from auth
   };
   
-  console.log('📝 Test data prepared:', JSON.stringify(testData, null, 2));
-  
   try {
-    console.log('💾 Attempting to insert test question...');
     const { data: insertResult, error: insertError } = await supabase
       .from('questions')
       .insert(testData)
       .select('*');
     
     if (insertError) {
-      logError('QUESTION_INSERT_TEST', insertError, { testData });
       
       // Analyze the specific error
       let errorAnalysis = 'Unknown insertion error';
@@ -209,7 +202,6 @@ async function testQuestionInsertion(supabase: any, user: any, subjects: any[]) 
     }
     
     if (!insertResult || insertResult.length === 0) {
-      console.log('❌ Insert succeeded but no data returned');
       return {
         success: false,
         error: 'Insert succeeded but no data returned',
@@ -217,21 +209,11 @@ async function testQuestionInsertion(supabase: any, user: any, subjects: any[]) 
       };
     }
     
-    console.log('✅ Test question inserted successfully!');
-    console.log('📊 Inserted data columns:', Object.keys(insertResult[0]));
-    
     // Clean up test data immediately
-    console.log('🧹 Cleaning up test data...');
     const { error: deleteError } = await supabase
       .from('questions')
       .delete()
       .eq('id', insertResult[0].id);
-    
-    if (deleteError) {
-      console.log('⚠️ Warning: Could not clean up test data:', deleteError.message);
-    } else {
-      console.log('✅ Test data cleaned up successfully');
-    }
     
     return {
       success: true,
@@ -241,12 +223,10 @@ async function testQuestionInsertion(supabase: any, user: any, subjects: any[]) 
     };
     
   } catch (error) {
-    logError('QUESTION_INSERT_EXCEPTION', error, { testData });
     return {
       success: false,
       error: 'Unexpected error during question insertion',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      testData: testData
+      details: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 }
@@ -489,20 +469,14 @@ export async function GET(req: NextRequest) {
 
 // POST a new question (QAUTHOR only)
 export async function POST(req: NextRequest) {
-  console.log('\n🚀 === QUESTION CREATION API CALLED ===');
-  console.log('⏰ Timestamp:', new Date().toISOString());
-  
   try {
     const supabase = createRouteHandlerClient({ cookies });
-    console.log('✅ Supabase client created');
     
     // Parse request body
     let body;
     try {
       body = await req.json();
-      console.log('📥 Request body received:', JSON.stringify(body, null, 2));
     } catch (parseError) {
-      logError('REQUEST_PARSING', parseError);
       return NextResponse.json({
         error: 'Invalid request body',
         details: 'Could not parse JSON request'
@@ -513,21 +487,16 @@ export async function POST(req: NextRequest) {
     
     // Validate required fields
     if (!content || !optionA || !optionB || !optionC || !optionD || !correctAnswer || !subject) {
-      console.log('❌ Missing required fields');
       return NextResponse.json({
         error: 'Missing required fields',
         details: 'content, optionA, optionB, optionC, optionD, correctAnswer, and subject are required'
       }, { status: 400 });
     }
     
-    console.log('✅ Request validation passed');
-    
     // Test database connectivity
-    console.log('\n🔍 === TESTING DATABASE CONNECTIVITY ===');
     const connectivityTest = await testDatabaseConnectivity(supabase);
     
     if (!connectivityTest.success) {
-      console.log('❌ Database connectivity test failed');
       return NextResponse.json({
         error: connectivityTest.error,
         details: connectivityTest.details,
@@ -537,14 +506,10 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
     
-    console.log('✅ Database connectivity test passed');
-    
     // Test question insertion
-    console.log('\n🧪 === TESTING QUESTION INSERTION ===');
     const insertionTest = await testQuestionInsertion(supabase, connectivityTest.user, connectivityTest.subjects);
     
     if (!insertionTest.success) {
-      console.log('❌ Question insertion test failed');
       return NextResponse.json({
         error: insertionTest.error,
         details: insertionTest.details,
@@ -555,12 +520,6 @@ export async function POST(req: NextRequest) {
         setupUrl: '/api/setup'
       }, { status: 500 });
     }
-    
-    console.log('✅ Question insertion test passed');
-    console.log('📊 Working schema confirmed:', insertionTest.workingSchema);
-    
-    // Now create the actual question
-    console.log('\n💾 === CREATING ACTUAL QUESTION ===');
     
     const questionData = {
       subject_id: subject,
@@ -587,33 +546,25 @@ export async function POST(req: NextRequest) {
       created_by: connectivityTest.user.id
     };
     
-    console.log('📝 Final question data:', JSON.stringify(questionData, null, 2));
-    
     const { data: finalResult, error: finalError } = await supabase
       .from('questions')
       .insert(questionData)
       .select('*');
     
     if (finalError) {
-      logError('FINAL_QUESTION_INSERT', finalError, { questionData });
       return NextResponse.json({
         error: 'Failed to create question',
         details: finalError.message,
-        questionData: questionData,
         suggestion: 'Check the error details above'
       }, { status: 500 });
     }
     
     if (!finalResult || finalResult.length === 0) {
-      console.log('❌ Final insert succeeded but no data returned');
       return NextResponse.json({
         error: 'Question creation succeeded but no data returned',
         details: 'This might indicate a database configuration issue'
       }, { status: 500 });
     }
-    
-    console.log('✅ Question created successfully!');
-    console.log('🎉 Final result:', JSON.stringify(finalResult[0], null, 2));
     
     return NextResponse.json({
       success: true,
@@ -622,11 +573,9 @@ export async function POST(req: NextRequest) {
     }, { status: 201 });
     
   } catch (error) {
-    logError('API_EXCEPTION', error);
     return NextResponse.json({
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 } 

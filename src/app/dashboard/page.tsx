@@ -37,6 +37,7 @@ import {
 import Link from 'next/link';
 import SubjectSelection from '@/components/Auth/SubjectSelection';
 import SubjectManager from '@/components/Admin/SubjectManager';
+import QuestionManager from '@/components/QAUTHOR/QuestionManager';
 import AspectRatioLayout from '@/components/AspectRatioLayout';
 
 const { Header, Content } = Layout;
@@ -313,21 +314,28 @@ export default function Dashboard() {
             </Button>
           </Header>
           <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
-            <Card>
-              <Title level={2}>Welcome, Question Author!</Title>
-              <Paragraph>
-                As a Question Author, you can create questions for students. Your questions will be reviewed and made available to students in their daily question practice.
-              </Paragraph>
-              <Divider />
-              <Button 
-                type="primary" 
-                icon={<PlusOutlined />}
-                size="large"
-                onClick={() => router.push('/create-question')}
-              >
-                Create New Question
-              </Button>
-            </Card>
+            <Row gutter={[16, 16]}>
+              <Col span={24}>
+                <Card>
+                  <Title level={2}>Welcome, Question Author!</Title>
+                  <Paragraph>
+                    As a Question Author, you can create questions for students. Your questions will be reviewed and made available to students in their daily question practice.
+                  </Paragraph>
+                  <Divider />
+                  <Button 
+                    type="primary" 
+                    icon={<PlusOutlined />}
+                    size="large"
+                    onClick={() => router.push('/create-question')}
+                  >
+                    Create New Question
+                  </Button>
+                </Card>
+              </Col>
+              <Col span={24}>
+                <QuestionManager />
+              </Col>
+            </Row>
           </Content>
         </Layout>
       </AspectRatioLayout>
