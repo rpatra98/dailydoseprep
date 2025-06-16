@@ -161,6 +161,9 @@ async function testQuestionInsertion(supabase: any, user: any, subjects: any[]) 
     correct_option: 'A',                     // CHARACTER
     explanation: 'This is a test explanation',          // TEXT
     difficulty: 'EASY',                      // USER-DEFINED
+    exam_category: 'OTHER',                  // USER-DEFINED (required)
+    year: 2024,                              // INTEGER
+    source: 'Test Source',                   // TEXT
     questionhash: 'test-hash-' + Date.now() + '-' + Math.random(), // TEXT (unique)
     created_by: user.id                      // UUID from auth
   };
@@ -570,6 +573,9 @@ export async function POST(req: NextRequest) {
       correct_option: correctAnswer,
       explanation: explanation || '',
       difficulty: difficulty || 'MEDIUM',
+      exam_category: examCategory || 'OTHER',  // Required field with default
+      year: year || new Date().getFullYear(),  // Required field with default
+      source: source || '',                    // Optional field
       questionhash: generateQuestionHash({
         content,
         optionA,
