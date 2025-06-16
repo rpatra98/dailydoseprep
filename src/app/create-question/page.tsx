@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/utils/supabase';
+import { getBrowserClient } from '@/lib/supabase-browser';
 import { UserRole, Question } from '@/types';
 import QuestionForm from '@/components/Question/QuestionForm';
 import { 
@@ -39,6 +39,7 @@ export default function CreateQuestion() {
       try {
         setLoading(true);
         // Get user role
+        const supabase = getBrowserClient();
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('role')

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Select, Alert, Spin, Typography } from 'antd';
-import { supabase } from '@/utils/supabase';
+import { getBrowserClient } from '@/lib/supabase-browser';
 import { Subject } from '@/types';
 
 const { Title, Text } = Typography;
@@ -27,6 +27,7 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
         setLoading(true);
         setError(null);
         
+        const supabase = getBrowserClient();
         const { data, error } = await supabase
           .from('subjects')
           .select('*')

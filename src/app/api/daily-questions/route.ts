@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/utils/supabase';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { DailyQuestionSet } from '@/types';
 
 // GET daily questions for a student
 export async function GET(req: NextRequest) {
   try {
+    const supabase = createRouteHandlerClient({ cookies });
     const { data: authData, error: authError } = await supabase.auth.getSession();
     
     if (authError || !authData.session) {
@@ -170,6 +172,7 @@ export async function GET(req: NextRequest) {
 // POST to submit answers for daily questions
 export async function POST(req: NextRequest) {
   try {
+    const supabase = createRouteHandlerClient({ cookies });
     const { data: authData, error: authError } = await supabase.auth.getSession();
     
     if (authError || !authData.session) {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/utils/supabase';
+import { getBrowserClient } from '@/lib/supabase-browser';
 import { UserRole } from '@/types';
 import { 
   Layout, 
@@ -79,6 +79,7 @@ export default function Dashboard() {
         setLoadError(null);
         
         // Get user role
+        const supabase = getBrowserClient();
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('role')
@@ -116,6 +117,7 @@ export default function Dashboard() {
 
   const fetchAllUsers = async () => {
     try {
+      const supabase = getBrowserClient();
       const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('id, email, role, created_at')
@@ -131,6 +133,7 @@ export default function Dashboard() {
 
   const fetchSystemStats = async () => {
     try {
+      const supabase = getBrowserClient();
       // Fetch user counts
       const { data: usersData, error: usersError } = await supabase
         .from('users')
@@ -193,6 +196,7 @@ export default function Dashboard() {
   const handleCreateQAUTHOR = async (values: { email: string; password: string }) => {
     try {
       setCreateLoading(true);
+      const supabase = getBrowserClient();
       
       // Register new user as QAUTHOR
       const { data: authData, error: authError } = await supabase.auth.signUp({

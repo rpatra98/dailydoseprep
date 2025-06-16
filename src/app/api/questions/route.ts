@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceRoleClient } from '@/lib/supabase-server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { Question } from '@/types';
 import crypto from 'crypto';
 
@@ -12,7 +13,7 @@ function generateQuestionHash(question: any): string {
 // GET questions with optional filters
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getServiceRoleClient();
+    const supabase = createRouteHandlerClient({ cookies });
     const { searchParams } = new URL(req.url);
     const subject = searchParams.get('subject');
     const difficulty = searchParams.get('difficulty');
@@ -60,59 +61,37 @@ export async function POST(req: NextRequest) {
   try {
     console.log('POST /api/questions: Starting request');
     
-    // Use only service role client to avoid multiple client instances
-    const supabase = getServiceRoleClient();
+    // Use createRouteHandlerClient for proper session handling
+    const supabase = createRouteHandlerClient({ cookies });
     
-    // Get authorization header to extract user info
-    const authHeader = req.headers.get('authorization');
-    const cookies = req.headers.get('cookie');
+    // Get the current session using the route handler client
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
-    console.log('Auth header present:', !!authHeader);
-    console.log('Cookies present:', !!cookies);
+    console.log('Session check:', {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      userId: session?.user?.id,
+      sessionError: sessionError?.message
+    });
     
-    // Try to get user ID from the request context
-    // Since we're using service role, we need to validate the user differently
-    let userId: string | null = null;
-    
-    // Parse cookies to get the auth token
-    if (cookies) {
-      const authTokenMatch = cookies.match(/ddp-supabase-auth-token=([^;]+)/);
-      if (authTokenMatch) {
-        try {
-          const tokenData = JSON.parse(decodeURIComponent(authTokenMatch[1]));
-          if (tokenData.user?.id) {
-            userId = tokenData.user.id;
-            console.log('User ID from cookie:', userId);
-          }
-        } catch (e) {
-          console.error('Error parsing auth token from cookie:', e);
-        }
-      }
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      return NextResponse.json({ 
+        error: 'Authentication error: ' + sessionError.message 
+      }, { status: 401 });
     }
     
-    // If we couldn't get user ID from cookie, try alternative approach
-    if (!userId) {
-      // Check for sb- prefixed cookies (default Supabase format)
-      const sbCookieMatch = cookies?.match(/sb-[^=]+-auth-token=([^;]+)/);
-      if (sbCookieMatch) {
-        try {
-          const tokenData = JSON.parse(decodeURIComponent(sbCookieMatch[1]));
-          if (tokenData.user?.id) {
-            userId = tokenData.user.id;
-            console.log('User ID from sb cookie:', userId);
-          }
-        } catch (e) {
-          console.error('Error parsing sb auth token:', e);
-        }
-      }
+    if (!session || !session.user) {
+      console.error('No valid session found');
+      return NextResponse.json({ 
+        error: 'Not authenticated - please log in again' 
+      }, { status: 401 });
     }
     
-    if (!userId) {
-      console.error('No user ID found in request');
-      return NextResponse.json({ error: 'Not authenticated - no user session found' }, { status: 401 });
-    }
+    const userId = session.user.id;
+    console.log(`Authenticated user ID: ${userId}`);
     
-    // Check if user is QAUTHOR or SUPERADMIN using service role client
+    // Check if user is QAUTHOR or SUPERADMIN
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('role')
@@ -121,18 +100,29 @@ export async function POST(req: NextRequest) {
     
     if (userError) {
       console.error('Error fetching user role:', userError);
-      return NextResponse.json({ error: 'Error fetching user role: ' + userError.message }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Error fetching user role: ' + userError.message 
+      }, { status: 500 });
     }
     
     console.log(`User role: ${userData?.role}`);
     
     if (userData?.role !== 'QAUTHOR' && userData?.role !== 'SUPERADMIN') {
-      return NextResponse.json({ error: 'Unauthorized. Only QAUTHORs can create questions' }, { status: 403 });
+      return NextResponse.json({ 
+        error: 'Unauthorized. Only QAUTHORs can create questions' 
+      }, { status: 403 });
     }
     
     // Parse request body
     const body = await req.json();
-    console.log('Request body received:', { ...body, optionA: body.optionA ? 'present' : 'missing' });
+    console.log('Request body received:', { 
+      title: body.title,
+      hasContent: !!body.content,
+      hasOptions: !!(body.optionA && body.optionB && body.optionC && body.optionD),
+      correctOption: body.correctOption,
+      hasExplanation: !!body.explanation,
+      subject: body.subject
+    });
     
     const {
       title,
@@ -172,7 +162,9 @@ export async function POST(req: NextRequest) {
     
     // Validate correct option
     if (!['A', 'B', 'C', 'D'].includes(correctOption)) {
-      return NextResponse.json({ error: 'Correct option must be A, B, C, or D' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Correct option must be A, B, C, or D' 
+      }, { status: 400 });
     }
     
     // Check if subject exists
@@ -184,7 +176,9 @@ export async function POST(req: NextRequest) {
       
     if (subjectError || !subjectData) {
       console.error('Subject validation error:', subjectError);
-      return NextResponse.json({ error: 'Invalid subject ID' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Invalid subject ID' 
+      }, { status: 400 });
     }
     
     console.log(`Subject validated: ${subjectData.id}`);
@@ -199,7 +193,9 @@ export async function POST(req: NextRequest) {
       
     if (existingQuestion) {
       console.log('Duplicate question found');
-      return NextResponse.json({ error: 'A similar question already exists for this subject' }, { status: 409 });
+      return NextResponse.json({ 
+        error: 'A similar question already exists for this subject' 
+      }, { status: 409 });
     }
     
     // Prepare options as JSONB
@@ -227,7 +223,11 @@ export async function POST(req: NextRequest) {
       created_by: userId
     };
     
-    console.log('Inserting question:', { ...newQuestion, options: 'JSONB object' });
+    console.log('Inserting question:', { 
+      ...newQuestion, 
+      options: 'JSONB object',
+      questionHash: 'generated'
+    });
     
     const { data, error } = await supabase
       .from('questions')
@@ -249,7 +249,9 @@ export async function POST(req: NextRequest) {
       
     if (error) {
       console.error('Error creating question:', error);
-      return NextResponse.json({ error: 'Database error: ' + error.message }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Database error: ' + error.message 
+      }, { status: 500 });
     }
     
     console.log('Question created successfully:', data.id);

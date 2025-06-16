@@ -7,9 +7,6 @@ let isInitializing = false;
 // Only log in development
 const isDev = process.env.NODE_ENV === 'development';
 
-// Storage key to avoid conflicts
-const STORAGE_KEY = 'ddp-supabase-auth-token';
-
 export function getBrowserClient(): SupabaseClient {
   if (typeof window === 'undefined') {
     // We're on the server, return a dummy client that won't be used
@@ -61,11 +58,11 @@ export function getBrowserClient(): SupabaseClient {
       throw new Error('Supabase configuration error');
     }
     
-    // Create the client with proper auth configuration
+    // Create the client with default auth configuration to match auth helpers
     browserClientInstance = createClient(supabaseUrl, supabaseKey, {
       auth: {
         storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-        storageKey: STORAGE_KEY,
+        // Use default storage key to be compatible with auth helpers
         persistSession: true,
         detectSessionInUrl: true,
         autoRefreshToken: true,
@@ -127,11 +124,10 @@ export function clearBrowserClient(): void {
     browserClientInstance = null;
   }
   
-  // Clear the auth storage
+  // Clear the auth storage - use default Supabase storage keys
   if (typeof window !== 'undefined') {
     try {
-      window.localStorage.removeItem(STORAGE_KEY);
-      // Also clear any other Supabase-related storage keys
+      // Clear all Supabase-related storage keys
       const keysToRemove = [];
       for (let i = 0; i < window.localStorage.length; i++) {
         const key = window.localStorage.key(i);
@@ -140,8 +136,15 @@ export function clearBrowserClient(): void {
         }
       }
       keysToRemove.forEach(key => window.localStorage.removeItem(key));
+      
+      if (isDev) {
+        console.log('Cleared auth storage keys:', keysToRemove);
+      }
     } catch (error) {
       // Silent fail if localStorage is not available
+      if (isDev) {
+        console.error('Error clearing auth storage:', error);
+      }
     }
   }
 }

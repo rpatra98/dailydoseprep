@@ -46,34 +46,37 @@ function ErrorBoundary({ children }: { children: React.ReactNode }) {
     return (
       <div style={{ 
         padding: '20px', 
-        textAlign: 'center', 
-        maxWidth: '600px', 
-        margin: '40px auto',
-        backgroundColor: '#fff',
-        border: '1px solid #f0f0f0',
-        borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        textAlign: 'center',
+        color: 'red',
+        fontFamily: 'monospace'
       }}>
-        <h1>Something went wrong</h1>
-        <p>{error?.message || "An unexpected error occurred"}</p>
+        <h2>Something went wrong</h2>
+        <details style={{ whiteSpace: 'pre-wrap' }}>
+          {error && error.toString()}
+        </details>
         <button 
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            setHasError(false);
+            setError(null);
+            window.location.reload();
+          }}
           style={{
-            backgroundColor: '#1677ff',
+            marginTop: '10px',
+            padding: '10px 20px',
+            backgroundColor: '#007bff',
             color: 'white',
             border: 'none',
-            padding: '8px 16px',
             borderRadius: '4px',
             cursor: 'pointer'
           }}
         >
-          Reload the application
+          Reload Page
         </button>
       </div>
     );
   }
 
-  return children;
+  return <>{children}</>;
 }
 
 export default function RootLayout({
@@ -95,23 +98,52 @@ export default function RootLayout({
     const cleanupTokens = () => {
       try {
         if (typeof window !== 'undefined') {
-          // Check for invalid tokens in localStorage
-          const authToken = window.localStorage.getItem('ddp-supabase-auth-token');
-          if (authToken) {
+          // Clear the old custom storage key if it exists
+          const oldAuthToken = window.localStorage.getItem('ddp-supabase-auth-token');
+          if (oldAuthToken) {
+            window.localStorage.removeItem('ddp-supabase-auth-token');
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Removed old custom auth token');
+            }
+          }
+          
+          // Check for invalid tokens in default Supabase storage
+          const keysToCheck = [];
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (key && (key.includes('supabase') || key.includes('sb-'))) {
+              keysToCheck.push(key);
+            }
+          }
+          
+          // Validate each auth token
+          for (const key of keysToCheck) {
             try {
-              const parsed = JSON.parse(authToken);
-              // If token is malformed or expired, clear it
-              if (!parsed.access_token || !parsed.refresh_token) {
-                clearBrowserClient();
+              const tokenValue = window.localStorage.getItem(key);
+              if (tokenValue) {
+                const parsed = JSON.parse(tokenValue);
+                // If token is malformed or expired, clear it
+                if (!parsed.access_token || !parsed.refresh_token) {
+                  window.localStorage.removeItem(key);
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('Removed invalid token:', key);
+                  }
+                }
               }
             } catch (e) {
               // If we can't parse the token, it's invalid
-              clearBrowserClient();
+              window.localStorage.removeItem(key);
+              if (process.env.NODE_ENV === 'development') {
+                console.log('Removed unparseable token:', key);
+              }
             }
           }
         }
       } catch (error) {
         // Silent cleanup failure
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Token cleanup error:', error);
+        }
       }
     };
     
@@ -125,6 +157,25 @@ export default function RootLayout({
     return () => clearTimeout(timer);
   }, []);
 
+  if (loading) {
+    return (
+      <html lang="en">
+        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            fontSize: '18px',
+            color: '#666'
+          }}>
+            Loading...
+          </div>
+        </body>
+      </html>
+    );
+  }
+
   return (
     <html lang="en">
       <head>
@@ -134,30 +185,15 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {loading ? (
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            height: '100vh',
-            width: '100%',
-            backgroundColor: '#f5f5f5'
-          }}>
-            <div className="loading-spinner"></div>
-            <p style={{ marginTop: '20px' }}>Loading Daily Dose Prep...</p>
-          </div>
-        ) : (
-          <ErrorBoundary>
-            <AntdRegistry>
-              <ConfigProvider theme={theme}>
-                <AuthProvider>
-                  {children}
-                </AuthProvider>
-              </ConfigProvider>
-            </AntdRegistry>
-          </ErrorBoundary>
-        )}
+        <ErrorBoundary>
+          <AntdRegistry>
+            <ConfigProvider theme={theme}>
+              <AuthProvider>
+                {children}
+              </AuthProvider>
+            </ConfigProvider>
+          </AntdRegistry>
+        </ErrorBoundary>
       </body>
     </html>
   );

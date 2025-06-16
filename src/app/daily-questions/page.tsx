@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/utils/supabase';
+import { getBrowserClient } from '@/lib/supabase-browser';
 import { UserRole } from '@/types';
 import { 
   Layout, 
