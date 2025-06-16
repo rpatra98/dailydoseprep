@@ -7,6 +7,7 @@ import { ConfigProvider } from 'antd';
 import { AntdRegistry } from '@ant-design/nextjs-registry';
 import theme from '@/theme/themeConfig';
 import { useState, useEffect } from "react";
+import { clearBrowserClient } from "@/lib/supabase-browser";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -89,6 +90,32 @@ export default function RootLayout({
         console.error("Missing Supabase environment variables");
       }
     }
+    
+    // Clean up any invalid tokens on app startup
+    const cleanupTokens = () => {
+      try {
+        if (typeof window !== 'undefined') {
+          // Check for invalid tokens in localStorage
+          const authToken = window.localStorage.getItem('ddp-supabase-auth-token');
+          if (authToken) {
+            try {
+              const parsed = JSON.parse(authToken);
+              // If token is malformed or expired, clear it
+              if (!parsed.access_token || !parsed.refresh_token) {
+                clearBrowserClient();
+              }
+            } catch (e) {
+              // If we can't parse the token, it's invalid
+              clearBrowserClient();
+            }
+          }
+        }
+      } catch (error) {
+        // Silent cleanup failure
+      }
+    };
+    
+    cleanupTokens();
     
     // Shorter timeout to improve user experience
     const timer = setTimeout(() => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getBrowserClient } from '@/lib/supabase-browser';
+import { getBrowserClient, clearBrowserClient } from '@/lib/supabase-browser';
 import { AuthContextType, User, LoginResponse } from '@/types';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
@@ -154,6 +154,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Handle auth state changes
+  const handleAuthStateChange = async (event: string, session: any) => {
+    if (event === 'SIGNED_IN' && session?.user) {
+      const userData = await fetchUserData(session.user.id);
+      
+      if (userData) {
+        setUser(userData);
+      } else {
+        const createdUser = await ensureUserExists(
+          session.user.id,
+          session.user.email || 'unknown@email.com',
+          'STUDENT'
+        );
+        
+        if (createdUser) {
+          setUser(createdUser);
+        } else {
+          setError('Failed to initialize user data');
+        }
+      }
+    } else if (event === 'SIGNED_OUT') {
+      setUser(null);
+      setError(null);
+    } else if (event === 'TOKEN_REFRESHED') {
+      // Handle token refresh - just ensure user data is still valid
+      if (session?.user && !user) {
+        const userData = await fetchUserData(session.user.id);
+        if (userData) {
+          setUser(userData);
+        }
+      }
+    }
+    
+    setLoading(false);
+  };
+
   // Setup authentication
   useEffect(() => {
     if (!browserSupabase) {
@@ -168,15 +204,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let isActive = true;
     
-    const setData = async () => {
+    const initializeAuth = async () => {
       try {
         setError(null);
+        
+        // Get initial session
         const { data: { session }, error: sessionError } = await browserSupabase.auth.getSession();
         
         if (sessionError) {
           if (isDev) {
             console.error('Session error:', sessionError);
           }
+          
+          // If it's a refresh token error, clear the client and try again
+          if (sessionError.message?.includes('refresh') || sessionError.message?.includes('Invalid')) {
+            clearBrowserClient();
+            setError('Session expired. Please sign in again.');
+          } else {
+            setError(sessionError.message);
+          }
+          
           if (isActive) {
             setAuthInitialized(true);
             setLoading(false);
@@ -231,39 +278,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // Setup auth state change listener
-    const { data: { subscription } } = browserSupabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!isActive) return;
+    const { data: { subscription } } = browserSupabase.auth.onAuthStateChange(handleAuthStateChange);
 
-        if (event === 'SIGNED_IN' && session?.user) {
-          const userData = await fetchUserData(session.user.id);
-          
-          if (userData) {
-            setUser(userData);
-          } else {
-            const createdUser = await ensureUserExists(
-              session.user.id,
-              session.user.email || 'unknown@email.com',
-              'STUDENT'
-            );
-            
-            if (createdUser) {
-              setUser(createdUser);
-            } else {
-              setError('Failed to initialize user data');
-            }
-          }
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setError(null);
-        }
-        
-        setLoading(false);
-      }
-    );
-
-    // Initial data setup
-    setData();
+    // Initial auth setup
+    initializeAuth();
 
     // Cleanup on unmount
     return () => {
@@ -348,6 +366,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw error;
       }
       
+      // Clear the browser client and user state
+      clearBrowserClient();
       setUser(null);
       router.push('/login');
     } catch (err) {
