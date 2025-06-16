@@ -30,115 +30,139 @@ async function discoverQuestionsSchema(supabase: any) {
     };
   }
   
-  // Get a valid subject UUID for testing
+  // Check if questions table exists at all
+  if (existingError) {
+    console.log('❌ Questions table error:', existingError.message);
+    if (existingError.message?.includes('relation') || existingError.message?.includes('does not exist')) {
+      return {
+        success: false,
+        error: 'Questions table does not exist. Please run supabase-manual-setup.sql script.',
+        details: existingError.message
+      };
+    }
+  }
+  
+  // Check if subjects table exists and has data
+  console.log('📋 Checking subjects table...');
   const { data: subjects, error: subjectsError } = await supabase
     .from('subjects')
-    .select('id')
+    .select('id, name')
     .limit(1);
   
-  if (subjectsError || !subjects || subjects.length === 0) {
-    console.log('❌ No subjects found, cannot test schema');
+  if (subjectsError) {
+    console.log('❌ Subjects table error:', subjectsError.message);
     return {
       success: false,
-      error: 'No subjects found in database. Please run the complete setup script.'
+      error: 'Subjects table does not exist. Please run supabase-manual-setup.sql script.',
+      details: subjectsError.message
+    };
+  }
+  
+  if (!subjects || subjects.length === 0) {
+    console.log('❌ No subjects found in database');
+    return {
+      success: false,
+      error: 'No subjects found in database. Please run supabase-manual-setup.sql script to insert default subjects.',
+      details: 'Subjects table exists but is empty'
     };
   }
   
   const testSubjectId = subjects[0].id;
-  console.log('📋 Using test subject ID:', testSubjectId);
+  console.log('📋 Using test subject:', subjects[0].name, '(', testSubjectId, ')');
   
-  // Get current user ID for testing
+  // Check authentication
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-  const testUserId = user?.id || '00000000-0000-0000-0000-000000000000';
-  
-  // If no existing data, try different schema combinations with proper UUIDs
-  const schemaCombinations = [
-    // Schema 1: supabase-manual-setup.sql format (EXACT MATCH)
-    {
-      name: 'supabase-manual-setup-exact',
-      fields: {
-        subject: testSubjectId,                    // UUID
-        question_text: 'test question',           // TEXT
-        options: { A: 'test', B: 'test', C: 'test', D: 'test' }, // JSONB
-        correct_answer: 'A',                      // TEXT
-        explanation: 'test explanation',          // TEXT
-        difficulty: 'EASY',                       // TEXT
-        questionHash: 'test-hash-' + Date.now(), // TEXT (unique)
-        created_by: testUserId                    // UUID
-      }
-    },
-    // Schema 2: Alternative with subject_id
-    {
-      name: 'subject_id-variant',
-      fields: {
-        subject_id: testSubjectId,
-        question_text: 'test question',
-        options: { A: 'test', B: 'test', C: 'test', D: 'test' },
-        correct_answer: 'A',
-        explanation: 'test explanation',
-        difficulty: 'EASY',
-        created_by: testUserId
-      }
-    },
-    // Schema 3: Alternative naming
-    {
-      name: 'alternative-naming',
-      fields: {
-        subject: testSubjectId,
-        content: 'test question',
-        options: { A: 'test', B: 'test', C: 'test', D: 'test' },
-        answer: 'A',
-        explanation: 'test explanation',
-        difficulty: 'EASY',
-        author: testUserId
-      }
-    },
-    // Schema 4: Simple naming
-    {
-      name: 'simple-naming',
-      fields: {
-        subject: testSubjectId,
-        question: 'test question',
-        options: { A: 'test', B: 'test', C: 'test', D: 'test' },
-        correct_answer: 'A',
-        explanation: 'test explanation',
-        created_by: testUserId
-      }
-    }
-  ];
-  
-  for (const schema of schemaCombinations) {
-    console.log(`🧪 Testing schema: ${schema.name}`);
-    console.log('📝 Test data:', schema.fields);
-    
-    const { data: testData, error: testError } = await supabase
-      .from('questions')
-      .insert(schema.fields)
-      .select('*');
-    
-    if (!testError && testData && testData.length > 0) {
-      console.log(`✅ Schema ${schema.name} works! Columns:`, Object.keys(testData[0]));
-      
-      // Clean up test data
-      await supabase.from('questions').delete().eq('id', testData[0].id);
-      
-      return {
-        success: true,
-        schemaName: schema.name,
-        columns: Object.keys(testData[0]),
-        workingFields: schema.fields,
-        sampleData: testData[0]
-      };
-    } else {
-      console.log(`❌ Schema ${schema.name} failed:`, testError?.message);
-      console.log('🔍 Error details:', testError);
-    }
+  if (userError) {
+    console.log('❌ Auth error:', userError.message);
+    return {
+      success: false,
+      error: 'Authentication failed. Please log in again.',
+      details: userError.message
+    };
   }
   
-  return {
-    success: false,
-    error: 'No working schema found'
+  if (!user) {
+    console.log('❌ No authenticated user');
+    return {
+      success: false,
+      error: 'No authenticated user. Please log in.',
+      details: 'User session not found'
+    };
+  }
+  
+  const testUserId = user.id;
+  console.log('👤 Using test user:', user.email, '(', testUserId, ')');
+  
+  // Try the exact supabase-manual-setup.sql schema first
+  console.log('🧪 Testing exact supabase-manual-setup.sql schema...');
+  
+  const testData = {
+    subject: testSubjectId,                    // UUID from subjects table
+    question_text: 'Test question - will be deleted',  // TEXT
+    options: { A: 'Option A', B: 'Option B', C: 'Option C', D: 'Option D' }, // JSONB
+    correct_answer: 'A',                      // TEXT
+    explanation: 'Test explanation',          // TEXT
+    difficulty: 'EASY',                       // TEXT
+    questionHash: 'test-hash-' + Date.now(), // TEXT (unique)
+    created_by: testUserId                    // UUID from auth
   };
+  
+  console.log('📝 Test data:', testData);
+  
+  const { data: insertResult, error: insertError } = await supabase
+    .from('questions')
+    .insert(testData)
+    .select('*');
+  
+  if (!insertError && insertResult && insertResult.length > 0) {
+    console.log('✅ Schema discovery successful! Columns:', Object.keys(insertResult[0]));
+    
+    // Clean up test data
+    await supabase.from('questions').delete().eq('id', insertResult[0].id);
+    console.log('🧹 Test data cleaned up');
+    
+    return {
+      success: true,
+      schemaName: 'supabase-manual-setup-exact',
+      columns: Object.keys(insertResult[0]),
+      workingFields: testData,
+      sampleData: insertResult[0]
+    };
+  } else {
+    console.log('❌ Schema test failed:', insertError?.message);
+    console.log('🔍 Full error details:', JSON.stringify(insertError, null, 2));
+    
+    // Try to identify the specific issue
+    if (insertError?.message?.includes('violates foreign key constraint')) {
+      return {
+        success: false,
+        error: 'Foreign key constraint violation. Check if subject ID exists and user is properly set up.',
+        details: insertError.message,
+        testData: testData
+      };
+    } else if (insertError?.message?.includes('column') && insertError?.message?.includes('does not exist')) {
+      return {
+        success: false,
+        error: 'Column mismatch. Database schema differs from expected supabase-manual-setup.sql format.',
+        details: insertError.message,
+        testData: testData
+      };
+    } else if (insertError?.message?.includes('permission')) {
+      return {
+        success: false,
+        error: 'Permission denied. Check RLS policies and user role.',
+        details: insertError.message,
+        testData: testData
+      };
+    } else {
+      return {
+        success: false,
+        error: 'Unknown database error during schema discovery.',
+        details: insertError?.message || 'Unknown error',
+        testData: testData
+      };
+    }
+  }
 }
 
 // Map our standard data to the discovered schema
