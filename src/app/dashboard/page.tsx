@@ -82,7 +82,7 @@ export default function Dashboard() {
 
     // Set a timeout to prevent infinite loading
     const loadingTimeout = setTimeout(() => {
-      if (isLoading && loadAttempts > 0 && !userRole) {
+      if (isLoading && !userRole) {
         console.warn('Loading user data timed out, showing fallback UI');
         setIsLoading(false);
         setLoadError('Failed to load user data. Please try refreshing the page.');
@@ -90,7 +90,7 @@ export default function Dashboard() {
     }, 10000); // 10 second timeout
 
     return () => clearTimeout(loadingTimeout);
-  }, [user, authInitialized, userRole, router, loadAttempts, isLoading]);
+  }, [user, authInitialized, userRole, router]);
 
   // Function to fetch user role and data
   const fetchUserData = async () => {
@@ -98,7 +98,6 @@ export default function Dashboard() {
       console.log('Fetching user data for dashboard');
       setIsLoading(true);
       setLoadError(null);
-      setLoadAttempts(prev => prev + 1);
       
       // Get user ID safely
       const userId = user?.id;
@@ -249,7 +248,7 @@ export default function Dashboard() {
   }
 
   // If we have a user but encountered an error or couldn't load role
-  if (loadError || (!userRole && loadAttempts > 0)) {
+  if (loadError) {
     return (
       <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
