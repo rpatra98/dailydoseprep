@@ -19,7 +19,8 @@ import {
   Form,
   Input,
   Table,
-  message
+  message,
+  Statistic
 } from 'antd';
 import { 
   LogoutOutlined, 
@@ -28,14 +29,27 @@ import {
   PlusOutlined,
   ReloadOutlined,
   MailOutlined,
-  LockOutlined
+  LockOutlined,
+  DatabaseOutlined,
+  TeamOutlined,
+  FileTextOutlined
 } from '@ant-design/icons';
 import Link from 'next/link';
 import SubjectSelection from '@/components/Auth/SubjectSelection';
+import SubjectManager from '@/components/Admin/SubjectManager';
 import AspectRatioLayout from '@/components/AspectRatioLayout';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
+
+interface SystemStats {
+  totalUsers: number;
+  totalQAuthors: number;
+  totalStudents: number;
+  totalSubjects: number;
+  totalQuestions: number;
+  questionsPerSubject: { [key: string]: number };
+}
 
 export default function Dashboard() {
   const { user, logout, authInitialized } = useAuth();
@@ -45,6 +59,7 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [createLoading, setCreateLoading] = useState(false);
+  const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
   const [form] = Form.useForm();
 
   // Redirect if not logged in
@@ -86,18 +101,12 @@ export default function Dashboard() {
         setUserRole(role);
         console.log('User role:', role);
         
-        // If SUPERADMIN, fetch all users
+        // If SUPERADMIN, fetch all users and system stats
         if (role === 'SUPERADMIN') {
-          const { data: usersData, error: usersError } = await supabase
-            .from('users')
-            .select('id, email, role, created_at')
-            .order('created_at', { ascending: false });
-            
-          if (usersError) {
-            console.error('Error fetching users:', usersError);
-          } else {
-            setAllUsers(usersData || []);
-          }
+          await Promise.all([
+            fetchAllUsers(),
+            fetchSystemStats()
+          ]);
         }
         
       } catch (error) {
@@ -110,6 +119,72 @@ export default function Dashboard() {
 
     fetchUserData();
   }, [user, authInitialized]);
+
+  const fetchAllUsers = async () => {
+    try {
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, email, role, created_at')
+        .order('created_at', { ascending: false });
+        
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+      } else {
+        setAllUsers(usersData || []);
+      }
+    } catch (error) {
+      console.error('Error in fetchAllUsers:', error);
+    }
+  };
+
+  const fetchSystemStats = async () => {
+    try {
+      // Fetch user counts
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('role');
+      
+      // Fetch subjects count
+      const { data: subjectsData, error: subjectsError } = await supabase
+        .from('subjects')
+        .select('id, name');
+      
+      // Fetch questions count
+      const { data: questionsData, error: questionsError } = await supabase
+        .from('questions')
+        .select('id, subject');
+
+      if (usersError || subjectsError || questionsError) {
+        console.error('Error fetching stats:', { usersError, subjectsError, questionsError });
+        return;
+      }
+
+      const totalUsers = usersData?.length || 0;
+      const totalQAuthors = usersData?.filter(u => u.role === 'QAUTHOR').length || 0;
+      const totalStudents = usersData?.filter(u => u.role === 'STUDENT').length || 0;
+      const totalSubjects = subjectsData?.length || 0;
+      const totalQuestions = questionsData?.length || 0;
+
+      // Calculate questions per subject
+      const questionsPerSubject: { [key: string]: number } = {};
+      subjectsData?.forEach(subject => {
+        const count = questionsData?.filter(q => q.subject === subject.id).length || 0;
+        questionsPerSubject[subject.name] = count;
+      });
+
+      setSystemStats({
+        totalUsers,
+        totalQAuthors,
+        totalStudents,
+        totalSubjects,
+        totalQuestions,
+        questionsPerSubject
+      });
+
+    } catch (error) {
+      console.error('Error fetching system stats:', error);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -159,15 +234,11 @@ export default function Dashboard() {
         message.success('QAUTHOR account created successfully!');
         form.resetFields();
         
-        // Refresh users list
-        const { data: usersData } = await supabase
-          .from('users')
-          .select('id, email, role, created_at')
-          .order('created_at', { ascending: false });
-        
-        if (usersData) {
-          setAllUsers(usersData);
-        }
+        // Refresh data
+        await Promise.all([
+          fetchAllUsers(),
+          fetchSystemStats()
+        ]);
       }
     } catch (error) {
       console.error('Error creating QAUTHOR:', error);
@@ -342,6 +413,68 @@ export default function Dashboard() {
           </Button>
         </Header>
         <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+          
+          {/* System Statistics */}
+          {systemStats && (
+            <Card title="System Statistics" style={{ marginBottom: 16 }}>
+              <Row gutter={[16, 16]}>
+                <Col xs={12} sm={8} md={6}>
+                  <Statistic
+                    title="Total Users"
+                    value={systemStats.totalUsers}
+                    prefix={<TeamOutlined />}
+                  />
+                </Col>
+                <Col xs={12} sm={8} md={6}>
+                  <Statistic
+                    title="QAUTHORs"
+                    value={systemStats.totalQAuthors}
+                    prefix={<UserAddOutlined />}
+                  />
+                </Col>
+                <Col xs={12} sm={8} md={6}>
+                  <Statistic
+                    title="Students"
+                    value={systemStats.totalStudents}
+                    prefix={<BookOutlined />}
+                  />
+                </Col>
+                <Col xs={12} sm={8} md={6}>
+                  <Statistic
+                    title="Subjects"
+                    value={systemStats.totalSubjects}
+                    prefix={<DatabaseOutlined />}
+                  />
+                </Col>
+                <Col xs={12} sm={8} md={6}>
+                  <Statistic
+                    title="Total Questions"
+                    value={systemStats.totalQuestions}
+                    prefix={<FileTextOutlined />}
+                  />
+                </Col>
+              </Row>
+              
+              {Object.keys(systemStats.questionsPerSubject).length > 0 && (
+                <>
+                  <Divider />
+                  <Title level={4}>Questions per Subject</Title>
+                  <Row gutter={[16, 16]}>
+                    {Object.entries(systemStats.questionsPerSubject).map(([subject, count]) => (
+                      <Col xs={12} sm={8} md={6} key={subject}>
+                        <Statistic
+                          title={subject}
+                          value={count}
+                          prefix={<FileTextOutlined />}
+                        />
+                      </Col>
+                    ))}
+                  </Row>
+                </>
+              )}
+            </Card>
+          )}
+
           <Row gutter={[16, 16]}>
             <Col xs={24} lg={16}>
               <Card title="User Management">
@@ -388,23 +521,25 @@ export default function Dashboard() {
             </Col>
             
             <Col xs={24} lg={8}>
-              <Card title="Quick Actions">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <Link href="/create-question">
-                    <Button type="primary" icon={<PlusOutlined />} block>
-                      Create Question
-                    </Button>
-                  </Link>
-                  <Link href="/daily-questions">
-                    <Button icon={<BookOutlined />} block>
-                      View Questions
-                    </Button>
-                  </Link>
-                </div>
+              <Card title="View Questions">
+                <Paragraph>
+                  As SUPERADMIN, you can view (but not edit) all questions created by QAUTHORs to monitor content quality.
+                </Paragraph>
+                <Link href="/daily-questions">
+                  <Button icon={<BookOutlined />} block>
+                    View All Questions
+                  </Button>
+                </Link>
               </Card>
             </Col>
           </Row>
           
+          {/* Subject Management */}
+          <Card style={{ marginTop: 16 }}>
+            <SubjectManager />
+          </Card>
+          
+          {/* All Users Table */}
           <Card title="All Users" style={{ marginTop: 16 }}>
             <Table 
               dataSource={allUsers} 
