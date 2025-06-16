@@ -276,7 +276,6 @@ export default function Dashboard() {
             </Title>
             <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
               <span className="hidden-mobile">Sign Out</span>
-              <LogoutOutlined className="visible-mobile" />
             </Button>
           </Header>
           <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -318,7 +317,6 @@ export default function Dashboard() {
             </Title>
             <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
               <span className="hidden-mobile">Sign Out</span>
-              <LogoutOutlined className="visible-mobile" />
             </Button>
           </Header>
           <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
@@ -362,7 +360,6 @@ export default function Dashboard() {
             </Title>
             <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
               <span className="hidden-mobile">Sign Out</span>
-              <LogoutOutlined className="visible-mobile" />
             </Button>
           </Header>
           <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
@@ -428,7 +425,6 @@ export default function Dashboard() {
           </Title>
           <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
             <span className="hidden-mobile">Sign Out</span>
-            <LogoutOutlined className="visible-mobile" />
           </Button>
         </Header>
         <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
