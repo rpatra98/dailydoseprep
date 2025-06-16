@@ -9,7 +9,8 @@
     "lint": "next lint",
     "setup-db": "node src/scripts/create-db-schema.js",
     "reset-db": "node src/scripts/reset-database.js",
-    "simple-reset": "node src/scripts/simple-reset.js"
+    "simple-reset": "node src/scripts/simple-reset.js",
+    "fix-db": "node src/scripts/fix-database.js"
   },
   "dependencies": {
     "@ant-design/cssinjs": "^1.23.0",

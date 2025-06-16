@@ -43,30 +43,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log(`Fetching user data for ID: ${userId} (attempt ${retryCount + 1})`);
       
-      // Increased timeout to 10 seconds
+      // Shorter timeout - 5 seconds max
       const timeoutPromise = new Promise<null>((_, reject) => {
-        setTimeout(() => reject(new Error('User data fetch timeout')), 10000);
+        setTimeout(() => reject(new Error('User data fetch timeout')), 5000);
       });
       
-      // Create the fetch promise
-      const fetchPromise = new Promise<User | null>(async (resolve) => {
+      // Create the fetch promise with simpler logic
+      const fetchPromise = async (): Promise<User | null> => {
         try {
-          // First check if the user exists in the auth system
-          const { data: authUser, error: authError } = await browserSupabase.auth.getUser();
-          
-          if (authError) {
-            console.error('Error getting auth user:', authError);
-            resolve(null);
-            return;
-          }
-          
-          if (!authUser || authUser.user.id !== userId) {
-            console.warn(`Auth user mismatch or not found for ID: ${userId}`);
-            resolve(null);
-            return;
-          }
-          
-          // Now check if the user exists in our users table
+          // Direct query to users table
           const { data: userData, error: userError } = await browserSupabase
             .from('users')
             .select('*')
@@ -76,37 +61,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (userError) {
             if (userError.code === 'PGRST116') {
               console.warn(`User ${userId} exists in Auth but not in users table`);
-              resolve(null);
+              return null;
             } else {
               console.error('Error fetching user data:', userError);
-              resolve(null);
+              return null;
             }
-            return;
           }
           
           if (!userData) {
             console.warn(`No user data found for ID: ${userId}`);
-            resolve(null);
-            return;
+            return null;
           }
           
           console.log("User data fetched successfully:", userData);
-          resolve(userData as User);
+          return userData as User;
         } catch (error) {
-          console.error("Error in fetchUserData:", error);
-          resolve(null);
+          console.error("Error in fetchUserData promise:", error);
+          return null;
         }
-      });
+      };
       
       // Race the fetch against the timeout
-      const result = await Promise.race([fetchPromise, timeoutPromise]) as User | null;
+      const result = await Promise.race([fetchPromise(), timeoutPromise]) as User | null;
       return result;
     } catch (error) {
       console.error("Error or timeout in fetchUserData:", error);
       
-      // Retry logic (max 2 attempts)
+      // Only retry once and with a delay
       if (retryCount < 1) {
-        console.log(`Retrying user data fetch for ID: ${userId}`);
+        console.log(`Retrying user data fetch for ID: ${userId} after delay...`);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
         return fetchUserData(userId, retryCount + 1);
       }
       
