@@ -1,14 +1,11 @@
 -- Create extension for UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create subjects table
+-- Create subjects table (simplified - just name for now)
 CREATE TABLE IF NOT EXISTS public.subjects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL UNIQUE,
-    examCategory TEXT DEFAULT 'OTHER',
-    description TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
 -- Create users table if not exists (Supabase Auth creates this, but we'll add our custom fields)
@@ -23,7 +20,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Create questions table
 CREATE TABLE IF NOT EXISTS public.questions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    subject UUID REFERENCES public.subjects(id),
+    subject_id UUID REFERENCES public.subjects(id),
     question_text TEXT NOT NULL,
     options JSONB,
     correct_answer TEXT,
@@ -107,9 +104,8 @@ CREATE TABLE student_attempts (
 );
 
 -- Create indexes
-CREATE INDEX idx_questions_exam_category ON questions(exam_category);
 CREATE INDEX idx_questions_difficulty ON questions(difficulty);
-CREATE INDEX idx_questions_subject ON questions(subject);
+CREATE INDEX idx_questions_subject_id ON questions(subject_id);
 CREATE INDEX idx_student_attempts_student_id ON student_attempts(student_id);
 CREATE INDEX idx_student_attempts_question_id ON student_attempts(question_id);
 
