@@ -528,7 +528,7 @@ export default function Dashboard() {
                 <Paragraph>
                   As SUPERADMIN, you can view (but not edit) all questions created by QAUTHORs to monitor content quality.
                 </Paragraph>
-                <Link href="/daily-questions">
+                <Link href="/admin/questions">
                   <Button icon={<BookOutlined />} block>
                     View All Questions
                   </Button>
