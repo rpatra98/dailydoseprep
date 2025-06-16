@@ -208,83 +208,91 @@ export async function POST(req: NextRequest) {
     
     console.log('Creating question with options:', options);
     
-    // Generate question hash for duplicate prevention
-    const questionHash = generateQuestionHash(body);
+    // First, let's try to see what columns actually exist by doing a simple select
+    try {
+      const { data: testData, error: testError } = await supabase
+        .from('questions')
+        .select('*')
+        .limit(1);
+      console.log('Test query result:', { testData, testError });
+    } catch (e) {
+      console.log('Test query failed:', e);
+    }
     
-    // Create new question using actual database schema from src/db/schema.sql
-    const newQuestion = {
-      subject_id: subject, // Using 'subject_id' with underscore
+    // Try a minimal insert first to see what works
+    const minimalQuestion = {
+      subject_id: subject,
       question_text: content,
-      options: options,
-      correct_answer: correctOption,
-      explanation: explanation,
-      difficulty: difficulty,
       created_by: userId
     };
     
-    console.log('Inserting question:', { 
-      ...newQuestion, 
-      options: 'JSONB object'
-    });
+    console.log('Trying minimal insert:', minimalQuestion);
     
-    const { data, error } = await supabase
+    const { data: minimalData, error: minimalError } = await supabase
       .from('questions')
-      .insert(newQuestion)
-      .select(`
-        id,
-        subject_id,
-        question_text,
-        options,
-        correct_answer,
-        explanation,
-        difficulty,
-        created_by,
-        created_at,
-        updated_at
-      `)
+      .insert(minimalQuestion)
+      .select('*')
       .single();
       
-    if (error) {
-      console.error('Error creating question:', error);
-      console.error('Full error details:', JSON.stringify(error, null, 2));
-      
-      // Try to get more information about the table structure
-      try {
-        const { data: tableInfo, error: tableError } = await supabase
-          .from('questions')
-          .select('*')
-          .limit(1);
-        console.log('Table structure test:', { tableInfo, tableError });
-      } catch (e) {
-        console.log('Could not test table structure:', e);
-      }
+    if (minimalError) {
+      console.error('Minimal insert failed:', minimalError);
+      console.error('Full minimal error:', JSON.stringify(minimalError, null, 2));
       
       return NextResponse.json({ 
-        error: 'Database error: ' + error.message 
+        error: 'Database error (minimal test): ' + minimalError.message 
       }, { status: 500 });
     }
     
-    console.log('Question created successfully:', data.id);
+    console.log('Minimal insert succeeded:', minimalData);
+    
+    // If minimal insert worked, try to update with the rest of the fields
+    const updateData = {
+      options: options,
+      correct_answer: correctOption,
+      explanation: explanation,
+      difficulty: difficulty
+    };
+    
+    const { data: updatedData, error: updateError } = await supabase
+      .from('questions')
+      .update(updateData)
+      .eq('id', minimalData.id)
+      .select('*')
+      .single();
+      
+    if (updateError) {
+      console.error('Update failed:', updateError);
+      console.error('Full update error:', JSON.stringify(updateError, null, 2));
+      
+      // Clean up the minimal record
+      await supabase.from('questions').delete().eq('id', minimalData.id);
+      
+      return NextResponse.json({ 
+        error: 'Database error (update test): ' + updateError.message 
+      }, { status: 500 });
+    }
+    
+    console.log('Question created and updated successfully:', updatedData.id);
     
     // Transform the response to match the frontend expectations
     const transformedQuestion = {
-      id: data.id,
+      id: updatedData.id,
       title: title,
-      content: data.question_text,
-      optionA: data.options.A,
-      optionB: data.options.B,
-      optionC: data.options.C,
-      optionD: data.options.D,
-      correctOption: data.correct_answer,
-      explanation: data.explanation,
-      difficulty: data.difficulty,
+      content: updatedData.question_text,
+      optionA: updatedData.options?.A || optionA,
+      optionB: updatedData.options?.B || optionB,
+      optionC: updatedData.options?.C || optionC,
+      optionD: updatedData.options?.D || optionD,
+      correctOption: updatedData.correct_answer || correctOption,
+      explanation: updatedData.explanation || explanation,
+      difficulty: updatedData.difficulty || difficulty,
       examCategory: examCategory,
-      subject: data.subject_id,
+      subject: updatedData.subject_id,
       year: year || null,
       source: source || null,
-      createdBy: data.created_by,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
+      createdBy: updatedData.created_by,
+      createdAt: updatedData.created_at,
+      updatedAt: updatedData.updated_at
     };
     
     return NextResponse.json(transformedQuestion, { status: 201 });
