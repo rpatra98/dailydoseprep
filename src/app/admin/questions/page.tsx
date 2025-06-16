@@ -172,16 +172,19 @@ export default function AdminQuestionsPage() {
     return (
       <AspectRatioLayout>
         <Layout className="full-height">
-          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
+          <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', alignItems: 'center' }}>
             <Button 
               type="text" 
               icon={<ArrowLeftOutlined />} 
               onClick={handleBackToDashboard}
-              style={{ marginRight: 16 }}
+              style={{ marginRight: 8 }}
             >
-              Back
+              <span className="hidden-mobile">Back</span>
             </Button>
-            <Title level={3} style={{ margin: 0 }}>All Questions</Title>
+            <Title level={3} style={{ margin: 0 }}>
+              <span className="hidden-mobile">All Questions</span>
+              <span className="visible-mobile">Questions</span>
+            </Title>
           </Header>
           <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Card style={{ textAlign: 'center', maxWidth: 500 }}>
@@ -313,24 +316,27 @@ export default function AdminQuestionsPage() {
   return (
     <AspectRatioLayout>
       <Layout className="full-height">
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <Button 
               type="text" 
               icon={<ArrowLeftOutlined />} 
               onClick={handleBackToDashboard}
-              style={{ marginRight: 16 }}
+              style={{ marginRight: 8 }}
             >
-              Back
+              <span className="hidden-mobile">Back</span>
             </Button>
-            <Title level={3} style={{ margin: 0 }}>All Questions</Title>
+            <Title level={3} style={{ margin: 0 }}>
+              <span className="hidden-mobile">All Questions</span>
+              <span className="visible-mobile">Questions</span>
+            </Title>
           </div>
           <Button 
             icon={<ReloadOutlined />} 
             onClick={fetchAllQuestions}
             loading={loading}
           >
-            Refresh
+            <span className="hidden-mobile">Refresh</span>
           </Button>
         </Header>
         <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>

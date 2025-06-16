@@ -269,10 +269,14 @@ export default function Dashboard() {
     return (
       <AspectRatioLayout>
         <Layout className="full-height">
-          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={3} style={{ margin: 0 }}>Dashboard</Title>
+          <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0 }}>
+              <span className="hidden-mobile">Dashboard</span>
+              <span className="visible-mobile">Dashboard</span>
+            </Title>
             <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
-              Sign Out
+              <span className="hidden-mobile">Sign Out</span>
+              <LogoutOutlined className="visible-mobile" />
             </Button>
           </Header>
           <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -307,10 +311,14 @@ export default function Dashboard() {
     return (
       <AspectRatioLayout>
         <Layout className="full-height">
-          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={3} style={{ margin: 0 }}>QAUTHOR Dashboard</Title>
+          <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0 }}>
+              <span className="hidden-mobile">QAUTHOR Dashboard</span>
+              <span className="visible-mobile">QAUTHOR</span>
+            </Title>
             <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
-              Sign Out
+              <span className="hidden-mobile">Sign Out</span>
+              <LogoutOutlined className="visible-mobile" />
             </Button>
           </Header>
           <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
@@ -347,10 +355,14 @@ export default function Dashboard() {
     return (
       <AspectRatioLayout>
         <Layout className="full-height">
-          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={3} style={{ margin: 0 }}>Student Dashboard</Title>
+          <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0 }}>
+              <span className="hidden-mobile">Student Dashboard</span>
+              <span className="visible-mobile">Student</span>
+            </Title>
             <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
-              Sign Out
+              <span className="hidden-mobile">Sign Out</span>
+              <LogoutOutlined className="visible-mobile" />
             </Button>
           </Header>
           <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
@@ -409,10 +421,14 @@ export default function Dashboard() {
   return (
     <AspectRatioLayout>
       <Layout className="full-height">
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Title level={3} style={{ margin: 0 }}>SUPERADMIN Dashboard</Title>
+        <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Title level={3} style={{ margin: 0 }}>
+            <span className="hidden-mobile">SUPERADMIN Dashboard</span>
+            <span className="visible-mobile">SUPERADMIN</span>
+          </Title>
           <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
-            Sign Out
+            <span className="hidden-mobile">Sign Out</span>
+            <LogoutOutlined className="visible-mobile" />
           </Button>
         </Header>
         <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>

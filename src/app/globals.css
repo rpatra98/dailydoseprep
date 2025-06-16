@@ -323,3 +323,22 @@ body {
   align-items: center;
   height: 100%;
 }
+
+/* Mobile responsive visibility classes */
+.hidden-mobile {
+  display: inline;
+}
+
+.visible-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .hidden-mobile {
+    display: none;
+  }
+  
+  .visible-mobile {
+    display: inline;
+  }
+}
