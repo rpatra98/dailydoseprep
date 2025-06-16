@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     // Check if user is a STUDENT
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('role, primarySubject')
+      .select('role')
       .eq('id', authData.session.user.id)
       .single();
     
@@ -24,11 +24,6 @@ export async function GET(req: NextRequest) {
     
     if (userData?.role !== 'STUDENT') {
       return NextResponse.json({ error: 'Only students can access daily questions' }, { status: 403 });
-    }
-    
-    // Check if student has selected a primary subject
-    if (!userData.primarySubject) {
-      return NextResponse.json({ error: 'Please select a primary subject first' }, { status: 400 });
     }
     
     // Get today's date in YYYY-MM-DD format for consistency
@@ -95,7 +90,6 @@ export async function GET(req: NextRequest) {
     
     let query = supabase.from('questions')
       .select('id, title, content, optionA, optionB, optionC, optionD')
-      .eq('subject', userData.primarySubject)
       .order('createdAt', { ascending: true });
       
     // Exclude previously attempted questions

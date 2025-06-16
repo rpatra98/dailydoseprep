@@ -6,17 +6,13 @@ export type Option = 'A' | 'B' | 'C' | 'D';
 export interface Subject {
     id: string;
     name: string;
-    examCategory: ExamCategory;
-    description?: string;
     created_at: string;
-    updated_at?: string;
 }
 
 export interface User {
     id: string;
     email: string;
     role: UserRole;
-    primarySubject?: string;  // Subject ID for students
     created_at?: string;
     updated_at?: string;
 }

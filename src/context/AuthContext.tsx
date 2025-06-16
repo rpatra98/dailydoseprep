@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Direct query to users table without complex filtering
           const { data: userData, error: userError } = await browserSupabase
             .from('users')
-            .select('id, email, role, primarySubject, created_at, updated_at')
+            .select('id, email, role, created_at, updated_at')
             .eq('id', userId)
             .maybeSingle(); // Use maybeSingle instead of single to avoid errors when no data
   
@@ -97,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // First check if user exists with timeout
       const checkPromise = browserSupabase
         .from('users')
-        .select('id, email, role, primarySubject, created_at, updated_at')
+        .select('id, email, role, created_at, updated_at')
         .eq('id', userId)
         .maybeSingle();
         
@@ -128,7 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email,
           role,
         })
-        .select('id, email, role, primarySubject, created_at, updated_at')
+        .select('id, email, role, created_at, updated_at')
         .single();
         
       const insertTimeoutPromise = new Promise((_, reject) => {

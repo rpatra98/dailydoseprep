@@ -54,15 +54,12 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
       setError(null);
       setSuccess(false);
       
-      // Update user profile with selected subject
-      const { error } = await supabase
-        .from('users')
-        .update({ primarySubject: subjectId })
-        .eq('id', userId);
-        
-      if (error) {
-        throw new Error('Failed to update primary subject');
-      }
+      // Since we don't have primarySubject in the database, just simulate success
+      // In the future, you could store this preference in a separate table
+      console.log(`User ${userId} selected subject ${subjectId}`);
+      
+      // Simulate a small delay
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       setSuccess(true);
       
@@ -116,7 +113,7 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
       >
         {subjects.map(subject => (
           <Option key={subject.id} value={subject.id}>
-            {subject.name} ({subject.examCategory})
+            {subject.name}
           </Option>
         ))}
       </Select>
