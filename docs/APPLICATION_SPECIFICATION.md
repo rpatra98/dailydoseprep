@@ -6,18 +6,42 @@
 - **The actual database schema uses MIXED naming conventions** (from supabase-manual-setup.sql)
 - **Most columns use snake_case**: `question_text`, `correct_answer`, `created_at`, `updated_at`
 - **Some columns use camelCase**: `questionHash`, `primarySubject`, `examCategory`
-- **ALWAYS check supabase-manual-setup.sql for exact column names before coding**
-- Examples of actual column names: `question_text`, `correct_answer`, `questionHash`, `primarySubject`
+- **ALWAYS use supabase-manual-setup.sql as the single source of truth**
+- **src/db/schema.sql has been updated to match supabase-manual-setup.sql exactly**
 
-### Database Schema Priority
-1. **Primary Schema**: `supabase-manual-setup.sql` - This is the authoritative schema
-2. **Secondary**: `src/db/schema.sql` - May be outdated, always verify against manual setup
-3. **When implementing**: Always check `supabase-manual-setup.sql` first for correct column names
+### Database Schema - Single Source of Truth
+**AUTHORITATIVE SCHEMA**: `supabase-manual-setup.sql` and `src/db/schema.sql` (now synchronized)
 
-### Key Database Tables Structure
-- **questions table**: `subject`, `question_text`, `options`, `correct_answer`, `explanation`, `difficulty`, `questionHash`, `created_by`
-- **users table**: `id`, `email`, `role`, `primarySubject`, `created_at`, `updated_at`
-- **subjects table**: `id`, `name`, `examCategory`, `description`, `created_at`, `updated_at`
+### Key Database Tables Structure (CORRECT COLUMN NAMES)
+
+#### questions table:
+- `id` UUID PRIMARY KEY
+- `subject` UUID (foreign key to subjects.id) - **NOT subject_id**
+- `question_text` TEXT - **NOT content or title**
+- `options` JSONB - **Contains {A: "...", B: "...", C: "...", D: "..."}**
+- `correct_answer` TEXT - **NOT correctOption or correctAnswer**
+- `explanation` TEXT
+- `difficulty` TEXT
+- `questionHash` TEXT (camelCase)
+- `created_by` UUID (foreign key to users.id)
+- `created_at` TIMESTAMP
+- `updated_at` TIMESTAMP
+
+#### users table:
+- `id` UUID PRIMARY KEY
+- `email` TEXT
+- `role` TEXT ('SUPERADMIN', 'QAUTHOR', 'STUDENT')
+- `primarySubject` UUID (camelCase, foreign key to subjects.id)
+- `created_at` TIMESTAMP
+- `updated_at` TIMESTAMP
+
+#### subjects table:
+- `id` UUID PRIMARY KEY
+- `name` TEXT
+- `examCategory` TEXT (camelCase)
+- `description` TEXT
+- `created_at` TIMESTAMP
+- `updated_at` TIMESTAMP
 
 ### API Implementation Guidelines
 - Use `createRouteHandlerClient({ cookies })` for server-side API routes
