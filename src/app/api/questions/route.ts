@@ -20,10 +20,10 @@ export async function GET(req: NextRequest) {
     const examCategory = searchParams.get('examCategory');
     const limit = parseInt(searchParams.get('limit') || '50');
     
-    // Start building the query - using actual database field names from supabase-manual-setup.sql
+    // Start building the query - using actual database field names from src/db/schema.sql
     let query = supabase.from('questions').select(`
       id,
-      subject,
+      subject_id,
       question_text,
       options,
       correct_answer,
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     `);
     
     // Apply filters if provided
-    if (subject) query = query.eq('subject', subject);
+    if (subject) query = query.eq('subject_id', subject);
     if (difficulty) query = query.eq('difficulty', difficulty);
     
     // Execute query with pagination
@@ -183,12 +183,12 @@ export async function POST(req: NextRequest) {
     
     console.log(`Subject validated: ${subjectData.id}`);
     
-    // Check for duplicate questions (using question text and subject)
+    // Check for duplicate questions (using question text and subject_id)
     const { data: existingQuestion } = await supabase
       .from('questions')
       .select('id')
       .eq('question_text', content)
-      .eq('subject', subject)
+      .eq('subject_id', subject)
       .maybeSingle();
       
     if (existingQuestion) {
@@ -211,22 +211,20 @@ export async function POST(req: NextRequest) {
     // Generate question hash for duplicate prevention
     const questionHash = generateQuestionHash(body);
     
-    // Create new question using actual database schema from supabase-manual-setup.sql
+    // Create new question using actual database schema from src/db/schema.sql
     const newQuestion = {
-      subject: subject, // Using 'subject' not 'subject_id'
+      subject_id: subject, // Using 'subject_id' with underscore
       question_text: content,
       options: options,
       correct_answer: correctOption,
       explanation: explanation,
       difficulty: difficulty,
-      questionHash: questionHash,
       created_by: userId
     };
     
     console.log('Inserting question:', { 
       ...newQuestion, 
-      options: 'JSONB object',
-      questionHash: 'generated'
+      options: 'JSONB object'
     });
     
     const { data, error } = await supabase
@@ -234,13 +232,12 @@ export async function POST(req: NextRequest) {
       .insert(newQuestion)
       .select(`
         id,
-        subject,
+        subject_id,
         question_text,
         options,
         correct_answer,
         explanation,
         difficulty,
-        questionHash,
         created_by,
         created_at,
         updated_at
@@ -249,6 +246,19 @@ export async function POST(req: NextRequest) {
       
     if (error) {
       console.error('Error creating question:', error);
+      console.error('Full error details:', JSON.stringify(error, null, 2));
+      
+      // Try to get more information about the table structure
+      try {
+        const { data: tableInfo, error: tableError } = await supabase
+          .from('questions')
+          .select('*')
+          .limit(1);
+        console.log('Table structure test:', { tableInfo, tableError });
+      } catch (e) {
+        console.log('Could not test table structure:', e);
+      }
+      
       return NextResponse.json({ 
         error: 'Database error: ' + error.message 
       }, { status: 500 });
@@ -269,7 +279,7 @@ export async function POST(req: NextRequest) {
       explanation: data.explanation,
       difficulty: data.difficulty,
       examCategory: examCategory,
-      subject: data.subject,
+      subject: data.subject_id,
       year: year || null,
       source: source || null,
       createdBy: data.created_by,
