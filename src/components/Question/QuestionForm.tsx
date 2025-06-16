@@ -16,7 +16,7 @@ import {
   SaveOutlined, 
   CloseOutlined 
 } from '@ant-design/icons';
-import { supabase } from '@/utils/supabase';
+import { getBrowserClient } from '@/lib/supabase-browser';
 import { Question, DifficultyLevel, ExamCategory, Option, Subject } from '@/types';
 
 const { Title, Text } = Typography;
@@ -40,6 +40,7 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
     const fetchSubjects = async () => {
       try {
         setLoading(true);
+        const supabase = getBrowserClient();
         const { data, error } = await supabase
           .from('subjects')
           .select('*')
@@ -65,6 +66,7 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
       setSubmitting(true);
       setError(null);
       
+      const supabase = getBrowserClient();
       const { data: authData } = await supabase.auth.getSession();
       if (!authData.session) {
         throw new Error('You must be logged in to create questions');
@@ -80,8 +82,8 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         optionD: values.optionD,
         correctOption: values.correctOption,
         explanation: values.explanation,
-        difficulty: values.difficulty,
-        examCategory: values.examCategory,
+        difficulty: values.difficulty || 'MEDIUM', // Default to MEDIUM if not provided
+        examCategory: values.examCategory || 'OTHER', // Default to OTHER if not provided
         subject: values.subject,
         year: values.year ? parseInt(values.year, 10) : null,
         source: values.source || null,
@@ -93,6 +95,7 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies for authentication
         body: JSON.stringify(questionData),
       });
       
@@ -125,7 +128,7 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
     <div>
       <Title level={3}>Create New Question</Title>
       <Text>
-        Fill out all fields below to create a complete question. Each question must have four options
+        Fill out the required fields below to create a complete question. Each question must have four options
         with one correct answer and belong to a specific subject.
       </Text>
       
@@ -244,10 +247,10 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         
         <Form.Item
           name="examCategory"
-          label="Exam Category"
-          rules={[{ required: true, message: 'Please select an exam category' }]}
+          label="Exam Category (Optional)"
+          help="If not selected, will default to 'OTHER'"
         >
-          <Select placeholder="Select exam category">
+          <Select placeholder="Select exam category" allowClear>
             <SelectOption value="UPSC">UPSC</SelectOption>
             <SelectOption value="JEE">JEE</SelectOption>
             <SelectOption value="NEET">NEET</SelectOption>
@@ -258,10 +261,10 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         
         <Form.Item
           name="difficulty"
-          label="Difficulty Level"
-          rules={[{ required: true, message: 'Please select a difficulty level' }]}
+          label="Difficulty Level (Optional)"
+          help="If not selected, will default to 'MEDIUM'"
         >
-          <Select placeholder="Select difficulty">
+          <Select placeholder="Select difficulty" allowClear>
             <SelectOption value="EASY">Easy</SelectOption>
             <SelectOption value="MEDIUM">Medium</SelectOption>
             <SelectOption value="HARD">Hard</SelectOption>
