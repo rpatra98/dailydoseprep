@@ -43,29 +43,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log(`Fetching user data for ID: ${userId} (attempt ${retryCount + 1})`);
       
-      // Shorter timeout - 5 seconds max
+      // Much shorter timeout - 3 seconds max
       const timeoutPromise = new Promise<null>((_, reject) => {
-        setTimeout(() => reject(new Error('User data fetch timeout')), 5000);
+        setTimeout(() => reject(new Error('User data fetch timeout')), 3000);
       });
       
-      // Create the fetch promise with simpler logic
+      // Create the fetch promise with simpler logic and no RLS dependency
       const fetchPromise = async (): Promise<User | null> => {
         try {
-          // Direct query to users table
+          // Direct query to users table without complex filtering
           const { data: userData, error: userError } = await browserSupabase
             .from('users')
-            .select('*')
+            .select('id, email, role, primarySubject, created_at, updated_at')
             .eq('id', userId)
-            .single();
+            .maybeSingle(); // Use maybeSingle instead of single to avoid errors when no data
   
           if (userError) {
-            if (userError.code === 'PGRST116') {
-              console.warn(`User ${userId} exists in Auth but not in users table`);
-              return null;
-            } else {
-              console.error('Error fetching user data:', userError);
-              return null;
-            }
+            console.error('Error fetching user data:', userError);
+            return null;
           }
           
           if (!userData) {
@@ -87,13 +82,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error("Error or timeout in fetchUserData:", error);
       
-      // Only retry once and with a delay
-      if (retryCount < 1) {
-        console.log(`Retrying user data fetch for ID: ${userId} after delay...`);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
-        return fetchUserData(userId, retryCount + 1);
-      }
-      
+      // Don't retry on timeout - just return null
       return null;
     }
   };
@@ -105,16 +94,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log(`Checking if user ${userId} exists in users table`);
       
-      // First check if user exists
-      const { data: existingUser, error: checkError } = await browserSupabase
+      // First check if user exists with timeout
+      const checkPromise = browserSupabase
         .from('users')
-        .select('*')
+        .select('id, email, role, primarySubject, created_at, updated_at')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
+        
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Check user timeout')), 2000);
+      });
       
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = not found
+      const { data: existingUser, error: checkError } = await Promise.race([checkPromise, timeoutPromise]) as any;
+      
+      if (checkError) {
         console.error('Error checking user existence:', checkError);
-        return null;
+        // Continue to create user instead of failing
       }
       
       // If user exists, return it
@@ -126,43 +121,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // User doesn't exist, create it
       console.log(`Creating new user record for ${userId} with role ${role}`);
       
-      // Use a direct insert with RPC to avoid potential issues
-      try {
-        const { data: newUser, error: insertError } = await browserSupabase
-          .from('users')
-          .insert({
-            id: userId,
-            email,
-            role,
-          })
-          .select()
-          .single();
+      const insertPromise = browserSupabase
+        .from('users')
+        .insert({
+          id: userId,
+          email,
+          role,
+        })
+        .select('id, email, role, primarySubject, created_at, updated_at')
+        .single();
         
-        if (insertError) {
-          console.error('Error creating user record:', insertError);
-          return null;
-        }
-        
-        console.log('Created new user record:', newUser);
-        return newUser as User;
-      } catch (insertErr) {
-        console.error('Exception during user creation:', insertErr);
-        
-        // If insert failed, try one more time to check if the user exists
-        // (in case it was created by another concurrent process)
-        const { data: recheckUser, error: recheckError } = await browserSupabase
-          .from('users')
-          .select('*')
-          .eq('id', userId)
-          .single();
-          
-        if (!recheckError && recheckUser) {
-          console.log('User record found on recheck:', recheckUser);
-          return recheckUser as User;
-        }
-        
+      const insertTimeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Insert user timeout')), 3000);
+      });
+      
+      const { data: newUser, error: insertError } = await Promise.race([insertPromise, insertTimeoutPromise]) as any;
+      
+      if (insertError) {
+        console.error('Error creating user record:', insertError);
         return null;
       }
+      
+      console.log('Created new user record:', newUser);
+      return newUser as User;
     } catch (error) {
       console.error('Error in ensureUserExists:', error);
       return null;
