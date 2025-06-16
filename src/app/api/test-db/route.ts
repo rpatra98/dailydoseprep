@@ -74,13 +74,17 @@ export async function GET(req: NextRequest) {
       console.log('🧪 Testing question insert capability...');
       
       const testQuestion = {
-        subject: subjects[0].id,
-        question_text: 'Test question - will be deleted',
-        options: { A: 'Option A', B: 'Option B', C: 'Option C', D: 'Option D' },
-        correct_answer: 'A',
+        subject_id: subjects[0].id,
+        title: 'Test Question',
+        content: 'Test question - will be deleted',
+        option_a: 'Option A',
+        option_b: 'Option B',
+        option_c: 'Option C',
+        option_d: 'Option D',
+        correct_option: 'A',
         explanation: 'Test explanation',
         difficulty: 'EASY',
-        questionHash: 'test-' + Date.now(),
+        questionhash: 'test-' + Date.now(),
         created_by: session?.user?.id || '00000000-0000-0000-0000-000000000000'
       };
       

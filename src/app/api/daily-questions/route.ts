@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       // Fetch the questions for this set
       const { data: questions, error: questionsError } = await supabase
         .from('questions')
-        .select('id, question_text, options')
+        .select('id, title, content, option_a, option_b, option_c, option_d')
         .in('id', existingSet.questions);
         
       if (questionsError) {
@@ -52,12 +52,11 @@ export async function GET(req: NextRequest) {
       
       // Randomize the options for each question
       const questionsWithRandomizedOptions = questions?.map(question => {
-        const questionOptions = question.options || {};
         const options = [
-          { key: 'A', value: questionOptions.A || '' },
-          { key: 'B', value: questionOptions.B || '' },
-          { key: 'C', value: questionOptions.C || '' },
-          { key: 'D', value: questionOptions.D || '' }
+          { key: 'A', value: question.option_a || '' },
+          { key: 'B', value: question.option_b || '' },
+          { key: 'C', value: question.option_c || '' },
+          { key: 'D', value: question.option_d || '' }
         ];
         
         // Shuffle the options
@@ -68,7 +67,8 @@ export async function GET(req: NextRequest) {
         
         return {
           id: question.id,
-          content: question.question_text,
+          title: question.title,
+          content: question.content,
           options: options
         };
       });
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
     const attemptedIds = attemptedQuestionIds?.map(item => item.questionId) || [];
     
     let query = supabase.from('questions')
-      .select('id, question_text, options')
+      .select('id, title, content, option_a, option_b, option_c, option_d')
       .order('created_at', { ascending: true });
       
     // Exclude previously attempted questions
@@ -137,12 +137,11 @@ export async function GET(req: NextRequest) {
     
     // Randomize the options for each question
     const questionsWithRandomizedOptions = availableQuestions.map(question => {
-      const questionOptions = question.options || {};
       const options = [
-        { key: 'A', value: questionOptions.A || '' },
-        { key: 'B', value: questionOptions.B || '' },
-        { key: 'C', value: questionOptions.C || '' },
-        { key: 'D', value: questionOptions.D || '' }
+        { key: 'A', value: question.option_a || '' },
+        { key: 'B', value: question.option_b || '' },
+        { key: 'C', value: question.option_c || '' },
+        { key: 'D', value: question.option_d || '' }
       ];
       
       // Shuffle the options
@@ -153,7 +152,8 @@ export async function GET(req: NextRequest) {
       
       return {
         id: question.id,
-        content: question.question_text,
+        title: question.title,
+        content: question.content,
         options: options
       };
     });

@@ -149,21 +149,20 @@ async function testQuestionInsertion(supabase: any, user: any, subjects: any[]) 
   const testSubject = subjects[0];
   console.log('📋 Using test subject:', testSubject.name, '(', testSubject.id, ')');
   
-  // Test data matching supabase-manual-setup.sql exactly
+  // Test data matching actual database schema
   const testData = {
-    subject: testSubject.id,                    // UUID from subjects table
-    question_text: 'Test question - will be deleted immediately',  // TEXT
-    options: { 
-      A: 'Test Option A', 
-      B: 'Test Option B', 
-      C: 'Test Option C', 
-      D: 'Test Option D' 
-    }, // JSONB
-    correct_answer: 'A',                      // TEXT
+    subject_id: testSubject.id,               // UUID from subjects table
+    title: 'Test Question',                  // TEXT
+    content: 'Test question - will be deleted immediately',  // TEXT
+    option_a: 'Test Option A',               // TEXT
+    option_b: 'Test Option B',               // TEXT
+    option_c: 'Test Option C',               // TEXT
+    option_d: 'Test Option D',               // TEXT
+    correct_option: 'A',                     // CHARACTER
     explanation: 'This is a test explanation',          // TEXT
-    difficulty: 'EASY',                       // TEXT
-    questionHash: 'test-hash-' + Date.now() + '-' + Math.random(), // TEXT (unique)
-    created_by: user.id                       // UUID from auth
+    difficulty: 'EASY',                      // USER-DEFINED
+    questionhash: 'test-hash-' + Date.now() + '-' + Math.random(), // TEXT (unique)
+    created_by: user.id                      // UUID from auth
   };
   
   console.log('📝 Test data prepared:', JSON.stringify(testData, null, 2));
@@ -336,14 +335,18 @@ async function discoverQuestionsSchema(supabase: any) {
   console.log('🧪 Testing exact supabase-manual-setup.sql schema...');
   
   const testData = {
-    subject: testSubjectId,                    // UUID from subjects table
-    question_text: 'Test question - will be deleted',  // TEXT
-    options: { A: 'Option A', B: 'Option B', C: 'Option C', D: 'Option D' }, // JSONB
-    correct_answer: 'A',                      // TEXT
-    explanation: 'Test explanation',          // TEXT
-    difficulty: 'EASY',                       // TEXT
-    questionHash: 'test-hash-' + Date.now(), // TEXT (unique)
-    created_by: testUserId                    // UUID from auth
+    subject_id: testSubjectId,                // UUID from subjects table
+    title: 'Test Question',                  // TEXT
+    content: 'Test question - will be deleted',  // TEXT
+    option_a: 'Option A',                    // TEXT
+    option_b: 'Option B',                    // TEXT
+    option_c: 'Option C',                    // TEXT
+    option_d: 'Option D',                    // TEXT
+    correct_option: 'A',                     // CHARACTER
+    explanation: 'Test explanation',         // TEXT
+    difficulty: 'EASY',                      // USER-DEFINED
+    questionhash: 'test-hash-' + Date.now(), // TEXT (unique)
+    created_by: testUserId                   // UUID from auth
   };
   
   console.log('📝 Test data:', testData);
@@ -557,18 +560,17 @@ export async function POST(req: NextRequest) {
     console.log('\n💾 === CREATING ACTUAL QUESTION ===');
     
     const questionData = {
-      subject: subject,
-      question_text: content,
-      options: {
-        A: optionA,
-        B: optionB,
-        C: optionC,
-        D: optionD
-      },
-      correct_answer: correctAnswer,
+      subject_id: subject,
+      title: title || 'Question',
+      content: content,
+      option_a: optionA,
+      option_b: optionB,
+      option_c: optionC,
+      option_d: optionD,
+      correct_option: correctAnswer,
       explanation: explanation || '',
       difficulty: difficulty || 'MEDIUM',
-      questionHash: generateQuestionHash({
+      questionhash: generateQuestionHash({
         content,
         optionA,
         optionB,
