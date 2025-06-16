@@ -210,7 +210,7 @@ export async function DELETE(
     const { count: questionCount, error: countError } = await supabaseAdmin
       .from('questions')
       .select('id', { count: 'exact', head: true })
-      .eq('subject', id);
+      .eq('subject_id', id);
       
     if (countError) {
       console.error('Error checking for associated questions:', countError);

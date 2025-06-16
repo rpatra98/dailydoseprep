@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
       console.log('🧪 Testing question insert capability...');
       
       const testQuestion = {
-        subject: subjects[0].id,
+        subject_id: subjects[0].id,
         question_text: 'Test question - will be deleted',
         options: { A: 'Option A', B: 'Option B', C: 'Option C', D: 'Option D' },
         correct_answer: 'A',

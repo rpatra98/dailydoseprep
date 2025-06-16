@@ -40,13 +40,14 @@ export async function GET(req: NextRequest) {
           actualColumns: actualColumns,
           sampleData: existingQuestions[0],
           expectedColumns: [
-            'id', 'subject', 'question_text', 'options', 
+            'id', 'subject_id', 'question_text', 'options', 
             'correct_answer', 'explanation', 'difficulty', 
             'question_hash', 'created_by', 'created_at', 'updated_at'
           ],
           analysis: {
             hasCorrectAnswer: actualColumns.includes('correct_answer'),
             hasQuestionText: actualColumns.includes('question_text'),
+            hasSubjectId: actualColumns.includes('subject_id'),
             hasSubject: actualColumns.includes('subject'),
             hasOptions: actualColumns.includes('options'),
             hasCreatedBy: actualColumns.includes('created_by')
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
         console.log('Table is empty, testing insert...');
         
         const testData = {
-          subject: 'test',
+          subject_id: 'test',
           question_text: 'test question',
           options: { A: 'test', B: 'test', C: 'test', D: 'test' },
           correct_answer: 'A',
@@ -85,7 +86,9 @@ export async function GET(req: NextRequest) {
           if (errorMessage.includes('question_text')) {
             missingColumns.push('question_text');
           }
-          if (errorMessage.includes('subject')) {
+          if (errorMessage.includes('subject_id')) {
+            missingColumns.push('subject_id');
+          } else if (errorMessage.includes('subject')) {
             missingColumns.push('subject');
           }
           

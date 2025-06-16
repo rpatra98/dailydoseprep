@@ -151,7 +151,7 @@ async function testQuestionInsertion(supabase: any, user: any, subjects: any[]) 
   
   // Test data matching supabase-manual-setup.sql exactly
   const testData = {
-    subject: testSubject.id,                    // UUID from subjects table
+    subject_id: testSubject.id,                 // UUID from subjects table
     question_text: 'Test question - will be deleted immediately',  // TEXT
     options: { 
       A: 'Test Option A', 
@@ -336,7 +336,7 @@ async function discoverQuestionsSchema(supabase: any) {
   console.log('🧪 Testing exact supabase-manual-setup.sql schema...');
   
   const testData = {
-    subject: testSubjectId,                    // UUID from subjects table
+    subject_id: testSubjectId,                 // UUID from subjects table
     question_text: 'Test question - will be deleted',  // TEXT
     options: { A: 'Option A', B: 'Option B', C: 'Option C', D: 'Option D' }, // JSONB
     correct_answer: 'A',                      // TEXT
@@ -412,8 +412,8 @@ function mapDataToSchema(data: any, schemaInfo: any) {
   const columns = schemaInfo.columns || [];
   
   // Map subject
-  if (columns.includes('subject')) mapped.subject = subject;
-  else if (columns.includes('subject_id')) mapped.subject_id = subject;
+  if (columns.includes('subject_id')) mapped.subject_id = subject;
+  else if (columns.includes('subject')) mapped.subject = subject;
   
   // Map question text
   if (columns.includes('question_text')) mapped.question_text = content;
@@ -557,7 +557,7 @@ export async function POST(req: NextRequest) {
     console.log('\n💾 === CREATING ACTUAL QUESTION ===');
     
     const questionData = {
-      subject: subject,
+      subject_id: subject,
       question_text: content,
       options: {
         A: optionA,
