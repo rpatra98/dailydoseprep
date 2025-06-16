@@ -11,7 +11,6 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    console.log("Home component mounting");
     setMounted(true);
   }, []);
 

@@ -31,7 +31,6 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user && authInitialized) {
-      console.log('User is logged in, redirecting to dashboard');
       router.push('/dashboard');
     }
   }, [user, router, authInitialized]);
@@ -57,11 +56,8 @@ export default function LoginPage() {
     setLoginAttempts(prev => prev + 1);
     
     try {
-      console.log('Attempting login for:', email);
       await login(email, password);
-      console.log('Login successful, should redirect');
     } catch (err) {
-      console.error('Login failed:', err);
       const errorMessage = err instanceof Error ? err.message : 'Login failed';
       setLocalError(errorMessage);
       

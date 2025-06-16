@@ -84,9 +84,9 @@ export interface WeakPassword {
 }
 
 export interface LoginResponse {
-    user: SupabaseUser;
-    session: Session;
-    weakPassword?: WeakPassword;
+    success: boolean;
+    user?: User;
+    error?: string;
 }
 
 export interface AuthContextType {
@@ -96,6 +96,6 @@ export interface AuthContextType {
     authInitialized: boolean;
     login: (email: string, password: string) => Promise<LoginResponse | void>;
     logout: () => Promise<void>;
-    createQAUTHOR: (email: string, password: string) => Promise<string>;
-    registerStudent: (email: string, password: string) => Promise<string>;
+    createQAUTHOR: (email: string, password: string) => Promise<User>;
+    registerStudent: (email: string, password: string) => Promise<User>;
 } 

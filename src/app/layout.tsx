@@ -24,9 +24,11 @@ function ErrorBoundary({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    // Add global error handler
+    // Add global error handler (only in development)
     const handleError = (event: ErrorEvent) => {
-      console.error("Global error caught:", event.error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Global error caught:", event.error);
+      }
       setError(event.error);
       setHasError(true);
       event.preventDefault();
@@ -81,13 +83,11 @@ export default function RootLayout({
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    console.log("Root layout mounted");
-    
-    // Check if environment variables are available
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      console.error("Missing Supabase environment variables");
-    } else {
-      console.log("Supabase environment variables found");
+    // Check if environment variables are available (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error("Missing Supabase environment variables");
+      }
     }
     
     // Shorter timeout to improve user experience

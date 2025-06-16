@@ -1,286 +1,239 @@
+'use client';
+
 import { useState, useEffect } from 'react';
-import { 
-  Table, 
-  Button, 
-  Modal, 
-  Form, 
-  Input, 
-  Popconfirm, 
-  message,
-  Typography,
-  Space,
-  Tag,
-  Empty,
-  Alert
-} from 'antd';
-import { 
-  PlusOutlined, 
-  EditOutlined, 
-  DeleteOutlined,
-  ReloadOutlined 
-} from '@ant-design/icons';
-import { Subject, ExamCategory } from '@/types';
+import { Card, Button, List, Input, Form, Modal, message, Popconfirm, Typography } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
 
-export const SubjectManager = () => {
+interface Subject {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+// Only log in development
+const isDev = process.env.NODE_ENV === 'development';
+
+const SubjectManager = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
-  const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [currentSubject, setCurrentSubject] = useState<Partial<Subject> | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [form] = Form.useForm();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
+
+  useEffect(() => {
+    fetchSubjects();
+  }, []);
+
   const fetchSubjects = async () => {
     try {
       setLoading(true);
-      setErrorMessage(null);
-      
-      console.log('Fetching subjects...');
-      const response = await fetch('/api/subjects', {
-        credentials: 'include', // Include cookies for authentication
-      });
+      const response = await fetch('/api/subjects');
       
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Error response from API:', errorData);
-        throw new Error(errorData.error || errorData.details || 'Failed to fetch subjects');
+        if (isDev) {
+          console.error('Error response from API:', errorData);
+        }
+        throw new Error(errorData.error || 'Failed to fetch subjects');
       }
       
       const data = await response.json();
-      console.log('Subjects fetched successfully:', data.length);
       setSubjects(data);
     } catch (error) {
-      console.error('Error fetching subjects:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to load subjects');
+      if (isDev) {
+        console.error('Error fetching subjects:', error);
+      }
       message.error('Failed to load subjects');
     } finally {
       setLoading(false);
     }
   };
-  
-  useEffect(() => {
-    fetchSubjects();
-  }, []);
-  
-  const handleAddNew = () => {
-    form.resetFields();
-    setCurrentSubject(null);
-    setIsEditing(false);
-    setIsModalVisible(true);
-  };
-  
-  const handleEdit = (subject: Subject) => {
-    form.setFieldsValue({
-      name: subject.name
-    });
-    setCurrentSubject(subject);
-    setIsEditing(true);
-    setIsModalVisible(true);
-  };
-  
+
   const handleDelete = async (id: string) => {
     try {
-      setErrorMessage(null);
-      console.log(`Deleting subject ${id}...`);
-      
       const response = await fetch(`/api/subjects/${id}`, {
         method: 'DELETE',
-        credentials: 'include', // Include cookies for authentication
       });
       
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Error response from API:', errorData);
-        throw new Error(errorData.error || errorData.details || 'Failed to delete subject');
+        if (isDev) {
+          console.error('Error response from API:', errorData);
+        }
+        throw new Error(errorData.error || 'Failed to delete subject');
       }
       
-      console.log(`Subject ${id} deleted successfully`);
       message.success('Subject deleted successfully');
       fetchSubjects();
     } catch (error) {
-      console.error('Error deleting subject:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to delete subject');
-      message.error(error instanceof Error ? error.message : 'Failed to delete subject');
+      if (isDev) {
+        console.error('Error deleting subject:', error);
+      }
+      message.error('Failed to delete subject');
     }
   };
-  
-  const handleModalOk = async () => {
+
+  const handleSave = async (values: { name: string }) => {
     try {
-      setErrorMessage(null);
-      const values = await form.validateFields();
-      
-      if (isEditing && currentSubject?.id) {
+      if (editingSubject) {
         // Update existing subject
-        console.log(`Updating subject ${currentSubject.id}...`);
-        const response = await fetch(`/api/subjects/${currentSubject.id}`, {
+        const response = await fetch(`/api/subjects/${editingSubject.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
-          credentials: 'include', // Include cookies for authentication
-          body: JSON.stringify(values),
+          body: JSON.stringify({ name: values.name }),
         });
         
         if (!response.ok) {
           const errorData = await response.json();
-          console.error('Error response from API:', errorData);
-          throw new Error(errorData.error || errorData.details || 'Failed to update subject');
+          if (isDev) {
+            console.error('Error response from API:', errorData);
+          }
+          throw new Error(errorData.error || 'Failed to update subject');
         }
         
-        console.log(`Subject ${currentSubject.id} updated successfully`);
         message.success('Subject updated successfully');
       } else {
         // Create new subject
-        console.log('Creating new subject...');
         const response = await fetch('/api/subjects', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          credentials: 'include', // Include cookies for authentication
-          body: JSON.stringify(values),
+          body: JSON.stringify({ name: values.name }),
         });
         
         if (!response.ok) {
           const errorData = await response.json();
-          console.error('Error response from API:', errorData);
-          throw new Error(errorData.error || errorData.details || 'Failed to create subject');
+          if (isDev) {
+            console.error('Error response from API:', errorData);
+          }
+          throw new Error(errorData.error || 'Failed to create subject');
         }
         
-        console.log('Subject created successfully');
         message.success('Subject created successfully');
       }
       
-      setIsModalVisible(false);
+      setModalVisible(false);
+      setEditingSubject(null);
+      form.resetFields();
       fetchSubjects();
     } catch (error) {
-      console.error('Error saving subject:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to save subject');
-      message.error(error instanceof Error ? error.message : 'Failed to save subject');
+      if (isDev) {
+        console.error('Error saving subject:', error);
+      }
+      message.error('Failed to save subject');
     }
   };
-  
-  const handleModalCancel = () => {
-    setIsModalVisible(false);
+
+  const openModal = (subject?: Subject) => {
+    setEditingSubject(subject || null);
+    if (subject) {
+      form.setFieldsValue({ name: subject.name });
+    } else {
+      form.resetFields();
+    }
+    setModalVisible(true);
   };
-  
-  const columns = [
-    {
-      title: 'Name',
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: 'Exam Category',
-      dataIndex: 'examCategory',
-      key: 'examCategory',
-      render: (text: ExamCategory) => <Tag color="blue">{text}</Tag>,
-    },
-    {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description',
-      ellipsis: true,
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_: any, record: Subject) => (
-        <Space>
-          <Button
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-            size="small"
-          >
-            Edit
-          </Button>
-          <Popconfirm
-            title="Are you sure you want to delete this subject?"
-            description="This action cannot be undone if the subject has no questions."
-            onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              size="small"
-            >
-              Delete
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
-  
+
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Title level={4}>Subject Management</Title>
-        <Space>
-          <Button
-            onClick={fetchSubjects}
-            icon={<ReloadOutlined />}
-          >
-            Refresh
-          </Button>
+    <Card
+      title={
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Title level={4} style={{ margin: 0 }}>Subject Management</Title>
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={handleAddNew}
+            onClick={() => openModal()}
           >
-            Add New Subject
+            Add Subject
           </Button>
-        </Space>
-      </div>
-      
-      {errorMessage && (
-        <Alert
-          message="Error"
-          description={errorMessage}
-          type="error"
-          showIcon
-          closable
-          onClose={() => setErrorMessage(null)}
-          style={{ marginBottom: 16 }}
-        />
-      )}
-      
-      <Table
-        dataSource={subjects}
-        columns={columns}
-        rowKey="id"
+        </div>
+      }
+      style={{ marginBottom: 24 }}
+    >
+      <List
         loading={loading}
-        pagination={{ pageSize: 10 }}
-        locale={{
-          emptyText: <Empty description="No subjects available yet" />
-        }}
+        dataSource={subjects}
+        renderItem={(subject) => (
+          <List.Item
+            actions={[
+              <Button
+                key="edit"
+                type="text"
+                icon={<EditOutlined />}
+                onClick={() => openModal(subject)}
+              />,
+              <Popconfirm
+                key="delete"
+                title="Are you sure you want to delete this subject?"
+                onConfirm={() => handleDelete(subject.id)}
+                okText="Yes"
+                cancelText="No"
+              >
+                <Button
+                  type="text"
+                  danger
+                  icon={<DeleteOutlined />}
+                />
+              </Popconfirm>,
+            ]}
+          >
+            <List.Item.Meta
+              title={subject.name}
+              description={`Created: ${new Date(subject.created_at).toLocaleDateString()}`}
+            />
+          </List.Item>
+        )}
       />
-      
+
       <Modal
-        title={isEditing ? 'Edit Subject' : 'Add New Subject'}
-        open={isModalVisible}
-        onOk={handleModalOk}
-        onCancel={handleModalCancel}
-        okText={isEditing ? 'Update' : 'Create'}
+        title={editingSubject ? 'Edit Subject' : 'Add Subject'}
+        open={modalVisible}
+        onCancel={() => {
+          setModalVisible(false);
+          setEditingSubject(null);
+          form.resetFields();
+        }}
+        footer={null}
       >
         <Form
           form={form}
           layout="vertical"
+          onFinish={handleSave}
         >
           <Form.Item
             name="name"
             label="Subject Name"
-            rules={[{ required: true, message: 'Please enter subject name' }]}
+            rules={[
+              { required: true, message: 'Please enter subject name' },
+              { min: 2, message: 'Subject name must be at least 2 characters' },
+            ]}
           >
             <Input placeholder="Enter subject name" />
           </Form.Item>
+          
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+            <Button
+              onClick={() => {
+                setModalVisible(false);
+                setEditingSubject(null);
+                form.resetFields();
+              }}
+              style={{ marginRight: 8 }}
+            >
+              Cancel
+            </Button>
+            <Button type="primary" htmlType="submit">
+              {editingSubject ? 'Update' : 'Create'}
+            </Button>
+          </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </Card>
   );
 };
 

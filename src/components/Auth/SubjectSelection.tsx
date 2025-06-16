@@ -56,7 +56,7 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
       
       // Since we don't have primarySubject in the database, just simulate success
       // In the future, you could store this preference in a separate table
-      console.log(`User ${userId} selected subject ${subjectId}`);
+      // Subject selected
       
       // Simulate a small delay
       await new Promise(resolve => setTimeout(resolve, 500));

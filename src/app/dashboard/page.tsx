@@ -65,7 +65,6 @@ export default function Dashboard() {
   // Redirect if not logged in
   useEffect(() => {
     if (authInitialized && !user) {
-      console.log('No user found, redirecting to login');
       router.push('/login');
     }
   }, [user, router, authInitialized]);
@@ -79,8 +78,6 @@ export default function Dashboard() {
         setIsLoading(true);
         setLoadError(null);
         
-        console.log('Fetching user data for:', user.id);
-        
         // Get user role
         const { data: userData, error: userError } = await supabase
           .from('users')
@@ -89,7 +86,6 @@ export default function Dashboard() {
           .maybeSingle();
 
         if (userError) {
-          console.error('Error fetching user role:', userError);
           throw new Error(`Failed to load user data: ${userError.message}`);
         }
         
@@ -99,7 +95,6 @@ export default function Dashboard() {
         
         const role = userData.role as UserRole;
         setUserRole(role);
-        console.log('User role:', role);
         
         // If SUPERADMIN, fetch all users and system stats
         if (role === 'SUPERADMIN') {
@@ -110,7 +105,6 @@ export default function Dashboard() {
         }
         
       } catch (error) {
-        console.error('Error fetching user data:', error);
         setLoadError(error instanceof Error ? error.message : 'Failed to load user data');
       } finally {
         setIsLoading(false);
@@ -127,14 +121,12 @@ export default function Dashboard() {
         .select('id, email, role, created_at')
         .order('created_at', { ascending: false });
         
-      if (usersError) {
-        console.error('Error fetching users:', usersError);
-      } else {
-        setAllUsers(usersData || []);
+              if (!usersError) {
+          setAllUsers(usersData || []);
+        }
+      } catch (error) {
+        // Silent error handling for production
       }
-    } catch (error) {
-      console.error('Error in fetchAllUsers:', error);
-    }
   };
 
   const fetchSystemStats = async () => {
@@ -152,10 +144,9 @@ export default function Dashboard() {
       // Fetch questions count
       const { data: questionsData, error: questionsError } = await supabase
         .from('questions')
-        .select('id, subject');
+        .select('id, subject_id');
 
       if (usersError || subjectsError || questionsError) {
-        console.error('Error fetching stats:', { usersError, subjectsError, questionsError });
         return;
       }
 
@@ -168,7 +159,7 @@ export default function Dashboard() {
       // Calculate questions per subject
       const questionsPerSubject: { [key: string]: number } = {};
       subjectsData?.forEach(subject => {
-        const count = questionsData?.filter(q => q.subject === subject.id).length || 0;
+        const count = questionsData?.filter(q => q.subject_id === subject.id).length || 0;
         questionsPerSubject[subject.name] = count;
       });
 
@@ -182,7 +173,7 @@ export default function Dashboard() {
       });
 
     } catch (error) {
-      console.error('Error fetching system stats:', error);
+      // Silent error handling for production
     }
   };
 
@@ -191,7 +182,7 @@ export default function Dashboard() {
       await logout();
       router.push('/');
     } catch (error) {
-      console.error('Error signing out:', error);
+      // Handle sign out error silently
     }
   };
   
