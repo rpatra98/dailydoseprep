@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { getRouteHandlerClient, getServiceRoleClient } from '@/lib/supabase-server';
 import { Question } from '@/types';
 import crypto from 'crypto';
 
@@ -13,7 +12,7 @@ function generateQuestionHash(question: any): string {
 // GET questions with optional filters
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = getServiceRoleClient();
     const { searchParams } = new URL(req.url);
     const subject = searchParams.get('subject');
     const difficulty = searchParams.get('difficulty');
@@ -59,25 +58,41 @@ export async function GET(req: NextRequest) {
 // POST a new question (QAUTHOR only)
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    console.log('POST /api/questions: Starting request');
+    
+    // Use both clients - route handler for session, service role for operations
+    const supabaseAuth = getRouteHandlerClient();
+    const supabaseAdmin = getServiceRoleClient();
     
     // Get the current session
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    const { data: { session }, error: authError } = await supabaseAuth.auth.getSession();
     
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    if (authError) {
+      console.error('Authentication error:', authError);
+      return NextResponse.json({ error: 'Authentication error: ' + authError.message }, { status: 401 });
     }
     
-    // Check if user is QAUTHOR or SUPERADMIN
-    const { data: userData, error: userError } = await supabase
+    if (!session) {
+      console.error('No session found');
+      return NextResponse.json({ error: 'Not authenticated - no session found' }, { status: 401 });
+    }
+    
+    const userId = session.user.id;
+    console.log(`User ID from session: ${userId}`);
+    
+    // Check if user is QAUTHOR or SUPERADMIN using service role client
+    const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
       .select('role')
-      .eq('id', session.user.id)
+      .eq('id', userId)
       .single();
     
     if (userError) {
-      return NextResponse.json({ error: 'Error fetching user role' }, { status: 500 });
+      console.error('Error fetching user role:', userError);
+      return NextResponse.json({ error: 'Error fetching user role: ' + userError.message }, { status: 500 });
     }
+    
+    console.log(`User role: ${userData?.role}`);
     
     if (userData?.role !== 'QAUTHOR' && userData?.role !== 'SUPERADMIN') {
       return NextResponse.json({ error: 'Unauthorized. Only QAUTHORs can create questions' }, { status: 403 });
@@ -85,6 +100,8 @@ export async function POST(req: NextRequest) {
     
     // Parse request body
     const body = await req.json();
+    console.log('Request body received:', { ...body, optionA: body.optionA ? 'present' : 'missing' });
+    
     const {
       title,
       content,
@@ -104,8 +121,20 @@ export async function POST(req: NextRequest) {
     // Validate required fields (difficulty and examCategory are now optional)
     if (!title || !content || !optionA || !optionB || !optionC || !optionD || 
         !correctOption || !explanation || !subject) {
+      const missingFields = [];
+      if (!title) missingFields.push('title');
+      if (!content) missingFields.push('content');
+      if (!optionA) missingFields.push('optionA');
+      if (!optionB) missingFields.push('optionB');
+      if (!optionC) missingFields.push('optionC');
+      if (!optionD) missingFields.push('optionD');
+      if (!correctOption) missingFields.push('correctOption');
+      if (!explanation) missingFields.push('explanation');
+      if (!subject) missingFields.push('subject');
+      
+      console.error('Missing required fields:', missingFields);
       return NextResponse.json({ 
-        error: 'Missing required fields. Title, content, all options, correct option, explanation, and subject are required.' 
+        error: `Missing required fields: ${missingFields.join(', ')}` 
       }, { status: 400 });
     }
     
@@ -115,18 +144,21 @@ export async function POST(req: NextRequest) {
     }
     
     // Check if subject exists
-    const { data: subjectData, error: subjectError } = await supabase
+    const { data: subjectData, error: subjectError } = await supabaseAdmin
       .from('subjects')
       .select('id')
       .eq('id', subject)
       .single();
       
     if (subjectError || !subjectData) {
+      console.error('Subject validation error:', subjectError);
       return NextResponse.json({ error: 'Invalid subject ID' }, { status: 400 });
     }
     
+    console.log(`Subject validated: ${subjectData.id}`);
+    
     // Check for duplicate questions (using question text and subject)
-    const { data: existingQuestion } = await supabase
+    const { data: existingQuestion } = await supabaseAdmin
       .from('questions')
       .select('id')
       .eq('question_text', content)
@@ -134,6 +166,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
       
     if (existingQuestion) {
+      console.log('Duplicate question found');
       return NextResponse.json({ error: 'A similar question already exists for this subject' }, { status: 409 });
     }
     
@@ -145,6 +178,8 @@ export async function POST(req: NextRequest) {
       D: optionD
     };
     
+    console.log('Creating question with options:', options);
+    
     // Create new question using actual database schema
     const newQuestion = {
       subject_id: subject,
@@ -153,10 +188,12 @@ export async function POST(req: NextRequest) {
       correct_answer: correctOption,
       explanation: explanation,
       difficulty: difficulty,
-      created_by: session.user.id
+      created_by: userId
     };
     
-    const { data, error } = await supabase
+    console.log('Inserting question:', { ...newQuestion, options: 'JSONB object' });
+    
+    const { data, error } = await supabaseAdmin
       .from('questions')
       .insert(newQuestion)
       .select(`
@@ -175,8 +212,10 @@ export async function POST(req: NextRequest) {
       
     if (error) {
       console.error('Error creating question:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Database error: ' + error.message }, { status: 500 });
     }
+    
+    console.log('Question created successfully:', data.id);
     
     // Transform the response to match the frontend expectations
     const transformedQuestion = {
@@ -202,6 +241,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(transformedQuestion, { status: 201 });
   } catch (err) {
     console.error('Exception in question creation:', err);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Server error: ' + (err instanceof Error ? err.message : 'Unknown error') 
+    }, { status: 500 });
   }
 } 

@@ -16,7 +16,7 @@ import {
   SaveOutlined, 
   CloseOutlined 
 } from '@ant-design/icons';
-import { getBrowserClient } from '@/lib/supabase-browser';
+import { useAuth } from '@/context/AuthContext';
 import { Question, DifficultyLevel, ExamCategory, Option, Subject } from '@/types';
 
 const { Title, Text } = Typography;
@@ -34,24 +34,29 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
   
   // Fetch subjects on component mount
   useEffect(() => {
     const fetchSubjects = async () => {
       try {
         setLoading(true);
-        const supabase = getBrowserClient();
-        const { data, error } = await supabase
-          .from('subjects')
-          .select('*')
-          .order('name', { ascending: true });
-          
-        if (error) {
+        setError(null);
+        
+        // Use fetch API to get subjects instead of direct Supabase client
+        const response = await fetch('/api/subjects', {
+          method: 'GET',
+          credentials: 'include',
+        });
+        
+        if (!response.ok) {
           throw new Error('Failed to load subjects');
         }
         
+        const data = await response.json();
         setSubjects(data || []);
       } catch (err) {
+        console.error('Error fetching subjects:', err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
         setLoading(false);
@@ -66,11 +71,18 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
       setSubmitting(true);
       setError(null);
       
-      const supabase = getBrowserClient();
-      const { data: authData } = await supabase.auth.getSession();
-      if (!authData.session) {
+      // Check if user is authenticated
+      if (!user) {
         throw new Error('You must be logged in to create questions');
       }
+      
+      console.log('Submitting question with values:', {
+        ...values,
+        optionA: values.optionA ? 'present' : 'missing',
+        optionB: values.optionB ? 'present' : 'missing',
+        optionC: values.optionC ? 'present' : 'missing',
+        optionD: values.optionD ? 'present' : 'missing',
+      });
       
       // Prepare the question object
       const questionData = {
@@ -89,6 +101,8 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         source: values.source || null,
       };
       
+      console.log('Sending question data to API:', questionData);
+      
       // Make API call to create the question
       const response = await fetch('/api/questions', {
         method: 'POST',
@@ -99,12 +113,16 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         body: JSON.stringify(questionData),
       });
       
+      console.log('API response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create question');
+        console.error('API error response:', errorData);
+        throw new Error(errorData.error || `Failed to create question (${response.status})`);
       }
       
       const createdQuestion = await response.json();
+      console.log('Question created successfully:', createdQuestion.id);
       
       // Reset the form
       form.resetFields();
@@ -114,6 +132,7 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         onComplete(createdQuestion);
       }
     } catch (err) {
+      console.error('Error in handleSubmit:', err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setSubmitting(false);
@@ -121,7 +140,7 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
   };
   
   if (loading) {
-    return <Spin tip="Loading..." />;
+    return <Spin tip="Loading subjects..." />;
   }
   
   return (
@@ -139,6 +158,8 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
           type="error"
           showIcon
           style={{ marginTop: 16, marginBottom: 16 }}
+          closable
+          onClose={() => setError(null)}
         />
       )}
       
@@ -286,6 +307,7 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
               htmlType="submit" 
               loading={submitting}
               icon={<SaveOutlined />}
+              disabled={!user}
             >
               Submit Question
             </Button>
