@@ -30,64 +30,86 @@ async function discoverQuestionsSchema(supabase: any) {
     };
   }
   
-  // If no existing data, try different schema combinations
+  // Get a valid subject UUID for testing
+  const { data: subjects, error: subjectsError } = await supabase
+    .from('subjects')
+    .select('id')
+    .limit(1);
+  
+  if (subjectsError || !subjects || subjects.length === 0) {
+    console.log('❌ No subjects found, cannot test schema');
+    return {
+      success: false,
+      error: 'No subjects found in database. Please run the complete setup script.'
+    };
+  }
+  
+  const testSubjectId = subjects[0].id;
+  console.log('📋 Using test subject ID:', testSubjectId);
+  
+  // Get current user ID for testing
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  const testUserId = user?.id || '00000000-0000-0000-0000-000000000000';
+  
+  // If no existing data, try different schema combinations with proper UUIDs
   const schemaCombinations = [
-    // Schema 1: supabase-manual-setup.sql format
+    // Schema 1: supabase-manual-setup.sql format (EXACT MATCH)
     {
-      name: 'supabase-manual-setup',
+      name: 'supabase-manual-setup-exact',
       fields: {
-        subject: 'test-subject-id',
-        question_text: 'test question',
-        options: { A: 'test', B: 'test', C: 'test', D: 'test' },
-        correct_answer: 'A',
-        explanation: 'test explanation',
-        difficulty: 'EASY',
-        questionHash: 'test-hash',
-        created_by: 'test-user-id'
+        subject: testSubjectId,                    // UUID
+        question_text: 'test question',           // TEXT
+        options: { A: 'test', B: 'test', C: 'test', D: 'test' }, // JSONB
+        correct_answer: 'A',                      // TEXT
+        explanation: 'test explanation',          // TEXT
+        difficulty: 'EASY',                       // TEXT
+        questionHash: 'test-hash-' + Date.now(), // TEXT (unique)
+        created_by: testUserId                    // UUID
       }
     },
-    // Schema 2: src/db/schema.sql format
+    // Schema 2: Alternative with subject_id
     {
-      name: 'src-db-schema',
+      name: 'subject_id-variant',
       fields: {
-        subject_id: 'test-subject-id',
+        subject_id: testSubjectId,
         question_text: 'test question',
         options: { A: 'test', B: 'test', C: 'test', D: 'test' },
         correct_answer: 'A',
         explanation: 'test explanation',
         difficulty: 'EASY',
-        created_by: 'test-user-id'
+        created_by: testUserId
       }
     },
     // Schema 3: Alternative naming
     {
-      name: 'alternative',
+      name: 'alternative-naming',
       fields: {
-        subject: 'test-subject-id',
+        subject: testSubjectId,
         content: 'test question',
         options: { A: 'test', B: 'test', C: 'test', D: 'test' },
         answer: 'A',
         explanation: 'test explanation',
         difficulty: 'EASY',
-        author: 'test-user-id'
+        author: testUserId
       }
     },
     // Schema 4: Simple naming
     {
-      name: 'simple',
+      name: 'simple-naming',
       fields: {
-        subject: 'test-subject-id',
+        subject: testSubjectId,
         question: 'test question',
         options: { A: 'test', B: 'test', C: 'test', D: 'test' },
         correct_answer: 'A',
         explanation: 'test explanation',
-        created_by: 'test-user-id'
+        created_by: testUserId
       }
     }
   ];
   
   for (const schema of schemaCombinations) {
     console.log(`🧪 Testing schema: ${schema.name}`);
+    console.log('📝 Test data:', schema.fields);
     
     const { data: testData, error: testError } = await supabase
       .from('questions')
@@ -109,6 +131,7 @@ async function discoverQuestionsSchema(supabase: any) {
       };
     } else {
       console.log(`❌ Schema ${schema.name} failed:`, testError?.message);
+      console.log('🔍 Error details:', testError);
     }
   }
   
@@ -308,20 +331,30 @@ export async function POST(req: NextRequest) {
     // Check if subject exists
     const { data: subjectData, error: subjectError } = await supabase
       .from('subjects')
-      .select('id')
+      .select('id, name')
       .eq('id', subject)
       .single();
       
     if (subjectError || !subjectData) {
       console.error('Subject validation error:', subjectError);
+      
+      // If subject not found, list available subjects for debugging
+      const { data: allSubjects } = await supabase
+        .from('subjects')
+        .select('id, name')
+        .limit(10);
+      
+      console.log('📋 Available subjects:', allSubjects);
+      
       return NextResponse.json({ 
-        error: 'Database setup incomplete or invalid subject ID',
+        error: 'Invalid subject ID or database setup incomplete',
         details: subjectError?.message,
+        availableSubjects: allSubjects,
         setupUrl: '/api/setup'
       }, { status: 400 });
     }
     
-    console.log(`✅ Subject validated: ${subjectData.id}`);
+    console.log(`✅ Subject validated: ${subjectData.name} (${subjectData.id})`);
     
     // === DYNAMIC SCHEMA DISCOVERY ===
     console.log('🔍 Starting dynamic schema discovery...');
