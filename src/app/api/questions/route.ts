@@ -10,6 +10,245 @@ function generateQuestionHash(question: any): string {
   return crypto.createHash('md5').update(stringToHash).digest('hex');
 }
 
+// Enhanced error logging function
+function logError(step: string, error: any, context?: any) {
+  console.error(`❌ [${step}] Error:`, error);
+  if (error?.message) console.error(`❌ [${step}] Message:`, error.message);
+  if (error?.code) console.error(`❌ [${step}] Code:`, error.code);
+  if (error?.details) console.error(`❌ [${step}] Details:`, error.details);
+  if (error?.hint) console.error(`❌ [${step}] Hint:`, error.hint);
+  if (context) console.error(`❌ [${step}] Context:`, JSON.stringify(context, null, 2));
+  console.error(`❌ [${step}] Full Error Object:`, JSON.stringify(error, null, 2));
+}
+
+// Comprehensive database connectivity test
+async function testDatabaseConnectivity(supabase: any) {
+  console.log('🔍 Testing database connectivity...');
+  
+  try {
+    // Test 1: Basic connection
+    console.log('📡 Testing basic Supabase connection...');
+    const { data: connectionTest, error: connectionError } = await supabase
+      .from('subjects')
+      .select('count')
+      .limit(1);
+    
+    if (connectionError) {
+      logError('CONNECTION_TEST', connectionError);
+      return {
+        success: false,
+        error: 'Database connection failed',
+        details: connectionError.message,
+        step: 'connection_test'
+      };
+    }
+    
+    console.log('✅ Basic connection successful');
+    
+    // Test 2: Authentication
+    console.log('🔐 Testing authentication...');
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError) {
+      logError('AUTH_TEST', authError);
+      return {
+        success: false,
+        error: 'Authentication failed',
+        details: authError.message,
+        step: 'auth_test'
+      };
+    }
+    
+    if (!user) {
+      console.log('❌ No authenticated user found');
+      return {
+        success: false,
+        error: 'No authenticated user',
+        details: 'User session not found',
+        step: 'auth_test'
+      };
+    }
+    
+    console.log('✅ Authentication successful:', user.email);
+    
+    // Test 3: Subjects table
+    console.log('📋 Testing subjects table...');
+    const { data: subjects, error: subjectsError } = await supabase
+      .from('subjects')
+      .select('id, name')
+      .limit(1);
+    
+    if (subjectsError) {
+      logError('SUBJECTS_TEST', subjectsError);
+      return {
+        success: false,
+        error: 'Subjects table access failed',
+        details: subjectsError.message,
+        step: 'subjects_test'
+      };
+    }
+    
+    if (!subjects || subjects.length === 0) {
+      console.log('❌ No subjects found in database');
+      return {
+        success: false,
+        error: 'No subjects found',
+        details: 'Subjects table is empty',
+        step: 'subjects_test'
+      };
+    }
+    
+    console.log('✅ Subjects table accessible:', subjects.length, 'subjects found');
+    
+    // Test 4: Questions table structure
+    console.log('❓ Testing questions table structure...');
+    const { data: questionsTest, error: questionsError } = await supabase
+      .from('questions')
+      .select('*')
+      .limit(1);
+    
+    if (questionsError) {
+      logError('QUESTIONS_STRUCTURE_TEST', questionsError);
+      return {
+        success: false,
+        error: 'Questions table access failed',
+        details: questionsError.message,
+        step: 'questions_structure_test'
+      };
+    }
+    
+    console.log('✅ Questions table accessible');
+    if (questionsTest && questionsTest.length > 0) {
+      console.log('📊 Existing questions found, columns:', Object.keys(questionsTest[0]));
+    } else {
+      console.log('📊 Questions table is empty (this is normal for new setup)');
+    }
+    
+    return {
+      success: true,
+      user: user,
+      subjects: subjects,
+      questionsColumns: questionsTest?.[0] ? Object.keys(questionsTest[0]) : null
+    };
+    
+  } catch (error) {
+    logError('DATABASE_CONNECTIVITY', error);
+    return {
+      success: false,
+      error: 'Unexpected database connectivity error',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      step: 'connectivity_test'
+    };
+  }
+}
+
+// Test question insertion with exact schema
+async function testQuestionInsertion(supabase: any, user: any, subjects: any[]) {
+  console.log('🧪 Testing question insertion...');
+  
+  const testSubject = subjects[0];
+  console.log('📋 Using test subject:', testSubject.name, '(', testSubject.id, ')');
+  
+  // Test data matching supabase-manual-setup.sql exactly
+  const testData = {
+    subject: testSubject.id,                    // UUID from subjects table
+    question_text: 'Test question - will be deleted immediately',  // TEXT
+    options: { 
+      A: 'Test Option A', 
+      B: 'Test Option B', 
+      C: 'Test Option C', 
+      D: 'Test Option D' 
+    }, // JSONB
+    correct_answer: 'A',                      // TEXT
+    explanation: 'This is a test explanation',          // TEXT
+    difficulty: 'EASY',                       // TEXT
+    questionHash: 'test-hash-' + Date.now() + '-' + Math.random(), // TEXT (unique)
+    created_by: user.id                       // UUID from auth
+  };
+  
+  console.log('📝 Test data prepared:', JSON.stringify(testData, null, 2));
+  
+  try {
+    console.log('💾 Attempting to insert test question...');
+    const { data: insertResult, error: insertError } = await supabase
+      .from('questions')
+      .insert(testData)
+      .select('*');
+    
+    if (insertError) {
+      logError('QUESTION_INSERT_TEST', insertError, { testData });
+      
+      // Analyze the specific error
+      let errorAnalysis = 'Unknown insertion error';
+      let recommendation = 'Check database setup';
+      
+      if (insertError.message?.includes('violates foreign key constraint')) {
+        errorAnalysis = 'Foreign key constraint violation';
+        recommendation = 'Check if subject ID exists and user is properly set up in database';
+      } else if (insertError.message?.includes('column') && insertError.message?.includes('does not exist')) {
+        errorAnalysis = 'Column does not exist in database';
+        recommendation = 'Database schema does not match expected format. Run supabase-manual-setup.sql';
+      } else if (insertError.message?.includes('permission') || insertError.message?.includes('denied')) {
+        errorAnalysis = 'Permission denied';
+        recommendation = 'Check RLS policies and user permissions';
+      } else if (insertError.message?.includes('duplicate') || insertError.message?.includes('unique')) {
+        errorAnalysis = 'Duplicate key violation';
+        recommendation = 'Question hash collision (very rare)';
+      }
+      
+      return {
+        success: false,
+        error: errorAnalysis,
+        details: insertError.message,
+        recommendation: recommendation,
+        testData: testData,
+        fullError: insertError
+      };
+    }
+    
+    if (!insertResult || insertResult.length === 0) {
+      console.log('❌ Insert succeeded but no data returned');
+      return {
+        success: false,
+        error: 'Insert succeeded but no data returned',
+        details: 'This might indicate a database configuration issue'
+      };
+    }
+    
+    console.log('✅ Test question inserted successfully!');
+    console.log('📊 Inserted data columns:', Object.keys(insertResult[0]));
+    
+    // Clean up test data immediately
+    console.log('🧹 Cleaning up test data...');
+    const { error: deleteError } = await supabase
+      .from('questions')
+      .delete()
+      .eq('id', insertResult[0].id);
+    
+    if (deleteError) {
+      console.log('⚠️ Warning: Could not clean up test data:', deleteError.message);
+    } else {
+      console.log('✅ Test data cleaned up successfully');
+    }
+    
+    return {
+      success: true,
+      columns: Object.keys(insertResult[0]),
+      sampleData: insertResult[0],
+      workingSchema: testData
+    };
+    
+  } catch (error) {
+    logError('QUESTION_INSERT_EXCEPTION', error, { testData });
+    return {
+      success: false,
+      error: 'Unexpected error during question insertion',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      testData: testData
+    };
+  }
+}
+
 // Dynamic schema discovery and mapping
 async function discoverQuestionsSchema(supabase: any) {
   console.log('🔍 Discovering questions table schema...');
@@ -216,257 +455,170 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
     
-    // Check if questions table exists
-    const { data: questions, error: questionsError } = await supabase
+    const { data: questions, error } = await supabase
       .from('questions')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
-    
-    if (questionsError) {
-      console.error('Questions table error:', questionsError);
-      return NextResponse.json({ 
-        error: 'Questions table does not exist or is inaccessible',
-        details: questionsError.message,
-        suggestion: 'Please run the database setup script from supabase-manual-setup.sql',
-        setupUrl: '/api/setup'
-      }, { status: 500 });
+      .select(`
+        *,
+        subjects (
+          name,
+          examCategory
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching questions:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    
-    return NextResponse.json(questions || []);
-  } catch (err) {
-    console.error('Exception in questions GET:', err);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+
+    return NextResponse.json(questions);
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 
 // POST a new question (QAUTHOR only)
 export async function POST(req: NextRequest) {
+  console.log('\n🚀 === QUESTION CREATION API CALLED ===');
+  console.log('⏰ Timestamp:', new Date().toISOString());
+  
   try {
-    console.log('🚀 POST /api/questions: Starting request');
-    
     const supabase = createRouteHandlerClient({ cookies });
+    console.log('✅ Supabase client created');
     
-    // Get the current session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    console.log('🔐 Session check:', {
-      hasSession: !!session,
-      hasUser: !!session?.user,
-      userId: session?.user?.id,
-      sessionError: sessionError?.message
-    });
-    
-    if (sessionError) {
-      console.error('Session error:', sessionError);
-      return NextResponse.json({ 
-        error: 'Authentication error: ' + sessionError.message 
-      }, { status: 401 });
+    // Parse request body
+    let body;
+    try {
+      body = await req.json();
+      console.log('📥 Request body received:', JSON.stringify(body, null, 2));
+    } catch (parseError) {
+      logError('REQUEST_PARSING', parseError);
+      return NextResponse.json({
+        error: 'Invalid request body',
+        details: 'Could not parse JSON request'
+      }, { status: 400 });
     }
     
-    if (!session || !session.user) {
-      console.error('No valid session found');
-      return NextResponse.json({ 
-        error: 'Not authenticated - please log in again' 
-      }, { status: 401 });
+    const { title, content, optionA, optionB, optionC, optionD, correctAnswer, explanation, subject, examCategory, difficulty, year, source } = body;
+    
+    // Validate required fields
+    if (!content || !optionA || !optionB || !optionC || !optionD || !correctAnswer || !subject) {
+      console.log('❌ Missing required fields');
+      return NextResponse.json({
+        error: 'Missing required fields',
+        details: 'content, optionA, optionB, optionC, optionD, correctAnswer, and subject are required'
+      }, { status: 400 });
     }
     
-    const userId = session.user.id;
-    console.log(`👤 Authenticated user ID: ${userId}`);
+    console.log('✅ Request validation passed');
     
-    // Check if user is QAUTHOR or SUPERADMIN
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .single();
+    // Test database connectivity
+    console.log('\n🔍 === TESTING DATABASE CONNECTIVITY ===');
+    const connectivityTest = await testDatabaseConnectivity(supabase);
     
-    if (userError) {
-      console.error('Error fetching user role:', userError);
-      return NextResponse.json({ 
-        error: 'Database setup incomplete. Please run database setup first.',
-        details: userError.message,
+    if (!connectivityTest.success) {
+      console.log('❌ Database connectivity test failed');
+      return NextResponse.json({
+        error: connectivityTest.error,
+        details: connectivityTest.details,
+        step: connectivityTest.step,
+        suggestion: 'Check database setup and authentication',
         setupUrl: '/api/setup'
       }, { status: 500 });
     }
     
-    console.log(`🎭 User role: ${userData?.role}`);
+    console.log('✅ Database connectivity test passed');
     
-    if (userData?.role !== 'QAUTHOR' && userData?.role !== 'SUPERADMIN') {
-      return NextResponse.json({ 
-        error: 'Unauthorized. Only QAUTHORs can create questions' 
-      }, { status: 403 });
-    }
+    // Test question insertion
+    console.log('\n🧪 === TESTING QUESTION INSERTION ===');
+    const insertionTest = await testQuestionInsertion(supabase, connectivityTest.user, connectivityTest.subjects);
     
-    // Parse request body
-    const body = await req.json();
-    console.log('📝 Request body received:', { 
-      title: body.title,
-      hasContent: !!body.content,
-      hasOptions: !!(body.optionA && body.optionB && body.optionC && body.optionD),
-      correctOption: body.correctOption,
-      hasExplanation: !!body.explanation,
-      subject: body.subject
-    });
-    
-    const {
-      title,
-      content,
-      optionA,
-      optionB,
-      optionC,
-      optionD,
-      correctOption,
-      explanation,
-      difficulty = 'MEDIUM',
-      examCategory = 'OTHER',
-      subject,
-      year,
-      source
-    } = body;
-    
-    // Validate required fields
-    if (!title || !content || !optionA || !optionB || !optionC || !optionD || 
-        !correctOption || !explanation || !subject) {
-      const missingFields = [];
-      if (!title) missingFields.push('title');
-      if (!content) missingFields.push('content');
-      if (!optionA) missingFields.push('optionA');
-      if (!optionB) missingFields.push('optionB');
-      if (!optionC) missingFields.push('optionC');
-      if (!optionD) missingFields.push('optionD');
-      if (!correctOption) missingFields.push('correctOption');
-      if (!explanation) missingFields.push('explanation');
-      if (!subject) missingFields.push('subject');
-      
-      console.error('Missing required fields:', missingFields);
-      return NextResponse.json({ 
-        error: `Missing required fields: ${missingFields.join(', ')}` 
-      }, { status: 400 });
-    }
-    
-    // Validate correct option
-    if (!['A', 'B', 'C', 'D'].includes(correctOption)) {
-      return NextResponse.json({ 
-        error: 'Correct option must be A, B, C, or D' 
-      }, { status: 400 });
-    }
-    
-    // Check if subject exists
-    const { data: subjectData, error: subjectError } = await supabase
-      .from('subjects')
-      .select('id, name')
-      .eq('id', subject)
-      .single();
-      
-    if (subjectError || !subjectData) {
-      console.error('Subject validation error:', subjectError);
-      
-      // If subject not found, list available subjects for debugging
-      const { data: allSubjects } = await supabase
-        .from('subjects')
-        .select('id, name')
-        .limit(10);
-      
-      console.log('📋 Available subjects:', allSubjects);
-      
-      return NextResponse.json({ 
-        error: 'Invalid subject ID or database setup incomplete',
-        details: subjectError?.message,
-        availableSubjects: allSubjects,
-        setupUrl: '/api/setup'
-      }, { status: 400 });
-    }
-    
-    console.log(`✅ Subject validated: ${subjectData.name} (${subjectData.id})`);
-    
-    // === DYNAMIC SCHEMA DISCOVERY ===
-    console.log('🔍 Starting dynamic schema discovery...');
-    
-    const schemaInfo = await discoverQuestionsSchema(supabase);
-    
-    if (!schemaInfo.success) {
-      console.error('❌ Schema discovery failed');
+    if (!insertionTest.success) {
+      console.log('❌ Question insertion test failed');
       return NextResponse.json({
-        error: 'Could not determine database schema. Please check database setup.',
-        details: schemaInfo.error,
+        error: insertionTest.error,
+        details: insertionTest.details,
+        recommendation: insertionTest.recommendation,
+        testData: insertionTest.testData,
+        fullError: insertionTest.fullError,
         suggestion: 'Run the complete supabase-manual-setup.sql script',
         setupUrl: '/api/setup'
       }, { status: 500 });
     }
     
-    console.log(`✅ Schema discovered: ${schemaInfo.schemaName || 'existing-data'}`);
-    console.log('📋 Available columns:', schemaInfo.columns);
+    console.log('✅ Question insertion test passed');
+    console.log('📊 Working schema confirmed:', insertionTest.workingSchema);
     
-    // Map our data to the discovered schema
-    const questionData = mapDataToSchema({
-      content,
-      optionA,
-      optionB,
-      optionC,
-      optionD,
-      correctOption,
-      explanation,
-      difficulty,
-      subject,
-      userId
-    }, schemaInfo);
+    // Now create the actual question
+    console.log('\n💾 === CREATING ACTUAL QUESTION ===');
     
-    console.log('💾 Inserting question with discovered schema...');
+    const questionData = {
+      subject: subject,
+      question_text: content,
+      options: {
+        A: optionA,
+        B: optionB,
+        C: optionC,
+        D: optionD
+      },
+      correct_answer: correctAnswer,
+      explanation: explanation || '',
+      difficulty: difficulty || 'MEDIUM',
+      questionHash: generateQuestionHash({
+        content,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        subject
+      }),
+      created_by: connectivityTest.user.id
+    };
     
-    const { data: insertedData, error: insertError } = await supabase
+    console.log('📝 Final question data:', JSON.stringify(questionData, null, 2));
+    
+    const { data: finalResult, error: finalError } = await supabase
       .from('questions')
       .insert(questionData)
-      .select('*')
-      .single();
+      .select('*');
     
-    if (insertError) {
-      console.error('❌ Insert failed:', insertError);
-      console.error('Full insert error:', JSON.stringify(insertError, null, 2));
-      
-      // Check if it's a duplicate
-      if (insertError.message?.includes('duplicate') || insertError.code === '23505') {
-        return NextResponse.json({ 
-          error: 'This question already exists (duplicate detected)' 
-        }, { status: 409 });
-      }
-      
-      return NextResponse.json({ 
-        error: 'Failed to create question: ' + insertError.message,
-        details: insertError,
-        attemptedData: questionData
+    if (finalError) {
+      logError('FINAL_QUESTION_INSERT', finalError, { questionData });
+      return NextResponse.json({
+        error: 'Failed to create question',
+        details: finalError.message,
+        questionData: questionData,
+        suggestion: 'Check the error details above'
       }, { status: 500 });
     }
     
-    console.log('✅ Question created successfully:', insertedData.id);
+    if (!finalResult || finalResult.length === 0) {
+      console.log('❌ Final insert succeeded but no data returned');
+      return NextResponse.json({
+        error: 'Question creation succeeded but no data returned',
+        details: 'This might indicate a database configuration issue'
+      }, { status: 500 });
+    }
     
-    // Transform response to match frontend expectations (camelCase for frontend)
-    const transformedQuestion = {
-      id: insertedData.id,
-      title: title,
-      content: content,
-      optionA: optionA,
-      optionB: optionB,
-      optionC: optionC,
-      optionD: optionD,
-      correctOption: correctOption,
-      explanation: explanation,
-      difficulty: difficulty,
-      examCategory: examCategory,
-      subject: subject,
-      year: year || null,
-      source: source || null,
-      createdBy: userId,
-      createdAt: insertedData.created_at,
-      updatedAt: insertedData.updated_at
-    };
+    console.log('✅ Question created successfully!');
+    console.log('🎉 Final result:', JSON.stringify(finalResult[0], null, 2));
     
-    return NextResponse.json(transformedQuestion, { status: 201 });
+    return NextResponse.json({
+      success: true,
+      message: 'Question created successfully',
+      question: finalResult[0]
+    }, { status: 201 });
     
-  } catch (err) {
-    console.error('Exception in question creation:', err);
-    return NextResponse.json({ 
-      error: 'Server error: ' + (err instanceof Error ? err.message : 'Unknown error') 
+  } catch (error) {
+    logError('API_EXCEPTION', error);
+    return NextResponse.json({
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
     }, { status: 500 });
   }
 } 
