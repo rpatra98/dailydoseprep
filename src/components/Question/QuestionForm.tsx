@@ -236,7 +236,7 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
           <Select placeholder="Select the subject">
             {subjects.map(subject => (
               <SelectOption key={subject.id} value={subject.id}>
-                {subject.name} ({subject.examCategory})
+                {subject.name}
               </SelectOption>
             ))}
           </Select>
