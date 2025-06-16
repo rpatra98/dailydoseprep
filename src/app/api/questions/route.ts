@@ -179,21 +179,21 @@ export async function POST(req: NextRequest) {
       subject
     });
     
-    // Create question using snake_case (Supabase/PostgreSQL standard)
+    // Create question using the EXACT schema from supabase-manual-setup.sql
     const questionData = {
-      subject: subject,                    // snake_case: subject (not subject_id based on supabase-manual-setup.sql)
-      question_text: content,              // snake_case: question_text
-      options: {                           // JSONB field
+      subject: subject,                    // matches: subject UUID REFERENCES public.subjects(id)
+      question_text: content,              // matches: question_text TEXT NOT NULL
+      options: {                           // matches: options JSONB
         A: optionA,
         B: optionB,
         C: optionC,
         D: optionD
       },
-      correct_answer: correctOption,       // snake_case: correct_answer
-      explanation: explanation,            // snake_case: explanation
-      difficulty: difficulty,              // snake_case: difficulty
-      question_hash: questionHash,         // snake_case: question_hash (for duplicate prevention)
-      created_by: userId                   // snake_case: created_by
+      correct_answer: correctOption,       // matches: correct_answer TEXT
+      explanation: explanation,            // matches: explanation TEXT
+      difficulty: difficulty,              // matches: difficulty TEXT
+      questionHash: questionHash,          // matches: questionHash TEXT (NOT question_hash!)
+      created_by: userId                   // matches: created_by UUID REFERENCES public.users(id)
     };
     
     console.log('Inserting question with snake_case data:', questionData);

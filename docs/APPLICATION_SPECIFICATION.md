@@ -2,11 +2,12 @@
 
 ## Database Conventions & Technical Standards
 
-### **CRITICAL: Always Use Snake Case for Database**
-- **ALL database table names, column names, and field names MUST use snake_case**
-- This is the Supabase/PostgreSQL standard convention
-- Examples: `subject_id`, `question_text`, `created_at`, `user_id`
-- **NEVER use camelCase in database schema**: avoid `subjectId`, `questionText`, `createdAt`
+### **CRITICAL: Database Naming Convention**
+- **The actual database schema uses MIXED naming conventions** (from supabase-manual-setup.sql)
+- **Most columns use snake_case**: `question_text`, `correct_answer`, `created_at`, `updated_at`
+- **Some columns use camelCase**: `questionHash`, `primarySubject`, `examCategory`
+- **ALWAYS check supabase-manual-setup.sql for exact column names before coding**
+- Examples of actual column names: `question_text`, `correct_answer`, `questionHash`, `primarySubject`
 
 ### Database Schema Priority
 1. **Primary Schema**: `supabase-manual-setup.sql` - This is the authoritative schema
@@ -14,9 +15,9 @@
 3. **When implementing**: Always check `supabase-manual-setup.sql` first for correct column names
 
 ### Key Database Tables Structure
-- **questions table**: `subject`, `question_text`, `options`, `correct_answer`, `explanation`, `difficulty`, `created_by`
-- **users table**: `id`, `email`, `role`, `primary_subject`, `created_at`, `updated_at`
-- **subjects table**: `id`, `name`, `exam_category`, `description`, `created_at`, `updated_at`
+- **questions table**: `subject`, `question_text`, `options`, `correct_answer`, `explanation`, `difficulty`, `questionHash`, `created_by`
+- **users table**: `id`, `email`, `role`, `primarySubject`, `created_at`, `updated_at`
+- **subjects table**: `id`, `name`, `examCategory`, `description`, `created_at`, `updated_at`
 
 ### API Implementation Guidelines
 - Use `createRouteHandlerClient({ cookies })` for server-side API routes
