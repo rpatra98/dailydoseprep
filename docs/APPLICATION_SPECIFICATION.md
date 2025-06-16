@@ -1,5 +1,28 @@
 # Daily Dose Prep - Application Specification
 
+## Database Conventions & Technical Standards
+
+### **CRITICAL: Always Use Snake Case for Database**
+- **ALL database table names, column names, and field names MUST use snake_case**
+- This is the Supabase/PostgreSQL standard convention
+- Examples: `subject_id`, `question_text`, `created_at`, `user_id`
+- **NEVER use camelCase in database schema**: avoid `subjectId`, `questionText`, `createdAt`
+
+### Database Schema Priority
+1. **Primary Schema**: `supabase-manual-setup.sql` - This is the authoritative schema
+2. **Secondary**: `src/db/schema.sql` - May be outdated, always verify against manual setup
+3. **When implementing**: Always check `supabase-manual-setup.sql` first for correct column names
+
+### Key Database Tables Structure
+- **questions table**: `subject`, `question_text`, `options`, `correct_answer`, `explanation`, `difficulty`, `created_by`
+- **users table**: `id`, `email`, `role`, `primary_subject`, `created_at`, `updated_at`
+- **subjects table**: `id`, `name`, `exam_category`, `description`, `created_at`, `updated_at`
+
+### API Implementation Guidelines
+- Use `createRouteHandlerClient({ cookies })` for server-side API routes
+- Always validate user authentication and role before database operations
+- Use snake_case when interfacing with database, transform to camelCase for frontend if needed
+
 ## Overview
 Daily Dose Prep is a competitive exam preparation platform that provides students with practice questions for various competitive exams in India. The platform allows QAUTHORs to create and manage questions, while students can practice and track their progress.
 

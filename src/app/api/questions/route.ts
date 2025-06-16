@@ -15,35 +15,24 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
     
-    // Try to get any existing questions to understand the schema
-    const { data: existingQuestions, error: schemaError } = await supabase
-      .from('questions')
-      .select('*')
-      .limit(1);
-    
-    if (schemaError) {
-      console.error('Schema discovery error:', schemaError);
-      return NextResponse.json({ 
-        error: 'Questions table may not exist: ' + schemaError.message,
-        suggestion: 'Please run the database setup script'
-      }, { status: 500 });
-    }
-    
-    console.log('Existing questions schema:', existingQuestions);
-    
-    // If we have questions, return them
-    const { data, error } = await supabase
+    // Check if questions table exists
+    const { data: questions, error: questionsError } = await supabase
       .from('questions')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
-      
-    if (error) {
-      console.error('Error fetching questions:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    
+    if (questionsError) {
+      console.error('Questions table error:', questionsError);
+      return NextResponse.json({ 
+        error: 'Questions table does not exist or is inaccessible',
+        details: questionsError.message,
+        suggestion: 'Please run the database setup script from supabase-manual-setup.sql',
+        setupUrl: '/api/setup'
+      }, { status: 500 });
     }
     
-    return NextResponse.json(data);
+    return NextResponse.json(questions || []);
   } catch (err) {
     console.error('Exception in questions GET:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
@@ -55,10 +44,9 @@ export async function POST(req: NextRequest) {
   try {
     console.log('POST /api/questions: Starting request');
     
-    // Use createRouteHandlerClient for proper session handling
     const supabase = createRouteHandlerClient({ cookies });
     
-    // Get the current session using the route handler client
+    // Get the current session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     console.log('Session check:', {
@@ -95,7 +83,9 @@ export async function POST(req: NextRequest) {
     if (userError) {
       console.error('Error fetching user role:', userError);
       return NextResponse.json({ 
-        error: 'Error fetching user role: ' + userError.message 
+        error: 'Database setup incomplete. Please run database setup first.',
+        details: userError.message,
+        setupUrl: '/api/setup'
       }, { status: 500 });
     }
     
@@ -171,206 +161,99 @@ export async function POST(req: NextRequest) {
     if (subjectError || !subjectData) {
       console.error('Subject validation error:', subjectError);
       return NextResponse.json({ 
-        error: 'Invalid subject ID' 
+        error: 'Database setup incomplete or invalid subject ID',
+        details: subjectError?.message,
+        setupUrl: '/api/setup'
       }, { status: 400 });
     }
     
     console.log(`Subject validated: ${subjectData.id}`);
     
-    // === COMPREHENSIVE TABLE DIAGNOSTICS ===
-    console.log('=== STARTING COMPREHENSIVE DIAGNOSTICS ===');
-    
-    // First, check if questions table exists at all
-    try {
-      const { data: tableCheck, error: tableError } = await supabase
-        .from('questions')
-        .select('count(*)')
-        .limit(1);
-      
-      console.log('Table existence check:', { tableCheck, tableError });
-      
-      if (tableError) {
-        console.log('❌ Questions table does not exist or is inaccessible');
-        console.log('Table error details:', JSON.stringify(tableError, null, 2));
-        
-        return NextResponse.json({ 
-          error: 'Questions table does not exist. Please run database setup.',
-          details: tableError.message,
-          suggestion: 'Run the SQL schema from src/db/schema.sql or supabase-manual-setup.sql'
-        }, { status: 500 });
-      }
-      
-      console.log('✅ Questions table exists');
-    } catch (e) {
-      console.log('❌ Exception checking table existence:', e);
-      return NextResponse.json({ 
-        error: 'Cannot access questions table',
-        details: e instanceof Error ? e.message : 'Unknown error'
-      }, { status: 500 });
-    }
-    
-    // Get existing questions to see the actual schema
-    const { data: existingQuestions, error: existingError } = await supabase
-      .from('questions')
-      .select('*')
-      .limit(1);
-    
-    console.log('Existing questions result:', { 
-      data: existingQuestions, 
-      error: existingError,
-      hasData: !!existingQuestions?.length,
-      firstQuestion: existingQuestions?.[0] || null
+    // Generate question hash to prevent duplicates
+    const questionHash = generateQuestionHash({
+      content,
+      optionA,
+      optionB,
+      optionC,
+      optionD,
+      subject
     });
     
-    if (existingQuestions && existingQuestions.length > 0) {
-      console.log('✅ Found existing question with columns:', Object.keys(existingQuestions[0]));
-      
-      // If we have existing data, use its schema
-      const existingSchema = existingQuestions[0];
-      const availableColumns = Object.keys(existingSchema);
-      
-      console.log('Using existing schema with columns:', availableColumns);
-      
-      // Build insert object based on available columns
-      const insertData: any = {};
-      
-             // Map our data to available columns
-       if (availableColumns.includes('subject')) insertData.subject = subject;
-       else if (availableColumns.includes('subject_id')) insertData.subject_id = subject;
-       else if (availableColumns.includes('subjectId')) insertData.subjectId = subject;
-      
-      if (availableColumns.includes('question_text')) insertData.question_text = content;
-      else if (availableColumns.includes('content')) insertData.content = content;
-      else if (availableColumns.includes('question')) insertData.question = content;
-      else if (availableColumns.includes('questionText')) insertData.questionText = content;
-      else if (availableColumns.includes('title')) insertData.title = title;
-      
-      if (availableColumns.includes('created_by')) insertData.created_by = userId;
-      else if (availableColumns.includes('createdBy')) insertData.createdBy = userId;
-      else if (availableColumns.includes('author')) insertData.author = userId;
-      else if (availableColumns.includes('user_id')) insertData.user_id = userId;
-      
-      if (availableColumns.includes('options')) {
-        insertData.options = {
-          A: optionA,
-          B: optionB,
-          C: optionC,
-          D: optionD
-        };
-      }
-      
-      if (availableColumns.includes('correct_answer')) insertData.correct_answer = correctOption;
-      else if (availableColumns.includes('correctAnswer')) insertData.correctAnswer = correctOption;
-      else if (availableColumns.includes('answer')) insertData.answer = correctOption;
-      
-      if (availableColumns.includes('explanation')) insertData.explanation = explanation;
-      if (availableColumns.includes('difficulty')) insertData.difficulty = difficulty;
-      
-      console.log('Attempting insert with mapped data:', insertData);
-      
-      const { data: insertedData, error: insertError } = await supabase
-        .from('questions')
-        .insert(insertData)
-        .select('*')
-        .single();
-      
-      if (insertError) {
-        console.error('❌ Insert failed with existing schema:', insertError);
-        console.error('Full insert error:', JSON.stringify(insertError, null, 2));
-        
-        return NextResponse.json({ 
-          error: 'Failed to insert question: ' + insertError.message,
-          availableColumns: availableColumns,
-          attemptedData: insertData
-        }, { status: 500 });
-      }
-      
-      console.log('✅ Question created successfully:', insertedData);
-      
-      // Transform response
-      const transformedQuestion = {
-        id: insertedData.id,
-        title: title,
-        content: content,
-        optionA: optionA,
-        optionB: optionB,
-        optionC: optionC,
-        optionD: optionD,
-        correctOption: correctOption,
-        explanation: explanation,
-        difficulty: difficulty,
-        examCategory: examCategory,
-        subject: subject,
-        year: year || null,
-        source: source || null,
-        createdBy: userId,
-        createdAt: insertedData.created_at,
-        updatedAt: insertedData.updated_at
-      };
-      
-      return NextResponse.json(transformedQuestion, { status: 201 });
-    }
-    
-    // If no existing questions, the table is empty - try to create the first one
-    console.log('📝 Table is empty, attempting to create first question');
-    
-    // Try the most likely schema based on our SQL files
-    const standardSchema = {
-      subject: subject,
-      question_text: content,
-      options: {
+    // Create question using snake_case (Supabase/PostgreSQL standard)
+    const questionData = {
+      subject: subject,                    // snake_case: subject (not subject_id based on supabase-manual-setup.sql)
+      question_text: content,              // snake_case: question_text
+      options: {                           // JSONB field
         A: optionA,
         B: optionB,
         C: optionC,
         D: optionD
       },
-      correct_answer: correctOption,
-      explanation: explanation,
-      difficulty: difficulty,
-      created_by: userId
+      correct_answer: correctOption,       // snake_case: correct_answer
+      explanation: explanation,            // snake_case: explanation
+      difficulty: difficulty,              // snake_case: difficulty
+      question_hash: questionHash,         // snake_case: question_hash (for duplicate prevention)
+      created_by: userId                   // snake_case: created_by
     };
     
-    console.log('Trying standard schema:', standardSchema);
+    console.log('Inserting question with snake_case data:', questionData);
     
-    const { data: standardData, error: standardError } = await supabase
+    const { data: insertedData, error: insertError } = await supabase
       .from('questions')
-      .insert(standardSchema)
+      .insert(questionData)
       .select('*')
       .single();
     
-    if (!standardError && standardData) {
-      console.log('✅ SUCCESS with standard schema:', standardData);
+    if (insertError) {
+      console.error('❌ Insert failed:', insertError);
+      console.error('Full insert error:', JSON.stringify(insertError, null, 2));
       
-      const transformedQuestion = {
-        id: standardData.id,
-        title: title,
-        content: content,
-        optionA: optionA,
-        optionB: optionB,
-        optionC: optionC,
-        optionD: optionD,
-        correctOption: correctOption,
-        explanation: explanation,
-        difficulty: difficulty,
-        examCategory: examCategory,
-        subject: subject,
-        year: year || null,
-        source: source || null,
-        createdBy: userId,
-        createdAt: standardData.created_at,
-        updatedAt: standardData.updated_at
-      };
+      // Check if it's a duplicate
+      if (insertError.message?.includes('duplicate') || insertError.code === '23505') {
+        return NextResponse.json({ 
+          error: 'This question already exists (duplicate detected)' 
+        }, { status: 409 });
+      }
       
-      return NextResponse.json(transformedQuestion, { status: 201 });
+      // Check if it's a table/schema issue
+      if (insertError.message?.includes('relation') || insertError.message?.includes('does not exist')) {
+        return NextResponse.json({ 
+          error: 'Questions table does not exist. Please run database setup.',
+          details: insertError.message,
+          setupUrl: '/api/setup'
+        }, { status: 500 });
+      }
+      
+      return NextResponse.json({ 
+        error: 'Failed to create question: ' + insertError.message,
+        details: insertError
+      }, { status: 500 });
     }
     
-    console.log('❌ Standard schema failed:', standardError);
+    console.log('✅ Question created successfully:', insertedData);
     
-    return NextResponse.json({ 
-      error: 'Could not create question. Database schema mismatch.',
-      details: standardError?.message,
-      suggestion: 'Please check if the database schema matches src/db/schema.sql'
-    }, { status: 500 });
+    // Transform response to match frontend expectations (camelCase for frontend)
+    const transformedQuestion = {
+      id: insertedData.id,
+      title: title,
+      content: content,
+      optionA: optionA,
+      optionB: optionB,
+      optionC: optionC,
+      optionD: optionD,
+      correctOption: correctOption,
+      explanation: explanation,
+      difficulty: difficulty,
+      examCategory: examCategory,
+      subject: subject,
+      year: year || null,
+      source: source || null,
+      createdBy: userId,
+      createdAt: insertedData.created_at,
+      updatedAt: insertedData.updated_at
+    };
+    
+    return NextResponse.json(transformedQuestion, { status: 201 });
     
   } catch (err) {
     console.error('Exception in question creation:', err);
