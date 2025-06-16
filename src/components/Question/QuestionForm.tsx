@@ -92,7 +92,7 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         optionB: values.optionB,
         optionC: values.optionC,
         optionD: values.optionD,
-        correctOption: values.correctOption,
+        correctAnswer: values.correctOption,
         explanation: values.explanation,
         difficulty: values.difficulty || 'MEDIUM', // Default to MEDIUM if not provided
         examCategory: values.examCategory || 'OTHER', // Default to OTHER if not provided

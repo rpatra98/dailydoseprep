@@ -113,7 +113,6 @@ export async function POST(req: NextRequest) {
       .from('subjects')
       .insert({
         name,
-        examCategory: 'OTHER', // Default exam category
         description: null
       })
       .select()

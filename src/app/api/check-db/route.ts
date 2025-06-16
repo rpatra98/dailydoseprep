@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     console.log('📋 Checking subjects table...');
     const { data: subjects, error: subjectsError } = await supabase
       .from('subjects')
-      .select('id, name, examCategory')
+      .select('id, name')
       .limit(3);
     
     results.checks.subjects = {
