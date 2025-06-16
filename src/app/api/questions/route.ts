@@ -20,24 +20,21 @@ export async function GET(req: NextRequest) {
     const examCategory = searchParams.get('examCategory');
     const limit = parseInt(searchParams.get('limit') || '50');
     
-    // Start building the query - using actual database field names from src/db/schema.sql
-    let query = supabase.from('questions').select(`
-      id,
-      subject_id,
-      question_text,
-      options,
-      correct_answer,
-      explanation,
-      difficulty,
-      created_by,
-      created_at,
-      updated_at,
-      subjects(name)
-    `);
+    // Try to discover the actual schema first
+    const { data: existingQuestions, error: schemaError } = await supabase
+      .from('questions')
+      .select('*')
+      .limit(1);
     
-    // Apply filters if provided
-    if (subject) query = query.eq('subject_id', subject);
-    if (difficulty) query = query.eq('difficulty', difficulty);
+    if (schemaError) {
+      console.error('Schema discovery error:', schemaError);
+      return NextResponse.json({ error: 'Schema error: ' + schemaError.message }, { status: 500 });
+    }
+    
+    console.log('Existing questions schema:', existingQuestions);
+    
+    // Start building the query based on what we find
+    let query = supabase.from('questions').select('*');
     
     // Execute query with pagination
     const { data, error } = await query
@@ -183,119 +180,183 @@ export async function POST(req: NextRequest) {
     
     console.log(`Subject validated: ${subjectData.id}`);
     
-    // Check for duplicate questions (using question text and subject_id)
-    const { data: existingQuestion } = await supabase
+    // First, let's discover the actual table schema
+    console.log('=== SCHEMA DISCOVERY ===');
+    
+    // Try to get existing questions to see the actual column structure
+    const { data: existingQuestions, error: existingError } = await supabase
       .from('questions')
-      .select('id')
-      .eq('question_text', content)
-      .eq('subject_id', subject)
-      .maybeSingle();
-      
-    if (existingQuestion) {
-      console.log('Duplicate question found');
-      return NextResponse.json({ 
-        error: 'A similar question already exists for this subject' 
-      }, { status: 409 });
-    }
-    
-    // Prepare options as JSONB
-    const options = {
-      A: optionA,
-      B: optionB,
-      C: optionC,
-      D: optionD
-    };
-    
-    console.log('Creating question with options:', options);
-    
-    // First, let's try to see what columns actually exist by doing a simple select
-    try {
-      const { data: testData, error: testError } = await supabase
-        .from('questions')
-        .select('*')
-        .limit(1);
-      console.log('Test query result:', { testData, testError });
-    } catch (e) {
-      console.log('Test query failed:', e);
-    }
-    
-    // Try a minimal insert first to see what works
-    const minimalQuestion = {
-      subject_id: subject,
-      question_text: content,
-      created_by: userId
-    };
-    
-    console.log('Trying minimal insert:', minimalQuestion);
-    
-    const { data: minimalData, error: minimalError } = await supabase
-      .from('questions')
-      .insert(minimalQuestion)
       .select('*')
-      .single();
-      
-    if (minimalError) {
-      console.error('Minimal insert failed:', minimalError);
-      console.error('Full minimal error:', JSON.stringify(minimalError, null, 2));
-      
-      return NextResponse.json({ 
-        error: 'Database error (minimal test): ' + minimalError.message 
-      }, { status: 500 });
+      .limit(1);
+    
+    console.log('Existing questions result:', { 
+      data: existingQuestions, 
+      error: existingError,
+      hasData: !!existingQuestions?.length,
+      firstQuestion: existingQuestions?.[0] || null
+    });
+    
+    if (existingQuestions && existingQuestions.length > 0) {
+      console.log('Found existing question with columns:', Object.keys(existingQuestions[0]));
     }
     
-    console.log('Minimal insert succeeded:', minimalData);
+    // Try different possible column name combinations
+    const possibleSchemas = [
+      // Schema 1: Original expected (src/db/schema.sql)
+      {
+        name: 'schema1_underscore',
+        fields: {
+          subject_id: subject,
+          question_text: content,
+          created_by: userId
+        }
+      },
+      // Schema 2: CamelCase
+      {
+        name: 'schema2_camelcase',
+        fields: {
+          subjectId: subject,
+          questionText: content,
+          createdBy: userId
+        }
+      },
+      // Schema 3: Simple names
+      {
+        name: 'schema3_simple',
+        fields: {
+          subject: subject,
+          question: content,
+          author: userId
+        }
+      },
+      // Schema 4: Alternative names
+      {
+        name: 'schema4_alt',
+        fields: {
+          subject_id: subject,
+          content: content,
+          user_id: userId
+        }
+      },
+      // Schema 5: Just basic fields
+      {
+        name: 'schema5_basic',
+        fields: {
+          title: title,
+          content: content
+        }
+      }
+    ];
     
-    // If minimal insert worked, try to update with the rest of the fields
-    const updateData = {
-      options: options,
-      correct_answer: correctOption,
-      explanation: explanation,
-      difficulty: difficulty
-    };
+    console.log('=== TESTING SCHEMAS ===');
     
-    const { data: updatedData, error: updateError } = await supabase
-      .from('questions')
-      .update(updateData)
-      .eq('id', minimalData.id)
-      .select('*')
-      .single();
+    for (const schema of possibleSchemas) {
+      console.log(`Testing schema: ${schema.name}`, schema.fields);
       
-    if (updateError) {
-      console.error('Update failed:', updateError);
-      console.error('Full update error:', JSON.stringify(updateError, null, 2));
-      
-      // Clean up the minimal record
-      await supabase.from('questions').delete().eq('id', minimalData.id);
-      
-      return NextResponse.json({ 
-        error: 'Database error (update test): ' + updateError.message 
-      }, { status: 500 });
+      try {
+        const { data: testData, error: testError } = await supabase
+          .from('questions')
+          .insert(schema.fields)
+          .select('*')
+          .single();
+        
+        if (!testError && testData) {
+          console.log(`✅ SUCCESS with ${schema.name}:`, testData);
+          console.log('Available columns:', Object.keys(testData));
+          
+          // Now try to add the remaining fields
+          const additionalFields: any = {};
+          
+          // Try to add options
+          if ('options' in testData || testData.hasOwnProperty('options')) {
+            additionalFields.options = {
+              A: optionA,
+              B: optionB,
+              C: optionC,
+              D: optionD
+            };
+          }
+          
+          // Try different names for correct answer
+          const correctAnswerFields = ['correct_answer', 'correctAnswer', 'answer', 'correct_option'];
+          for (const field of correctAnswerFields) {
+            if (field in testData || testData.hasOwnProperty(field)) {
+              additionalFields[field] = correctOption;
+              break;
+            }
+          }
+          
+          // Try different names for explanation
+          const explanationFields = ['explanation', 'description', 'details'];
+          for (const field of explanationFields) {
+            if (field in testData || testData.hasOwnProperty(field)) {
+              additionalFields[field] = explanation;
+              break;
+            }
+          }
+          
+          // Try different names for difficulty
+          const difficultyFields = ['difficulty', 'level', 'difficulty_level'];
+          for (const field of difficultyFields) {
+            if (field in testData || testData.hasOwnProperty(field)) {
+              additionalFields[field] = difficulty;
+              break;
+            }
+          }
+          
+          console.log('Trying to update with additional fields:', additionalFields);
+          
+          if (Object.keys(additionalFields).length > 0) {
+            const { data: updatedData, error: updateError } = await supabase
+              .from('questions')
+              .update(additionalFields)
+              .eq('id', testData.id)
+              .select('*')
+              .single();
+            
+            if (updateError) {
+              console.log('Update failed:', updateError);
+            } else {
+              console.log('✅ Update succeeded:', updatedData);
+            }
+          }
+          
+          // Return success response
+          const transformedQuestion = {
+            id: testData.id,
+            title: title,
+            content: content,
+            optionA: optionA,
+            optionB: optionB,
+            optionC: optionC,
+            optionD: optionD,
+            correctOption: correctOption,
+            explanation: explanation,
+            difficulty: difficulty,
+            examCategory: examCategory,
+            subject: subject,
+            year: year || null,
+            source: source || null,
+            createdBy: userId,
+            createdAt: testData.created_at,
+            updatedAt: testData.updated_at
+          };
+          
+          return NextResponse.json(transformedQuestion, { status: 201 });
+        } else {
+          console.log(`❌ Failed with ${schema.name}:`, testError?.message);
+        }
+      } catch (e) {
+        console.log(`❌ Exception with ${schema.name}:`, e);
+      }
     }
     
-    console.log('Question created and updated successfully:', updatedData.id);
+    console.log('=== ALL SCHEMAS FAILED ===');
     
-    // Transform the response to match the frontend expectations
-    const transformedQuestion = {
-      id: updatedData.id,
-      title: title,
-      content: updatedData.question_text,
-      optionA: updatedData.options?.A || optionA,
-      optionB: updatedData.options?.B || optionB,
-      optionC: updatedData.options?.C || optionC,
-      optionD: updatedData.options?.D || optionD,
-      correctOption: updatedData.correct_answer || correctOption,
-      explanation: updatedData.explanation || explanation,
-      difficulty: updatedData.difficulty || difficulty,
-      examCategory: examCategory,
-      subject: updatedData.subject_id,
-      year: year || null,
-      source: source || null,
-      createdBy: updatedData.created_by,
-      createdAt: updatedData.created_at,
-      updatedAt: updatedData.updated_at
-    };
+    return NextResponse.json({ 
+      error: 'Could not determine database schema. All test schemas failed.' 
+    }, { status: 500 });
     
-    return NextResponse.json(transformedQuestion, { status: 201 });
   } catch (err) {
     console.error('Exception in question creation:', err);
     return NextResponse.json({ 
