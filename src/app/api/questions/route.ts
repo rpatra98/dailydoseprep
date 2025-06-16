@@ -10,6 +10,160 @@ function generateQuestionHash(question: any): string {
   return crypto.createHash('md5').update(stringToHash).digest('hex');
 }
 
+// Dynamic schema discovery and mapping
+async function discoverQuestionsSchema(supabase: any) {
+  console.log('🔍 Discovering questions table schema...');
+  
+  // First, try to get existing data to see actual columns
+  const { data: existingQuestions, error: existingError } = await supabase
+    .from('questions')
+    .select('*')
+    .limit(1);
+  
+  if (!existingError && existingQuestions && existingQuestions.length > 0) {
+    const columns = Object.keys(existingQuestions[0]);
+    console.log('✅ Found existing data with columns:', columns);
+    return {
+      success: true,
+      columns: columns,
+      sampleData: existingQuestions[0]
+    };
+  }
+  
+  // If no existing data, try different schema combinations
+  const schemaCombinations = [
+    // Schema 1: supabase-manual-setup.sql format
+    {
+      name: 'supabase-manual-setup',
+      fields: {
+        subject: 'test-subject-id',
+        question_text: 'test question',
+        options: { A: 'test', B: 'test', C: 'test', D: 'test' },
+        correct_answer: 'A',
+        explanation: 'test explanation',
+        difficulty: 'EASY',
+        questionHash: 'test-hash',
+        created_by: 'test-user-id'
+      }
+    },
+    // Schema 2: src/db/schema.sql format
+    {
+      name: 'src-db-schema',
+      fields: {
+        subject_id: 'test-subject-id',
+        question_text: 'test question',
+        options: { A: 'test', B: 'test', C: 'test', D: 'test' },
+        correct_answer: 'A',
+        explanation: 'test explanation',
+        difficulty: 'EASY',
+        created_by: 'test-user-id'
+      }
+    },
+    // Schema 3: Alternative naming
+    {
+      name: 'alternative',
+      fields: {
+        subject: 'test-subject-id',
+        content: 'test question',
+        options: { A: 'test', B: 'test', C: 'test', D: 'test' },
+        answer: 'A',
+        explanation: 'test explanation',
+        difficulty: 'EASY',
+        author: 'test-user-id'
+      }
+    },
+    // Schema 4: Simple naming
+    {
+      name: 'simple',
+      fields: {
+        subject: 'test-subject-id',
+        question: 'test question',
+        options: { A: 'test', B: 'test', C: 'test', D: 'test' },
+        correct_answer: 'A',
+        explanation: 'test explanation',
+        created_by: 'test-user-id'
+      }
+    }
+  ];
+  
+  for (const schema of schemaCombinations) {
+    console.log(`🧪 Testing schema: ${schema.name}`);
+    
+    const { data: testData, error: testError } = await supabase
+      .from('questions')
+      .insert(schema.fields)
+      .select('*');
+    
+    if (!testError && testData && testData.length > 0) {
+      console.log(`✅ Schema ${schema.name} works! Columns:`, Object.keys(testData[0]));
+      
+      // Clean up test data
+      await supabase.from('questions').delete().eq('id', testData[0].id);
+      
+      return {
+        success: true,
+        schemaName: schema.name,
+        columns: Object.keys(testData[0]),
+        workingFields: schema.fields,
+        sampleData: testData[0]
+      };
+    } else {
+      console.log(`❌ Schema ${schema.name} failed:`, testError?.message);
+    }
+  }
+  
+  return {
+    success: false,
+    error: 'No working schema found'
+  };
+}
+
+// Map our standard data to the discovered schema
+function mapDataToSchema(data: any, schemaInfo: any) {
+  const { content, optionA, optionB, optionC, optionD, correctOption, explanation, difficulty, subject, userId } = data;
+  
+  const mapped: any = {};
+  const columns = schemaInfo.columns || [];
+  
+  // Map subject
+  if (columns.includes('subject')) mapped.subject = subject;
+  else if (columns.includes('subject_id')) mapped.subject_id = subject;
+  
+  // Map question text
+  if (columns.includes('question_text')) mapped.question_text = content;
+  else if (columns.includes('content')) mapped.content = content;
+  else if (columns.includes('question')) mapped.question = content;
+  
+  // Map options (usually JSONB)
+  if (columns.includes('options')) {
+    mapped.options = { A: optionA, B: optionB, C: optionC, D: optionD };
+  }
+  
+  // Map correct answer
+  if (columns.includes('correct_answer')) mapped.correct_answer = correctOption;
+  else if (columns.includes('correctAnswer')) mapped.correctAnswer = correctOption;
+  else if (columns.includes('answer')) mapped.answer = correctOption;
+  
+  // Map explanation
+  if (columns.includes('explanation')) mapped.explanation = explanation;
+  
+  // Map difficulty
+  if (columns.includes('difficulty')) mapped.difficulty = difficulty;
+  
+  // Map created by
+  if (columns.includes('created_by')) mapped.created_by = userId;
+  else if (columns.includes('createdBy')) mapped.createdBy = userId;
+  else if (columns.includes('author')) mapped.author = userId;
+  
+  // Map question hash if exists
+  const questionHash = generateQuestionHash(data);
+  if (columns.includes('questionHash')) mapped.questionHash = questionHash;
+  else if (columns.includes('question_hash')) mapped.question_hash = questionHash;
+  
+  console.log('📋 Mapped data:', mapped);
+  return mapped;
+}
+
 // GET questions with optional filters
 export async function GET(req: NextRequest) {
   try {
@@ -42,14 +196,14 @@ export async function GET(req: NextRequest) {
 // POST a new question (QAUTHOR only)
 export async function POST(req: NextRequest) {
   try {
-    console.log('POST /api/questions: Starting request');
+    console.log('🚀 POST /api/questions: Starting request');
     
     const supabase = createRouteHandlerClient({ cookies });
     
     // Get the current session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
-    console.log('Session check:', {
+    console.log('🔐 Session check:', {
       hasSession: !!session,
       hasUser: !!session?.user,
       userId: session?.user?.id,
@@ -71,7 +225,7 @@ export async function POST(req: NextRequest) {
     }
     
     const userId = session.user.id;
-    console.log(`Authenticated user ID: ${userId}`);
+    console.log(`👤 Authenticated user ID: ${userId}`);
     
     // Check if user is QAUTHOR or SUPERADMIN
     const { data: userData, error: userError } = await supabase
@@ -89,7 +243,7 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
     
-    console.log(`User role: ${userData?.role}`);
+    console.log(`🎭 User role: ${userData?.role}`);
     
     if (userData?.role !== 'QAUTHOR' && userData?.role !== 'SUPERADMIN') {
       return NextResponse.json({ 
@@ -99,7 +253,7 @@ export async function POST(req: NextRequest) {
     
     // Parse request body
     const body = await req.json();
-    console.log('Request body received:', { 
+    console.log('📝 Request body received:', { 
       title: body.title,
       hasContent: !!body.content,
       hasOptions: !!(body.optionA && body.optionB && body.optionC && body.optionD),
@@ -167,36 +321,41 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
     
-    console.log(`Subject validated: ${subjectData.id}`);
+    console.log(`✅ Subject validated: ${subjectData.id}`);
     
-    // Generate question hash to prevent duplicates
-    const questionHash = generateQuestionHash({
+    // === DYNAMIC SCHEMA DISCOVERY ===
+    console.log('🔍 Starting dynamic schema discovery...');
+    
+    const schemaInfo = await discoverQuestionsSchema(supabase);
+    
+    if (!schemaInfo.success) {
+      console.error('❌ Schema discovery failed');
+      return NextResponse.json({
+        error: 'Could not determine database schema. Please check database setup.',
+        details: schemaInfo.error,
+        suggestion: 'Run the complete supabase-manual-setup.sql script',
+        setupUrl: '/api/setup'
+      }, { status: 500 });
+    }
+    
+    console.log(`✅ Schema discovered: ${schemaInfo.schemaName || 'existing-data'}`);
+    console.log('📋 Available columns:', schemaInfo.columns);
+    
+    // Map our data to the discovered schema
+    const questionData = mapDataToSchema({
       content,
       optionA,
       optionB,
       optionC,
       optionD,
-      subject
-    });
+      correctOption,
+      explanation,
+      difficulty,
+      subject,
+      userId
+    }, schemaInfo);
     
-    // Create question using the EXACT schema from supabase-manual-setup.sql
-    const questionData = {
-      subject: subject,                    // matches: subject UUID REFERENCES public.subjects(id)
-      question_text: content,              // matches: question_text TEXT NOT NULL
-      options: {                           // matches: options JSONB
-        A: optionA,
-        B: optionB,
-        C: optionC,
-        D: optionD
-      },
-      correct_answer: correctOption,       // matches: correct_answer TEXT
-      explanation: explanation,            // matches: explanation TEXT
-      difficulty: difficulty,              // matches: difficulty TEXT
-      questionHash: questionHash,          // matches: questionHash TEXT (NOT question_hash!)
-      created_by: userId                   // matches: created_by UUID REFERENCES public.users(id)
-    };
-    
-    console.log('Inserting question with snake_case data:', questionData);
+    console.log('💾 Inserting question with discovered schema...');
     
     const { data: insertedData, error: insertError } = await supabase
       .from('questions')
@@ -215,22 +374,14 @@ export async function POST(req: NextRequest) {
         }, { status: 409 });
       }
       
-      // Check if it's a table/schema issue
-      if (insertError.message?.includes('relation') || insertError.message?.includes('does not exist')) {
-        return NextResponse.json({ 
-          error: 'Questions table does not exist. Please run database setup.',
-          details: insertError.message,
-          setupUrl: '/api/setup'
-        }, { status: 500 });
-      }
-      
       return NextResponse.json({ 
         error: 'Failed to create question: ' + insertError.message,
-        details: insertError
+        details: insertError,
+        attemptedData: questionData
       }, { status: 500 });
     }
     
-    console.log('✅ Question created successfully:', insertedData);
+    console.log('✅ Question created successfully:', insertedData.id);
     
     // Transform response to match frontend expectations (camelCase for frontend)
     const transformedQuestion = {
