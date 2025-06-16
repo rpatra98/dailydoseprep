@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRouteHandlerClient, getServiceRoleClient } from '@/lib/supabase-server';
+import { getServiceRoleClient } from '@/lib/supabase-server';
 import { Question } from '@/types';
 import crypto from 'crypto';
 
@@ -19,10 +19,10 @@ export async function GET(req: NextRequest) {
     const examCategory = searchParams.get('examCategory');
     const limit = parseInt(searchParams.get('limit') || '50');
     
-    // Start building the query - note: using actual database field names
+    // Start building the query - using actual database field names from supabase-manual-setup.sql
     let query = supabase.from('questions').select(`
       id,
-      subject_id,
+      subject,
       question_text,
       options,
       correct_answer,
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     `);
     
     // Apply filters if provided
-    if (subject) query = query.eq('subject_id', subject);
+    if (subject) query = query.eq('subject', subject);
     if (difficulty) query = query.eq('difficulty', difficulty);
     
     // Execute query with pagination
@@ -60,28 +60,60 @@ export async function POST(req: NextRequest) {
   try {
     console.log('POST /api/questions: Starting request');
     
-    // Use both clients - route handler for session, service role for operations
-    const supabaseAuth = getRouteHandlerClient();
-    const supabaseAdmin = getServiceRoleClient();
+    // Use only service role client to avoid multiple client instances
+    const supabase = getServiceRoleClient();
     
-    // Get the current session
-    const { data: { session }, error: authError } = await supabaseAuth.auth.getSession();
+    // Get authorization header to extract user info
+    const authHeader = req.headers.get('authorization');
+    const cookies = req.headers.get('cookie');
     
-    if (authError) {
-      console.error('Authentication error:', authError);
-      return NextResponse.json({ error: 'Authentication error: ' + authError.message }, { status: 401 });
+    console.log('Auth header present:', !!authHeader);
+    console.log('Cookies present:', !!cookies);
+    
+    // Try to get user ID from the request context
+    // Since we're using service role, we need to validate the user differently
+    let userId: string | null = null;
+    
+    // Parse cookies to get the auth token
+    if (cookies) {
+      const authTokenMatch = cookies.match(/ddp-supabase-auth-token=([^;]+)/);
+      if (authTokenMatch) {
+        try {
+          const tokenData = JSON.parse(decodeURIComponent(authTokenMatch[1]));
+          if (tokenData.user?.id) {
+            userId = tokenData.user.id;
+            console.log('User ID from cookie:', userId);
+          }
+        } catch (e) {
+          console.error('Error parsing auth token from cookie:', e);
+        }
+      }
     }
     
-    if (!session) {
-      console.error('No session found');
-      return NextResponse.json({ error: 'Not authenticated - no session found' }, { status: 401 });
+    // If we couldn't get user ID from cookie, try alternative approach
+    if (!userId) {
+      // Check for sb- prefixed cookies (default Supabase format)
+      const sbCookieMatch = cookies?.match(/sb-[^=]+-auth-token=([^;]+)/);
+      if (sbCookieMatch) {
+        try {
+          const tokenData = JSON.parse(decodeURIComponent(sbCookieMatch[1]));
+          if (tokenData.user?.id) {
+            userId = tokenData.user.id;
+            console.log('User ID from sb cookie:', userId);
+          }
+        } catch (e) {
+          console.error('Error parsing sb auth token:', e);
+        }
+      }
     }
     
-    const userId = session.user.id;
-    console.log(`User ID from session: ${userId}`);
+    if (!userId) {
+      console.error('No user ID found in request');
+      return NextResponse.json({ error: 'Not authenticated - no user session found' }, { status: 401 });
+    }
     
     // Check if user is QAUTHOR or SUPERADMIN using service role client
-    const { data: userData, error: userError } = await supabaseAdmin
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('role')
       .eq('id', userId)
@@ -144,7 +176,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Check if subject exists
-    const { data: subjectData, error: subjectError } = await supabaseAdmin
+    const { data: subjectData, error: subjectError } = await supabase
       .from('subjects')
       .select('id')
       .eq('id', subject)
@@ -158,11 +190,11 @@ export async function POST(req: NextRequest) {
     console.log(`Subject validated: ${subjectData.id}`);
     
     // Check for duplicate questions (using question text and subject)
-    const { data: existingQuestion } = await supabaseAdmin
+    const { data: existingQuestion } = await supabase
       .from('questions')
       .select('id')
       .eq('question_text', content)
-      .eq('subject_id', subject)
+      .eq('subject', subject)
       .maybeSingle();
       
     if (existingQuestion) {
@@ -180,30 +212,35 @@ export async function POST(req: NextRequest) {
     
     console.log('Creating question with options:', options);
     
-    // Create new question using actual database schema
+    // Generate question hash for duplicate prevention
+    const questionHash = generateQuestionHash(body);
+    
+    // Create new question using actual database schema from supabase-manual-setup.sql
     const newQuestion = {
-      subject_id: subject,
+      subject: subject, // Using 'subject' not 'subject_id'
       question_text: content,
       options: options,
       correct_answer: correctOption,
       explanation: explanation,
       difficulty: difficulty,
+      questionHash: questionHash,
       created_by: userId
     };
     
     console.log('Inserting question:', { ...newQuestion, options: 'JSONB object' });
     
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('questions')
       .insert(newQuestion)
       .select(`
         id,
-        subject_id,
+        subject,
         question_text,
         options,
         correct_answer,
         explanation,
         difficulty,
+        questionHash,
         created_by,
         created_at,
         updated_at
@@ -230,7 +267,7 @@ export async function POST(req: NextRequest) {
       explanation: data.explanation,
       difficulty: data.difficulty,
       examCategory: examCategory,
-      subject: data.subject_id,
+      subject: data.subject,
       year: year || null,
       source: source || null,
       createdBy: data.created_by,
