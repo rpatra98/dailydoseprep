@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Form, Input, Button, Card, Typography, Alert, Grid } from 'antd';
 import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import Link from 'next/link';
+import AspectRatioLayout from '@/components/AspectRatioLayout';
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -60,139 +61,139 @@ export default function RegisterPage() {
     }
   };
 
+  // Don't render during SSR to avoid hydration issues
+  if (!isMounted) {
+    return <div className="center-content">Loading...</div>;
+  }
+
   return (
-    <div style={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      justifyContent: 'center', 
-      alignItems: 'center', 
-      background: '#f0f2f5',
-      overflow: 'visible',
-      position: 'relative'
-    }}>
-      {/* Back button */}
-      <div style={{ 
-        position: 'absolute', 
-        top: isMobile ? 16 : 24, 
-        left: isMobile ? 16 : 24,
+    <AspectRatioLayout>
+      <div className="center-content" style={{ 
+        padding: isMobile ? '16px' : '24px',
+        position: 'relative'
       }}>
-        <Link href="/">
-          <Button 
-            icon={<ArrowLeftOutlined />} 
-            type="text"
+        {/* Back button */}
+        <div style={{ 
+          position: 'absolute', 
+          top: isMobile ? 16 : 24, 
+          left: isMobile ? 16 : 24,
+        }}>
+          <Link href="/">
+            <Button 
+              icon={<ArrowLeftOutlined />} 
+              type="text"
+              size={isMobile ? "middle" : "large"}
+            >
+              Back to Home
+            </Button>
+          </Link>
+        </div>
+
+        <Card className={isMobile ? 'mobile-full-card responsive-card' : 'responsive-card'}>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <Title level={isMobile ? 3 : 2}>Create your account</Title>
+            <Text type="secondary">
+              Or <Link href="/login" style={{ color: '#1677ff' }}>sign in to your existing account</Link>
+            </Text>
+          </div>
+          
+          {error && (
+            <Alert
+              message={error}
+              type="error"
+              showIcon
+              style={{ marginBottom: 24 }}
+            />
+          )}
+          
+          {success && (
+            <Alert
+              message={success}
+              type="success"
+              showIcon
+              style={{ marginBottom: 24 }}
+            />
+          )}
+          
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSubmit}
             size={isMobile ? "middle" : "large"}
           >
-            Back to Home
-          </Button>
-        </Link>
-      </div>
-
-      <Card style={{ 
-        width: isMobile ? '100%' : 400, 
-        borderRadius: isMobile ? 0 : 8, 
-        boxShadow: isMobile ? 'none' : '0 2px 8px rgba(0,0,0,0.15)',
-        margin: isMobile ? 0 : undefined,
-        border: isMobile ? 'none' : undefined
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <Title level={isMobile ? 3 : 2}>Create your account</Title>
-          <Text type="secondary">
-            Or <Link href="/login" style={{ color: '#1677ff' }}>sign in to your existing account</Link>
-          </Text>
-        </div>
-        
-        {error && (
-          <Alert
-            message={error}
-            type="error"
-            showIcon
-            style={{ marginBottom: 24 }}
-          />
-        )}
-        
-        {success && (
-          <Alert
-            message={success}
-            type="success"
-            showIcon
-            style={{ marginBottom: 24 }}
-          />
-        )}
-        
-        <Form
-          form={form}
-          name="register"
-          onFinish={handleSubmit}
-          layout="vertical"
-          requiredMark={false}
-        >
-          <Form.Item
-            name="email"
-            rules={[
-              { required: true, message: 'Please input your email!' },
-              { type: 'email', message: 'Please enter a valid email address' }
-            ]}
-          >
-            <Input 
-              prefix={<UserOutlined />} 
-              placeholder="Email address" 
-              size="large"
-              disabled={isSubmitting}
-            />
-          </Form.Item>
-          
-          <Form.Item
-            name="password"
-            rules={[
-              { required: true, message: 'Please input your password!' },
-              { min: 6, message: 'Password must be at least 6 characters' }
-            ]}
-          >
-            <Input.Password 
-              prefix={<LockOutlined />} 
-              placeholder="Password" 
-              size="large"
-              disabled={isSubmitting}
-            />
-          </Form.Item>
-          
-          <Form.Item
-            name="confirmPassword"
-            dependencies={['password']}
-            rules={[
-              { required: true, message: 'Please confirm your password!' },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue('password') === value) {
-                    return Promise.resolve();
-                  }
-                  return Promise.reject(new Error('The two passwords do not match!'));
-                },
-              }),
-            ]}
-          >
-            <Input.Password 
-              prefix={<LockOutlined />} 
-              placeholder="Confirm Password" 
-              size="large"
-              disabled={isSubmitting}
-            />
-          </Form.Item>
-          
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              size="large"
-              block
-              loading={isSubmitting}
+            <Form.Item
+              name="email"
+              label="Email"
+              rules={[
+                { required: true, message: 'Please enter your email address' },
+                { type: 'email', message: 'Please enter a valid email address' }
+              ]}
             >
-              Sign up
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-    </div>
+              <Input 
+                prefix={<UserOutlined />} 
+                placeholder="Enter your email"
+                autoComplete="email"
+              />
+            </Form.Item>
+            
+            <Form.Item
+              name="password"
+              label="Password"
+              rules={[
+                { required: true, message: 'Please enter a password' },
+                { min: 6, message: 'Password must be at least 6 characters' }
+              ]}
+            >
+              <Input.Password 
+                prefix={<LockOutlined />} 
+                placeholder="Create a password"
+                autoComplete="new-password"
+              />
+            </Form.Item>
+            
+            <Form.Item
+              name="confirmPassword"
+              label="Confirm Password"
+              dependencies={['password']}
+              rules={[
+                { required: true, message: 'Please confirm your password' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!value || getFieldValue('password') === value) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(new Error('The two passwords do not match'));
+                  },
+                }),
+              ]}
+            >
+              <Input.Password 
+                prefix={<LockOutlined />} 
+                placeholder="Confirm your password"
+                autoComplete="new-password"
+              />
+            </Form.Item>
+            
+            <Form.Item style={{ marginBottom: 0 }}>
+              <Button 
+                type="primary" 
+                htmlType="submit" 
+                block
+                disabled={isSubmitting}
+                loading={isSubmitting}
+              >
+                {isSubmitting ? 'Creating account...' : 'Create account'}
+              </Button>
+            </Form.Item>
+          </Form>
+          
+          <div style={{ textAlign: 'center', marginTop: 24 }}>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              By creating an account, you agree to our terms of service and privacy policy.
+            </Text>
+          </div>
+        </Card>
+      </div>
+    </AspectRatioLayout>
   );
 } 

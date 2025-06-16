@@ -1,374 +1,307 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabase';
-import { User, UserRole } from '@/types';
+import { UserRole } from '@/types';
 import { 
   Layout, 
   Typography, 
   Button, 
   Card, 
-  Form, 
-  Input, 
-  Alert, 
-  Table, 
-  Tag, 
   Spin, 
+  Alert, 
+  Divider, 
   Row, 
-  Col,
-  Divider,
+  Col, 
+  Tag,
+  Form,
+  Input,
+  Table,
   message
 } from 'antd';
-import {
-  LogoutOutlined,
+import { 
+  LogoutOutlined, 
+  UserAddOutlined, 
+  BookOutlined, 
   PlusOutlined,
-  BookOutlined,
+  ReloadOutlined,
   MailOutlined,
-  LockOutlined,
-  ReloadOutlined
+  LockOutlined
 } from '@ant-design/icons';
+import Link from 'next/link';
 import SubjectSelection from '@/components/Auth/SubjectSelection';
-import SubjectManager from '@/components/Admin/SubjectManager';
+import AspectRatioLayout from '@/components/AspectRatioLayout';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 
 export default function Dashboard() {
-  const { user, logout, createQAUTHOR, authInitialized } = useAuth();
+  const { user, logout, authInitialized } = useAuth();
   const router = useRouter();
-  const [form] = Form.useForm();
   const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadAttempts, setLoadAttempts] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
-  
-  // For creating new QAUTHOR
-  const [creatingAuthor, setCreatingAuthor] = useState(false);
-  const [createError, setCreateError] = useState('');
-  const [createSuccess, setCreateSuccess] = useState('');
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [form] = Form.useForm();
 
-  // Handle authentication and data loading
+  // Redirect if not logged in
   useEffect(() => {
-    console.log('Dashboard useEffect - Auth state:', { 
-      authInitialized, 
-      userExists: !!user,
-      userRole,
-      loadAttempts
-    });
-
-    // Wait for auth to initialize before doing anything
-    if (!authInitialized) {
-      console.log('Auth not initialized yet, waiting...');
-      return;
-    }
-
-    // Redirect if not logged in
-    if (!user) {
-      console.log('User not logged in, redirecting to login page');
+    if (authInitialized && !user) {
+      console.log('No user found, redirecting to login');
       router.push('/login');
-      return;
     }
+  }, [user, router, authInitialized]);
 
-    // If we have a user but no role yet, fetch user data
-    if (user && !userRole) {
-      fetchUserData();
-    } else {
-      // If we have both user and role, we're done loading
-      setIsLoading(false);
-    }
+  // Fetch user role and additional data
+  useEffect(() => {
+    if (!user || !authInitialized) return;
 
-    // Set a timeout to prevent infinite loading
-    const loadingTimeout = setTimeout(() => {
-      if (isLoading && !userRole) {
-        console.warn('Loading user data timed out, showing fallback UI');
-        setIsLoading(false);
-        setLoadError('Failed to load user data. Please try refreshing the page.');
-      }
-    }, 10000); // 10 second timeout
-
-    return () => clearTimeout(loadingTimeout);
-  }, [user, authInitialized, userRole, router]);
-
-  // Function to fetch user role and data
-  const fetchUserData = async () => {
-    try {
-      console.log('Fetching user data for dashboard');
-      setIsLoading(true);
-      setLoadError(null);
-      
-      // Get user ID safely
-      const userId = user?.id;
-      if (!userId) {
-        console.error('No user ID available for fetching data');
-        setLoadError('User ID not available');
-        setIsLoading(false);
-        return;
-      }
-      
-      // 1. Get user role
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', userId)
-        .single();
-
-      if (userError) {
-        console.error('Error fetching user role:', userError);
-        setLoadError(`Error fetching user role: ${userError.message}`);
-        setIsLoading(false);
-        return;
-      }
-      
-      if (userData?.role) {
-        console.log('User role fetched:', userData.role);
-        setUserRole(userData.role as UserRole);
+    const fetchUserData = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError(null);
         
-        // 2. If SUPERADMIN, fetch all users
-        if (userData.role === 'SUPERADMIN') {
-          console.log('Fetching all users for SUPERADMIN');
+        console.log('Fetching user data for:', user.id);
+        
+        // Get user role
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (userError) {
+          console.error('Error fetching user role:', userError);
+          throw new Error(`Failed to load user data: ${userError.message}`);
+        }
+        
+        if (!userData) {
+          throw new Error('User not found in database');
+        }
+        
+        const role = userData.role as UserRole;
+        setUserRole(role);
+        console.log('User role:', role);
+        
+        // If SUPERADMIN, fetch all users
+        if (role === 'SUPERADMIN') {
           const { data: usersData, error: usersError } = await supabase
             .from('users')
-            .select('*')
+            .select('id, email, role, created_at')
             .order('created_at', { ascending: false });
             
           if (usersError) {
             console.error('Error fetching users:', usersError);
-            message.error('Failed to load users list');
-          } else if (usersData) {
-            setUsers(usersData);
-            console.log(`Fetched ${usersData.length} users`);
+          } else {
+            setAllUsers(usersData || []);
           }
         }
-      } else {
-        console.warn('User record found but role is missing');
-        setLoadError('Your user account is missing role information');
+        
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setLoadError(error instanceof Error ? error.message : 'Failed to load user data');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error in fetchUserData:', error);
-      setLoadError('An unexpected error occurred while loading user data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
 
-  const refreshUsers = async () => {
-    if (userRole !== 'SUPERADMIN') return;
-    
-    try {
-      console.log('Refreshing users list');
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error refreshing users:', error);
-        message.error('Failed to refresh users list');
-        return;
-      }
-      
-      if (data) {
-        setUsers(data);
-        console.log(`Refreshed ${data.length} users`);
-        message.success('Users list refreshed');
-      }
-    } catch (error) {
-      console.error('Error in refreshUsers:', error);
-      message.error('Failed to refresh users list');
-    }
-  };
-
-  const handleCreateQAUTHOR = async (values: { email: string; password: string }) => {
-    const { email, password } = values;
-    setCreateError('');
-    setCreateSuccess('');
-    
-    if (!email || !password) {
-      setCreateError('Email and password are required');
-      return;
-    }
-
-    try {
-      setCreatingAuthor(true);
-      
-      // Create the QAUTHOR account
-      await createQAUTHOR(email, password);
-      
-      setCreateSuccess(`QAUTHOR account created for ${email}`);
-      form.resetFields();
-      
-      // Refresh user list
-      refreshUsers();
-    } catch (error) {
-      console.error('Error creating QAUTHOR:', error);
-      setCreateError(error instanceof Error ? error.message : 'Failed to create QAUTHOR');
-    } finally {
-      setCreatingAuthor(false);
-    }
-  };
+    fetchUserData();
+  }, [user, authInitialized]);
 
   const handleSignOut = async () => {
     try {
-      console.log('Attempting to sign out');
       await logout();
-      // No need to manually redirect, AuthContext will handle it
+      router.push('/');
     } catch (error) {
       console.error('Error signing out:', error);
-      // Even if there's an error, try to redirect to login page
-      router.push('/login');
     }
   };
-
+  
   const handleRetry = () => {
-    console.log('Retrying data fetch');
-    fetchUserData();
+    window.location.reload();
+  };
+
+  const handleCreateQAUTHOR = async (values: { email: string; password: string }) => {
+    try {
+      setCreateLoading(true);
+      
+      // Register new user as QAUTHOR
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+      });
+      
+      if (authError) {
+        message.error(`Failed to create account: ${authError.message}`);
+        return;
+      }
+      
+      if (authData.user) {
+        // Insert user with QAUTHOR role
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert([
+            {
+              id: authData.user.id,
+              email: values.email,
+              role: 'QAUTHOR'
+            }
+          ]);
+        
+        if (insertError) {
+          message.error(`Failed to set user role: ${insertError.message}`);
+          return;
+        }
+        
+        message.success('QAUTHOR account created successfully!');
+        form.resetFields();
+        
+        // Refresh users list
+        const { data: usersData } = await supabase
+          .from('users')
+          .select('id, email, role, created_at')
+          .order('created_at', { ascending: false });
+        
+        if (usersData) {
+          setAllUsers(usersData);
+        }
+      }
+    } catch (error) {
+      console.error('Error creating QAUTHOR:', error);
+      message.error('Failed to create QAUTHOR account');
+    } finally {
+      setCreateLoading(false);
+    }
   };
 
   // If auth is still initializing or we're loading data, show loading spinner
   if (!authInitialized || isLoading) {
     return (
-      <div style={{ 
-        height: '100%', 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        background: '#f0f2f5' 
-      }}>
-        <Spin size="large" tip={authInitialized ? "Loading user data..." : "Initializing..."} />
-      </div>
+      <AspectRatioLayout>
+        <div className="center-content">
+          <Spin size="large" tip={authInitialized ? "Loading user data..." : "Initializing..."} />
+        </div>
+      </AspectRatioLayout>
     );
   }
 
   // If not logged in, don't render anything (will redirect in useEffect)
   if (!user) {
-    return <div style={{ height: '100%', background: '#f0f2f5' }}></div>;
+    return (
+      <AspectRatioLayout>
+        <div className="full-height" style={{ background: '#f0f2f5' }}></div>
+      </AspectRatioLayout>
+    );
   }
 
   // If we have a user but encountered an error or couldn't load role
   if (loadError) {
     return (
-      <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Title level={3} style={{ margin: 0 }}>Dashboard</Title>
-          <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
-            Sign Out
-          </Button>
-        </Header>
-        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Card style={{ textAlign: 'center', maxWidth: 500 }}>
-            <Alert
-              message="Error Loading Dashboard"
-              description={loadError || "Failed to load your user data. Please try again."}
-              type="error"
-              showIcon
-              style={{ marginBottom: 24 }}
-            />
-            <Paragraph>
-              Welcome, {user.email}. We encountered an issue while loading your dashboard.
-            </Paragraph>
-            <Button 
-              type="primary" 
-              icon={<ReloadOutlined />} 
-              onClick={handleRetry}
-              style={{ marginTop: 16 }}
-            >
-              Retry
+      <AspectRatioLayout>
+        <Layout className="full-height">
+          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0 }}>Dashboard</Title>
+            <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
+              Sign Out
             </Button>
-          </Card>
-        </Content>
-      </Layout>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Card style={{ textAlign: 'center', maxWidth: 500 }}>
+              <Alert
+                message="Error Loading Dashboard"
+                description={loadError || "Failed to load your user data. Please try again."}
+                type="error"
+                showIcon
+                style={{ marginBottom: 24 }}
+              />
+              <Paragraph>
+                Welcome, {user.email}. We encountered an issue while loading your dashboard.
+              </Paragraph>
+              <Button 
+                type="primary" 
+                icon={<ReloadOutlined />} 
+                onClick={handleRetry}
+                style={{ marginTop: 16 }}
+              >
+                Retry
+              </Button>
+            </Card>
+          </Content>
+        </Layout>
+      </AspectRatioLayout>
     );
   }
 
-  // If we have a user but no role yet, show basic loading state (this should rarely happen with the improvements)
-  if (!userRole) {
+  // QAUTHOR Dashboard
+  if (userRole === 'QAUTHOR') {
     return (
-      <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Title level={3} style={{ margin: 0 }}>Dashboard</Title>
-          <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
-            Sign Out
-          </Button>
-        </Header>
-        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Card style={{ textAlign: 'center' }}>
-            <Spin tip="Loading user data..." />
-            <Paragraph style={{ marginTop: 16 }}>Welcome, {user.email}</Paragraph>
-            <Button 
-              type="link" 
-              icon={<ReloadOutlined />} 
-              onClick={handleRetry}
-              style={{ marginTop: 16 }}
-            >
-              Retry Loading
+      <AspectRatioLayout>
+        <Layout className="full-height">
+          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0 }}>QAUTHOR Dashboard</Title>
+            <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
+              Sign Out
             </Button>
-          </Card>
-        </Content>
-      </Layout>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+            <Card>
+              <Title level={2}>Welcome, Question Author!</Title>
+              <Paragraph>
+                As a Question Author, you can create questions for students. Your questions will be reviewed and made available to students in their daily question practice.
+              </Paragraph>
+              <Divider />
+              <Button 
+                type="primary" 
+                icon={<PlusOutlined />}
+                size="large"
+                onClick={() => router.push('/create-question')}
+              >
+                Create New Question
+              </Button>
+            </Card>
+          </Content>
+        </Layout>
+      </AspectRatioLayout>
     );
   }
 
-  // User role-specific dashboard
-  if (userRole !== 'SUPERADMIN') {
+  // STUDENT Dashboard
+  if (userRole === 'STUDENT') {
     return (
-      <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Title level={3} style={{ margin: 0 }}>{userRole === 'QAUTHOR' ? 'QAUTHOR Dashboard' : 'Student Dashboard'}</Title>
-          <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
-            Sign Out
-          </Button>
-        </Header>
-        <Content style={{ padding: '24px', flex: 1 }}>
-          <Card>
-            <Title level={4}>Welcome, {user.email}</Title>
-            
-            {/* QAUTHOR Dashboard Content */}
-            {userRole === 'QAUTHOR' && (
-              <>
-                <Text>
-                  As a QAUTHOR, you can create questions for students to practice with.
-                  Each question you create will be added to the subject database and made available to students.
-                </Text>
-                <div style={{ marginTop: 24 }}>
-                  <Button 
-                    type="primary" 
-                    icon={<PlusOutlined />} 
-                    size="large"
-                    onClick={() => router.push('/create-question')}
-                  >
-                    Create New Question
-                  </Button>
-                </div>
-              </>
-            )}
-            
-            {/* STUDENT Dashboard Content */}
-            {userRole === 'STUDENT' && (
-              <>
-                <Text>
-                  As a student, you'll receive 10 new questions daily at 6am from your primary subject.
-                  Select your primary subject to start practicing.
-                </Text>
-                <div style={{ marginTop: 24 }}>
-                  {user && <SubjectSelection userId={user.id} />}
-                </div>
-                <Divider />
-                <Button 
-                  type="primary" 
-                  icon={<BookOutlined />}
-                  size="large"
-                  onClick={() => router.push('/daily-questions')}
-                >
-                  View Today's Questions
-                </Button>
-              </>
-            )}
-          </Card>
-        </Content>
-      </Layout>
+      <AspectRatioLayout>
+        <Layout className="full-height">
+          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0 }}>Student Dashboard</Title>
+            <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
+              Sign Out
+            </Button>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+            <Card>
+              <Title level={2}>Welcome to Daily Dose Prep!</Title>
+              <Text>
+                As a student, you'll receive 10 new questions daily at 6am from your primary subject.
+                Select your primary subject to start practicing.
+              </Text>
+              <div style={{ marginTop: 24 }}>
+                {user && <SubjectSelection userId={user.id} />}
+              </div>
+              <Divider />
+              <Button 
+                type="primary" 
+                icon={<BookOutlined />}
+                size="large"
+                onClick={() => router.push('/daily-questions')}
+              >
+                View Today's Questions
+              </Button>
+            </Card>
+          </Content>
+        </Layout>
+      </AspectRatioLayout>
     );
   }
 
@@ -400,136 +333,89 @@ export default function Dashboard() {
   ];
 
   return (
-    <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Title level={3} style={{ margin: 0 }}>SUPERADMIN Dashboard</Title>
-        <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
-          Sign Out
-        </Button>
-      </Header>
-      <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} lg={16}>
-            <Card title="User Management">
-              <Title level={4}>Create QAUTHOR Account</Title>
-              <Form
-                form={form}
-                layout="vertical"
-                onFinish={handleCreateQAUTHOR}
-              >
-                <Form.Item
-                  name="email"
-                  label="Email"
-                  rules={[
-                    { required: true, message: 'Please enter an email address' },
-                    { type: 'email', message: 'Please enter a valid email address' }
-                  ]}
+    <AspectRatioLayout>
+      <Layout className="full-height">
+        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Title level={3} style={{ margin: 0 }}>SUPERADMIN Dashboard</Title>
+          <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleSignOut}>
+            Sign Out
+          </Button>
+        </Header>
+        <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={16}>
+              <Card title="User Management">
+                <Title level={4}>Create QAUTHOR Account</Title>
+                <Form
+                  form={form}
+                  layout="vertical"
+                  onFinish={handleCreateQAUTHOR}
                 >
-                  <Input prefix={<MailOutlined />} placeholder="Enter email address" />
-                </Form.Item>
-                
-                <Form.Item
-                  name="password"
-                  label="Password"
-                  rules={[
-                    { required: true, message: 'Please enter a password' },
-                    { min: 6, message: 'Password must be at least 6 characters' }
-                  ]}
-                >
-                  <Input.Password prefix={<LockOutlined />} placeholder="Enter password" />
-                </Form.Item>
-                
-                <Form.Item>
-                  <Button 
-                    type="primary" 
-                    htmlType="submit" 
-                    loading={creatingAuthor}
-                    icon={<PlusOutlined />}
+                  <Form.Item
+                    name="email"
+                    label="Email"
+                    rules={[
+                      { required: true, message: 'Please enter an email address' },
+                      { type: 'email', message: 'Please enter a valid email address' }
+                    ]}
                   >
-                    Create QAUTHOR
-                  </Button>
-                </Form.Item>
-              </Form>
-              
-              {createError && (
-                <Alert
-                  message="Error"
-                  description={createError}
-                  type="error"
-                  showIcon
-                  style={{ marginBottom: 16 }}
-                />
-              )}
-              
-              {createSuccess && (
-                <Alert
-                  message="Success"
-                  description={createSuccess}
-                  type="success"
-                  showIcon
-                  style={{ marginBottom: 16 }}
-                />
-              )}
-              
-              <Divider />
-              
-              <Title level={4}>User Accounts</Title>
-              <Table
-                dataSource={users}
-                rowKey="id"
-                pagination={{ pageSize: 10 }}
-                columns={[
-                  {
-                    title: 'Email',
-                    dataIndex: 'email',
-                    key: 'email',
-                  },
-                  {
-                    title: 'Role',
-                    dataIndex: 'role',
-                    key: 'role',
-                    render: (role) => (
-                      <Tag color={
-                        role === 'SUPERADMIN' ? 'red' :
-                        role === 'QAUTHOR' ? 'blue' :
-                        'green'
-                      }>
-                        {role}
-                      </Tag>
-                    )
-                  },
-                  {
-                    title: 'Created At',
-                    dataIndex: 'created_at',
-                    key: 'created_at',
-                    render: (date) => new Date(date).toLocaleString()
-                  }
-                ]}
-              />
-            </Card>
-          </Col>
+                    <Input prefix={<MailOutlined />} placeholder="Enter email address" />
+                  </Form.Item>
+                  
+                  <Form.Item
+                    name="password"
+                    label="Password"
+                    rules={[
+                      { required: true, message: 'Please enter a password' },
+                      { min: 6, message: 'Password must be at least 6 characters' }
+                    ]}
+                  >
+                    <Input.Password prefix={<LockOutlined />} placeholder="Enter password" />
+                  </Form.Item>
+                  
+                  <Form.Item>
+                    <Button 
+                      type="primary" 
+                      htmlType="submit" 
+                      icon={<UserAddOutlined />}
+                      loading={createLoading}
+                    >
+                      Create QAUTHOR
+                    </Button>
+                  </Form.Item>
+                </Form>
+              </Card>
+            </Col>
+            
+            <Col xs={24} lg={8}>
+              <Card title="Quick Actions">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <Link href="/create-question">
+                    <Button type="primary" icon={<PlusOutlined />} block>
+                      Create Question
+                    </Button>
+                  </Link>
+                  <Link href="/daily-questions">
+                    <Button icon={<BookOutlined />} block>
+                      View Questions
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+            </Col>
+          </Row>
           
-          <Col xs={24} lg={8}>
-            <Card title="System Statistics">
-              <Paragraph>
-                <Text strong>Total Users:</Text> {users.length}
-              </Paragraph>
-              <Paragraph>
-                <Text strong>QAUTHORs:</Text> {users.filter(u => u.role === 'QAUTHOR').length}
-              </Paragraph>
-              <Paragraph>
-                <Text strong>Students:</Text> {users.filter(u => u.role === 'STUDENT').length}
-              </Paragraph>
-            </Card>
-          </Col>
-          
-          <Col xs={24}>
-            <Card title="Subject Management">
-              <SubjectManager />
-            </Card>
-          </Col>
-        </Row>
-      </Content>
-    </Layout>
+          <Card title="All Users" style={{ marginTop: 16 }}>
+            <Table 
+              dataSource={allUsers} 
+              columns={columns} 
+              rowKey="id"
+              pagination={{ pageSize: 10 }}
+              scroll={{ x: 'max-content' }}
+            />
+          </Card>
+        </Content>
+      </Layout>
+    </AspectRatioLayout>
   );
 } 

@@ -10,9 +10,12 @@ interface AspectRatioLayoutProps {
 const { useBreakpoint } = Grid;
 
 /**
- * A component that wraps content in a 7:5 aspect ratio container
- * with optimized layout to prevent unnecessary scrolling and
- * be fully responsive across devices.
+ * A component that wraps content in a 7:5 aspect ratio container for desktop
+ * and provides full responsive layout for mobile/tablet devices.
+ * 
+ * Desktop (1024px+): 7:5 aspect ratio with rounded corners and shadow
+ * Tablet (768-1023px): Slightly padded full screen
+ * Mobile (<767px): Full screen without padding
  */
 const AspectRatioLayout: React.FC<AspectRatioLayoutProps> = ({ children }) => {
   const [isMounted, setIsMounted] = useState(false);
@@ -22,28 +25,20 @@ const AspectRatioLayout: React.FC<AspectRatioLayoutProps> = ({ children }) => {
     setIsMounted(true);
   }, []);
   
-  const isMobile = isMounted ? screens.xs : false;
-  
-  // Using inline styles for mobile to override the className styles when needed
-  const containerStyle = isMobile ? {
-    padding: 0,
-    height: '100vh',
-    width: '100vw'
-  } : undefined;
-  
-  const contentStyle = isMobile ? {
-    maxWidth: '100%',
-    width: '100%',
-    height: '100%',
-    maxHeight: 'none',
-    aspectRatio: 'unset',
-    borderRadius: 0,
-    boxShadow: 'none'
-  } : undefined;
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!isMounted) {
+    return (
+      <div className="aspect-ratio-container">
+        <div className="aspect-ratio-content">
+          {children}
+        </div>
+      </div>
+    );
+  }
   
   return (
-    <div className="aspect-ratio-container" style={containerStyle}>
-      <div className="aspect-ratio-content" style={contentStyle}>
+    <div className="aspect-ratio-container">
+      <div className="aspect-ratio-content">
         {children}
       </div>
     </div>

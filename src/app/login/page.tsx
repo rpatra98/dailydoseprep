@@ -3,35 +3,30 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Form, Input, Button, Card, Typography, Alert, Spin } from 'antd';
+import { Form, Input, Button, Card, Typography, Alert, Spin, Grid } from 'antd';
 import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import Link from 'next/link';
+import AspectRatioLayout from '@/components/AspectRatioLayout';
 
 const { Title } = Typography;
+const { useBreakpoint } = Grid;
 
 export default function LoginPage() {
   const [form] = Form.useForm();
   const [localError, setLocalError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [connectionIssue, setConnectionIssue] = useState(false);
   const { user, login, loading, error, authInitialized } = useAuth();
   const router = useRouter();
+  const screens = useBreakpoint();
   
-  // Check if we're on mobile
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => {
-      window.removeEventListener('resize', checkMobile);
-    };
+    setIsMounted(true);
   }, []);
+  
+  const isMobile = isMounted ? screens.xs : false;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -57,179 +52,160 @@ export default function LoginPage() {
   const handleSubmit = async (values: { email: string; password: string }) => {
     const { email, password } = values;
     setLocalError('');
-    setLoginAttempts(prev => prev + 1);
     setConnectionIssue(false);
+    setIsSubmitting(true);
+    setLoginAttempts(prev => prev + 1);
     
-    if (!email || !password) {
-      setLocalError('Email and password are required');
-      return;
-    }
-
     try {
-      setIsSubmitting(true);
-      console.log(`Login attempt ${loginAttempts + 1} for ${email}`);
+      console.log('Attempting login for:', email);
+      await login(email, password);
+      console.log('Login successful, should redirect');
+    } catch (err) {
+      console.error('Login failed:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Login failed';
+      setLocalError(errorMessage);
       
-      const result = await login(email, password);
-      
-      // If we get here, login was successful
-      console.log("Login successful, result:", result ? "Data returned" : "No data");
-      
-      // Force redirect to dashboard
-      router.push('/dashboard');
-    } catch (error) {
-      console.error("Login error in page component:", error);
-      
-      if (error instanceof Error) {
-        if (error.message.includes('Email not confirmed')) {
-          setLocalError('Account email not confirmed. If you are a QAUTHOR, please contact the SUPERADMIN.');
-        } else if (error.message.includes('Authentication client not initialized')) {
-          setLocalError('Authentication service is initializing. Please try again in a moment.');
-        } else if (error.message.includes('Invalid login credentials')) {
-          setLocalError('Invalid email or password. Please check your credentials and try again.');
-        } else if (error.message.includes('timeout') || error.message.includes('fetch')) {
-          setLocalError('Connection timeout. The server is not responding. Please check your internet connection and try again.');
-          setConnectionIssue(true);
-        } else {
-          setLocalError(`Login failed: ${error.message}`);
-        }
-      } else {
-        setLocalError('An unexpected error occurred. Please try again.');
-      }
-      
-      // If multiple login attempts fail, suggest refreshing the page
-      if (loginAttempts >= 2) {
-        setLocalError(prev => `${prev} You may need to refresh the page if the problem persists.`);
+      if (errorMessage.includes('timeout') || errorMessage.includes('network')) {
+        setConnectionIssue(true);
       }
     } finally {
       setIsSubmitting(false);
     }
   };
+  
+  // Don't render during SSR to avoid hydration issues
+  if (!isMounted) {
+    return <div className="center-content"><Spin size="large" /></div>;
+  }
 
-  // Handle manual page refresh
-  const handleRefresh = () => {
-    window.location.reload();
-  };
-
-  // Show any contextual errors from the auth provider
-  const displayError = localError || error;
-
-  // If auth is still initializing, show loading
-  if (!authInitialized && loading) {
+  // Show loading if authentication is initializing
+  if (!authInitialized) {
     return (
-      <div className="auth-page-container">
-        <Spin size="large" />
-        <p style={{ marginTop: 16 }}>Initializing authentication...</p>
-      </div>
+      <AspectRatioLayout>
+        <div className="center-content">
+          <Spin size="large" tip="Initializing authentication..." />
+        </div>
+      </AspectRatioLayout>
     );
   }
 
+  // Show spinner if we're currently loading/submitting
+  if (loading || isSubmitting) {
+    return (
+      <AspectRatioLayout>
+        <div className="center-content">
+          <Spin size="large" tip={isSubmitting ? "Signing you in..." : "Loading..."} />
+        </div>
+      </AspectRatioLayout>
+    );
+  }
+
+  // Display error from useAuth or local error
+  const displayError = error || localError;
+
   return (
-    <div className="auth-page-container">
-      {/* Back button */}
-      <div style={{ 
-        position: 'absolute', 
-        top: isMobile ? 16 : 24, 
-        left: isMobile ? 16 : 24,
+    <AspectRatioLayout>
+      <div className="center-content" style={{ 
+        padding: isMobile ? '16px' : '24px',
+        position: 'relative'
       }}>
-        <Link href="/">
-          <Button 
-            icon={<ArrowLeftOutlined />} 
-            type="text"
+        {/* Back button */}
+        <div style={{ 
+          position: 'absolute', 
+          top: isMobile ? 16 : 24, 
+          left: isMobile ? 16 : 24,
+        }}>
+          <Link href="/">
+            <Button 
+              icon={<ArrowLeftOutlined />} 
+              type="text"
+              size={isMobile ? "middle" : "large"}
+            >
+              Back to Home
+            </Button>
+          </Link>
+        </div>
+
+        <Card className={isMobile ? 'mobile-full-card responsive-card' : 'responsive-card'}>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <Title level={isMobile ? 3 : 2}>Sign in to your account</Title>
+          </div>
+          
+          {displayError && (
+            <Alert
+              message={displayError}
+              type="error"
+              showIcon
+              style={{ marginBottom: 24 }}
+            />
+          )}
+          
+          {connectionIssue && (
+            <Alert
+              message="Database Connection Issue"
+              description="We're having trouble connecting to our database. This could be due to server maintenance or network issues."
+              type="warning"
+              showIcon
+              style={{ marginBottom: 24 }}
+            />
+          )}
+          
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSubmit}
             size={isMobile ? "middle" : "large"}
           >
-            Back to Home
-          </Button>
-        </Link>
-      </div>
-
-      <Card style={{ 
-        width: isMobile ? '100%' : 400, 
-        borderRadius: 8, 
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        marginTop: '60px'
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <Title level={isMobile ? 3 : 2}>Sign in to your account</Title>
-        </div>
-        
-        {displayError && (
-          <Alert
-            message={displayError}
-            type="error"
-            showIcon
-            style={{ marginBottom: 24 }}
-          />
-        )}
-        
-        {connectionIssue && (
-          <Alert
-            message="Database Connection Issue"
-            description="We're having trouble connecting to our database. This could be due to server maintenance or network issues."
-            type="warning"
-            showIcon
-            style={{ marginBottom: 24 }}
-          />
-        )}
-        
-        <Form
-          form={form}
-          name="login"
-          onFinish={handleSubmit}
-          layout="vertical"
-          requiredMark={false}
-          initialValues={{ email: 'superadmin@ddp.com' }}
-        >
-          <Form.Item
-            name="email"
-            rules={[
-              { required: true, message: 'Please input your email!' },
-              { type: 'email', message: 'Please enter a valid email address' }
-            ]}
-          >
-            <Input 
-              prefix={<UserOutlined />} 
-              placeholder="Email address" 
-              size="large"
-              disabled={loading || isSubmitting}
-            />
-          </Form.Item>
-          
-          <Form.Item
-            name="password"
-            rules={[{ required: true, message: 'Please input your password!' }]}
-          >
-            <Input.Password 
-              prefix={<LockOutlined />} 
-              placeholder="Password" 
-              size="large"
-              disabled={loading || isSubmitting}
-            />
-          </Form.Item>
-          
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              size="large"
-              block
-              loading={loading || isSubmitting}
+            <Form.Item
+              name="email"
+              label="Email"
+              rules={[
+                { required: true, message: 'Please enter your email address' },
+                { type: 'email', message: 'Please enter a valid email address' }
+              ]}
             >
-              Sign in
-            </Button>
-          </Form.Item>
-          
-          {(loginAttempts > 0 || connectionIssue) && (
-            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <Input 
+                prefix={<UserOutlined />} 
+                placeholder="Enter your email"
+                autoComplete="email"
+              />
+            </Form.Item>
+            
+            <Form.Item
+              name="password"
+              label="Password"
+              rules={[
+                { required: true, message: 'Please enter your password' }
+              ]}
+            >
+              <Input.Password 
+                prefix={<LockOutlined />} 
+                placeholder="Enter your password"
+                autoComplete="current-password"
+              />
+            </Form.Item>
+            
+            <Form.Item style={{ marginBottom: 0 }}>
               <Button 
-                type="link" 
-                onClick={handleRefresh}
+                type="primary" 
+                htmlType="submit" 
+                block
+                disabled={isSubmitting}
+                loading={isSubmitting}
               >
-                Refresh page
+                {isSubmitting ? 'Signing in...' : 'Sign in'}
               </Button>
-            </div>
-          )}
-        </Form>
-      </Card>
-    </div>
+            </Form.Item>
+          </Form>
+          
+          <div style={{ textAlign: 'center', marginTop: 24 }}>
+            <span>Don't have an account? </span>
+            <Link href="/register" style={{ color: '#1677ff' }}>
+              Create one here
+            </Link>
+          </div>
+        </Card>
+      </div>
+    </AspectRatioLayout>
   );
 } 

@@ -19,6 +19,7 @@ import {
   Divider
 } from 'antd';
 import { ArrowLeftOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import AspectRatioLayout from '@/components/AspectRatioLayout';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -148,169 +149,185 @@ export default function DailyQuestions() {
   
   // If not logged in, don't render anything
   if (!user) {
-    return <div style={{ height: '100%', background: '#f0f2f5' }}></div>;
+    return (
+      <AspectRatioLayout>
+        <div className="full-height" style={{ background: '#f0f2f5' }}></div>
+      </AspectRatioLayout>
+    );
   }
   
   // If loading, show loading indicator
   if (loading) {
     return (
-      <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
-          <Title level={3} style={{ margin: 0 }}>Daily Questions</Title>
-        </Header>
-        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Card style={{ textAlign: 'center' }}>
-            <Spin tip="Loading your daily questions..." />
-          </Card>
-        </Content>
-      </Layout>
+      <AspectRatioLayout>
+        <Layout className="full-height">
+          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0 }}>Daily Questions</Title>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Card style={{ textAlign: 'center' }}>
+              <Spin tip="Loading your daily questions..." />
+            </Card>
+          </Content>
+        </Layout>
+      </AspectRatioLayout>
     );
   }
   
   // If no set is available or there's a special message
   if (!currentSet || !currentSet.questions || currentSet.questions.length === 0) {
     return (
-      <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
-          <Button 
-            type="text" 
-            icon={<ArrowLeftOutlined />} 
-            onClick={handleBackToDashboard}
-            style={{ marginRight: 16 }}
-          >
-            Back
-          </Button>
-          <Title level={3} style={{ margin: 0 }}>Daily Questions</Title>
-        </Header>
-        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Card>
-            <Result
-              status="info"
-              title={currentSet?.message || "No questions available"}
-              subTitle={
-                currentSet?.message 
-                  ? "You've completed all available questions for your primary subject!"
-                  : "Please select a primary subject in your dashboard to receive daily questions."
-              }
-              extra={
-                <Button type="primary" onClick={handleBackToDashboard}>
-                  Back to Dashboard
-                </Button>
-              }
-            />
-          </Card>
-        </Content>
-      </Layout>
+      <AspectRatioLayout>
+        <Layout className="full-height">
+          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
+            <Button 
+              type="text" 
+              icon={<ArrowLeftOutlined />} 
+              onClick={handleBackToDashboard}
+              style={{ marginRight: 16 }}
+            >
+              Back
+            </Button>
+            <Title level={3} style={{ margin: 0 }}>Daily Questions</Title>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Card>
+              <Result
+                status="info"
+                title={currentSet?.message || "No questions available"}
+                subTitle={
+                  currentSet?.message 
+                    ? "You've completed all available questions for your primary subject!"
+                    : "Please select a primary subject in your dashboard to receive daily questions."
+                }
+                extra={
+                  <Button type="primary" onClick={handleBackToDashboard}>
+                    Back to Dashboard
+                  </Button>
+                }
+              />
+            </Card>
+          </Content>
+        </Layout>
+      </AspectRatioLayout>
     );
   }
   
   // If set is already completed
   if (currentSet.completed) {
     return (
-      <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
-          <Button 
-            type="text" 
-            icon={<ArrowLeftOutlined />} 
-            onClick={handleBackToDashboard}
-            style={{ marginRight: 16 }}
-          >
-            Back
-          </Button>
-          <Title level={3} style={{ margin: 0 }}>Daily Questions</Title>
-        </Header>
-        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Card>
-            <Result
-              icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
-              title="Today's Questions Completed!"
-              subTitle={`For ${currentSet.date}, you got ${currentSet.score} questions correct out of ${currentSet.questions.length}.`}
-              extra={
-                <div style={{ textAlign: 'center' }}>
-                  <Progress 
-                    type="circle" 
-                    percent={Math.round((currentSet.score || 0) / currentSet.questions.length * 100)} 
-                    style={{ marginBottom: 16 }}
-                  />
-                  <br />
-                  <Button type="primary" onClick={handleBackToDashboard}>
+      <AspectRatioLayout>
+        <Layout className="full-height">
+          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
+            <Button 
+              type="text" 
+              icon={<ArrowLeftOutlined />} 
+              onClick={handleBackToDashboard}
+              style={{ marginRight: 16 }}
+            >
+              Back
+            </Button>
+            <Title level={3} style={{ margin: 0 }}>Daily Questions</Title>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Card style={{ textAlign: 'center', maxWidth: 600 }}>
+              <Result
+                status="success"
+                title="Questions Completed!"
+                subTitle={`You scored ${currentSet.score || 0} out of ${currentSet.questions.length} questions.`}
+                extra={[
+                  <Button type="primary" key="dashboard" onClick={handleBackToDashboard}>
                     Back to Dashboard
-                  </Button>
-                </div>
-              }
-            />
-          </Card>
-        </Content>
-      </Layout>
+                  </Button>,
+                ]}
+              />
+              <Divider />
+              <Progress 
+                type="circle" 
+                percent={Math.round(((currentSet.score || 0) / currentSet.questions.length) * 100)}
+                format={() => `${currentSet.score || 0}/${currentSet.questions.length}`}
+              />
+            </Card>
+          </Content>
+        </Layout>
+      </AspectRatioLayout>
     );
   }
   
   // Show active questions
   return (
-    <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
-        <Button 
-          type="text" 
-          icon={<ArrowLeftOutlined />} 
-          onClick={handleBackToDashboard}
-          style={{ marginRight: 16 }}
-        >
-          Back
-        </Button>
-        <Title level={3} style={{ margin: 0 }}>Daily Questions - {currentSet.date}</Title>
-      </Header>
-      <Content style={{ padding: '24px', flex: 1 }}>
-        {error && (
-          <Alert
-            message="Error"
-            description={error}
-            type="error"
-            showIcon
-            style={{ marginBottom: 16 }}
-            closable
-            onClose={() => setError(null)}
-          />
-        )}
-        
-        <Title level={4}>Your Daily Set of {currentSet.questions.length} Questions</Title>
-        <Paragraph>
-          Answer all questions by selecting one option for each. Your score will be shown after submission.
-        </Paragraph>
-        
-        {currentSet.questions.map((question, index) => (
-          <Card 
-            key={question.id} 
-            title={`Question ${index + 1}: ${question.title}`}
-            style={{ marginBottom: 16 }}
-          >
-            <Paragraph>{question.content}</Paragraph>
-            <Radio.Group 
-              onChange={e => handleAnswerChange(question.id, e.target.value)}
-              value={selectedAnswers[question.id]}
-              style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+    <AspectRatioLayout>
+      <Layout className="full-height">
+        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Button 
+              type="text" 
+              icon={<ArrowLeftOutlined />} 
+              onClick={handleBackToDashboard}
+              style={{ marginRight: 16 }}
             >
-              {question.options.map(option => (
-                <Radio key={option.key} value={option.key}>
-                  {option.key}: {option.value}
-                </Radio>
+              Back
+            </Button>
+            <Title level={3} style={{ margin: 0 }}>Daily Questions</Title>
+          </div>
+          <Text type="secondary">
+            {Object.keys(selectedAnswers).length} / {currentSet.questions.length} answered
+          </Text>
+        </Header>
+        <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+          <div style={{ maxWidth: 800, margin: '0 auto' }}>
+            {error && (
+              <Alert
+                message={error}
+                type="error"
+                showIcon
+                style={{ marginBottom: 24 }}
+                closable
+                onClose={() => setError(null)}
+              />
+            )}
+            
+            <Space direction="vertical" size="large" style={{ width: '100%' }}>
+              {currentSet.questions.map((question, index) => (
+                <Card 
+                  key={question.id}
+                  title={`Question ${index + 1}`}
+                  style={{ width: '100%' }}
+                >
+                  <Title level={4}>{question.title}</Title>
+                  <Paragraph>{question.content}</Paragraph>
+                  
+                  <Radio.Group
+                    value={selectedAnswers[question.id]}
+                    onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                    style={{ width: '100%' }}
+                  >
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      {question.options.map((option) => (
+                        <Radio key={option.key} value={option.key} style={{ width: '100%' }}>
+                          {option.value}
+                        </Radio>
+                      ))}
+                    </Space>
+                  </Radio.Group>
+                </Card>
               ))}
-            </Radio.Group>
-          </Card>
-        ))}
-        
-        <Space style={{ marginTop: 24 }}>
-          <Button 
-            type="primary" 
-            size="large"
-            onClick={handleSubmitAnswers}
-            loading={submitting}
-            disabled={submitting}
-          >
-            Submit All Answers
-          </Button>
-          <Button onClick={handleBackToDashboard}>Cancel</Button>
-        </Space>
-      </Content>
-    </Layout>
+            </Space>
+            
+            <div style={{ textAlign: 'center', marginTop: 32 }}>
+              <Button
+                type="primary"
+                size="large"
+                loading={submitting}
+                onClick={handleSubmitAnswers}
+                icon={<CheckCircleOutlined />}
+              >
+                {submitting ? 'Submitting...' : 'Submit Answers'}
+              </Button>
+            </div>
+          </div>
+        </Content>
+      </Layout>
+    </AspectRatioLayout>
   );
 } 

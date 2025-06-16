@@ -15,6 +15,7 @@ import {
   Result
 } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
+import AspectRatioLayout from '@/components/AspectRatioLayout';
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
@@ -81,95 +82,109 @@ export default function CreateQuestion() {
   
   // If not logged in, don't render anything (will redirect in useEffect)
   if (!user) {
-    return <div style={{ height: '100%', background: '#f0f2f5' }}></div>;
+    return (
+      <AspectRatioLayout>
+        <div className="full-height" style={{ background: '#f0f2f5' }}></div>
+      </AspectRatioLayout>
+    );
   }
   
   // If role not fetched yet, show loading
   if (loading) {
     return (
-      <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
-          <Title level={3} style={{ margin: 0 }}>Create Question</Title>
-        </Header>
-        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Card style={{ textAlign: 'center' }}>
-            <Spin tip="Loading user data..." />
-          </Card>
-        </Content>
-      </Layout>
+      <AspectRatioLayout>
+        <Layout className="full-height">
+          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0 }}>Create Question</Title>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Card style={{ textAlign: 'center' }}>
+              <Spin tip="Loading user data..." />
+            </Card>
+          </Content>
+        </Layout>
+      </AspectRatioLayout>
     );
   }
   
   // If not authorized, show message
   if (userRole !== 'QAUTHOR' && userRole !== 'SUPERADMIN') {
     return (
-      <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
-          <Title level={3} style={{ margin: 0 }}>Create Question</Title>
-        </Header>
-        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Card>
-            <Result
-              status="403"
-              title="Not Authorized"
-              subTitle="Sorry, you are not authorized to create questions."
-              extra={
-                <Button type="primary" onClick={handleBackToDashboard}>
-                  Back to Dashboard
-                </Button>
-              }
-            />
-          </Card>
-        </Content>
-      </Layout>
+      <AspectRatioLayout>
+        <Layout className="full-height">
+          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0 }}>Create Question</Title>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Card>
+              <Result
+                status="403"
+                title="Not Authorized"
+                subTitle="Sorry, you are not authorized to create questions."
+                extra={
+                  <Button type="primary" onClick={handleBackToDashboard}>
+                    Back to Dashboard
+                  </Button>
+                }
+              />
+            </Card>
+          </Content>
+        </Layout>
+      </AspectRatioLayout>
     );
   }
   
   if (success) {
     return (
-      <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
-          <Title level={3} style={{ margin: 0 }}>Create Question</Title>
-        </Header>
-        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Card>
-            <Result
-              status="success"
-              title="Question Created Successfully!"
-              subTitle="Your question has been added to the database and will be available for students."
-              extra={[
-                <Button type="primary" key="another" onClick={handleCreateAnother}>
-                  Create Another Question
-                </Button>,
-                <Button key="dashboard" onClick={handleBackToDashboard}>
-                  Back to Dashboard
-                </Button>,
-              ]}
-            />
-          </Card>
-        </Content>
-      </Layout>
+      <AspectRatioLayout>
+        <Layout className="full-height">
+          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0 }}>Create Question</Title>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Card>
+              <Result
+                status="success"
+                title="Question Created Successfully!"
+                subTitle="Your question has been added to the database and will be available for students."
+                extra={[
+                  <Button type="primary" key="another" onClick={handleCreateAnother}>
+                    Create Another Question
+                  </Button>,
+                  <Button key="dashboard" onClick={handleBackToDashboard}>
+                    Back to Dashboard
+                  </Button>,
+                ]}
+              />
+            </Card>
+          </Content>
+        </Layout>
+      </AspectRatioLayout>
     );
   }
   
   return (
-    <Layout style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
-        <Button 
-          type="text" 
-          icon={<ArrowLeftOutlined />} 
-          onClick={handleBackToDashboard}
-          style={{ marginRight: 16 }}
-        >
-          Back
-        </Button>
-        <Title level={3} style={{ margin: 0 }}>Create Question</Title>
-      </Header>
-      <Content style={{ padding: '24px', flex: 1 }}>
-        <Card>
-          <QuestionForm onComplete={handleQuestionCreated} onCancel={handleBackToDashboard} />
-        </Card>
-      </Content>
-    </Layout>
+    <AspectRatioLayout>
+      <Layout className="full-height">
+        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center' }}>
+          <Button 
+            type="text" 
+            icon={<ArrowLeftOutlined />} 
+            onClick={handleBackToDashboard}
+            style={{ marginRight: 16 }}
+          >
+            Back
+          </Button>
+          <Title level={3} style={{ margin: 0 }}>Create Question</Title>
+        </Header>
+        <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+          <div style={{ maxWidth: 800, margin: '0 auto' }}>
+            <Card>
+              <QuestionForm onComplete={handleQuestionCreated} onCancel={handleBackToDashboard} />
+            </Card>
+          </div>
+        </Content>
+      </Layout>
+    </AspectRatioLayout>
   );
 } 
