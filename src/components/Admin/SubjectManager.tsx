@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, Button, List, Input, Form, Modal, message, Popconfirm, Typography } from 'antd';
+import { Card, Button, List, Input, Form, Modal, message, Popconfirm, Typography, Space, Grid } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
+const { useBreakpoint } = Grid;
 
 interface Subject {
   id: string;
@@ -25,6 +26,10 @@ const SubjectManager = ({ onSubjectChange }: SubjectManagerProps) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [form] = Form.useForm();
+  const screens = useBreakpoint();
+
+  // Check if we're on mobile
+  const isMobile = screens.xs || !screens.sm;
 
   useEffect(() => {
     fetchSubjects();
@@ -178,21 +183,49 @@ const SubjectManager = ({ onSubjectChange }: SubjectManagerProps) => {
     setModalVisible(true);
   };
 
+  // Responsive header content
+  const headerContent = isMobile ? (
+    <Space direction="vertical" style={{ width: '100%' }} size="middle">
+      <Title level={4} style={{ margin: 0, textAlign: 'center' }}>
+        Subject Management
+      </Title>
+      <Button
+        type="primary"
+        icon={<PlusOutlined />}
+        onClick={() => openModal()}
+        block
+        size="middle"
+      >
+        Add Subject
+      </Button>
+    </Space>
+  ) : (
+    <div style={{ 
+      display: 'flex', 
+      justifyContent: 'space-between', 
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: '12px'
+    }}>
+      <Title level={4} style={{ margin: 0, flex: 1, minWidth: '200px' }}>
+        Subject Management
+      </Title>
+      <Button
+        type="primary"
+        icon={<PlusOutlined />}
+        onClick={() => openModal()}
+        size="middle"
+      >
+        Add Subject
+      </Button>
+    </div>
+  );
+
   return (
     <Card
-      title={
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Title level={4} style={{ margin: 0 }}>Subject Management</Title>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => openModal()}
-          >
-            Add Subject
-          </Button>
-        </div>
-      }
+      title={headerContent}
       style={{ marginBottom: 24 }}
+      bodyStyle={{ padding: isMobile ? '12px' : '24px' }}
     >
       <List
         loading={loading}
@@ -205,6 +238,8 @@ const SubjectManager = ({ onSubjectChange }: SubjectManagerProps) => {
                 type="text"
                 icon={<EditOutlined />}
                 onClick={() => openModal(subject)}
+                size={isMobile ? "small" : "middle"}
+                title="Edit Subject"
               />,
               <Popconfirm
                 key="delete"
@@ -212,21 +247,58 @@ const SubjectManager = ({ onSubjectChange }: SubjectManagerProps) => {
                 onConfirm={() => handleDelete(subject.id)}
                 okText="Yes"
                 cancelText="No"
+                placement={isMobile ? "topRight" : "top"}
               >
                 <Button
                   type="text"
                   danger
                   icon={<DeleteOutlined />}
+                  size={isMobile ? "small" : "middle"}
+                  title="Delete Subject"
                 />
               </Popconfirm>,
             ]}
+            style={{ 
+              padding: isMobile ? '8px 0' : '12px 0',
+              flexWrap: isMobile ? 'wrap' : 'nowrap'
+            }}
           >
             <List.Item.Meta
-              title={subject.name}
-              description={`Created: ${new Date(subject.created_at).toLocaleDateString()}`}
+              title={
+                <span style={{ 
+                  fontSize: isMobile ? '14px' : '16px',
+                  fontWeight: 500
+                }}>
+                  {subject.name}
+                </span>
+              }
+              description={
+                <span style={{ 
+                  fontSize: isMobile ? '12px' : '14px',
+                  color: '#666'
+                }}>
+                  Created: {new Date(subject.created_at).toLocaleDateString()}
+                </span>
+              }
             />
           </List.Item>
         )}
+        locale={{
+          emptyText: (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: isMobile ? '20px 10px' : '40px 20px',
+              color: '#999'
+            }}>
+              <Title level={5} style={{ color: '#999', margin: 0 }}>
+                No subjects yet
+              </Title>
+              <p style={{ margin: '8px 0 0 0', fontSize: isMobile ? '12px' : '14px' }}>
+                Click "Add Subject" to create your first subject
+              </p>
+            </div>
+          )
+        }}
       />
 
       <Modal
@@ -238,6 +310,8 @@ const SubjectManager = ({ onSubjectChange }: SubjectManagerProps) => {
           form.resetFields();
         }}
         footer={null}
+        width={isMobile ? '90%' : 520}
+        style={{ top: isMobile ? 20 : undefined }}
       >
         <Form
           form={form}
@@ -252,23 +326,32 @@ const SubjectManager = ({ onSubjectChange }: SubjectManagerProps) => {
               { min: 2, message: 'Subject name must be at least 2 characters' },
             ]}
           >
-            <Input placeholder="Enter subject name" />
+            <Input 
+              placeholder="Enter subject name" 
+              size={isMobile ? "middle" : "large"}
+            />
           </Form.Item>
           
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-            <Button
-              onClick={() => {
-                setModalVisible(false);
-                setEditingSubject(null);
-                form.resetFields();
-              }}
-              style={{ marginRight: 8 }}
-            >
-              Cancel
-            </Button>
-            <Button type="primary" htmlType="submit">
-              {editingSubject ? 'Update' : 'Create'}
-            </Button>
+            <Space>
+              <Button
+                onClick={() => {
+                  setModalVisible(false);
+                  setEditingSubject(null);
+                  form.resetFields();
+                }}
+                size={isMobile ? "middle" : "large"}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="primary" 
+                htmlType="submit"
+                size={isMobile ? "middle" : "large"}
+              >
+                {editingSubject ? 'Update' : 'Create'}
+              </Button>
+            </Space>
           </Form.Item>
         </Form>
       </Modal>
