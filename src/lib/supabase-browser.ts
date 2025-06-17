@@ -149,6 +149,49 @@ export function clearBrowserClient(): void {
   }
 }
 
+// Force clear all authentication data and refresh client
+export function forceRefreshAuth(): void {
+  if (isDev) {
+    console.log('Force refreshing authentication...');
+  }
+  
+  // Clear the client instance
+  browserClientInstance = null;
+  
+  // Clear all storage
+  if (typeof window !== 'undefined') {
+    try {
+      // Clear localStorage
+      const keysToRemove = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('sb-'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => window.localStorage.removeItem(key));
+      
+      // Clear sessionStorage
+      const sessionKeysToRemove = [];
+      for (let i = 0; i < window.sessionStorage.length; i++) {
+        const key = window.sessionStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('sb-'))) {
+          sessionKeysToRemove.push(key);
+        }
+      }
+      sessionKeysToRemove.forEach(key => window.sessionStorage.removeItem(key));
+      
+      if (isDev) {
+        console.log('Force cleared storage keys:', [...keysToRemove, ...sessionKeysToRemove]);
+      }
+    } catch (error) {
+      if (isDev) {
+        console.error('Error force clearing storage:', error);
+      }
+    }
+  }
+}
+
 // Check and handle token refresh issues
 export async function checkAndRefreshToken(): Promise<boolean> {
   const client = getBrowserClient();

@@ -36,6 +36,19 @@ const SubjectManager = () => {
         if (isDev) {
           console.error('Error response from API:', errorData);
         }
+        
+        // Handle authentication errors
+        if (response.status === 401) {
+          message.error('Your session has expired. Please log out and log back in.');
+          // Optionally force logout
+          if (typeof window !== 'undefined') {
+            setTimeout(() => {
+              window.location.href = '/login?error=session_expired';
+            }, 2000);
+          }
+          return;
+        }
+        
         throw new Error(errorData.error || 'Failed to fetch subjects');
       }
       
@@ -111,6 +124,18 @@ const SubjectManager = () => {
           if (isDev) {
             console.error('Error response from API:', errorData);
           }
+          
+          // Handle authentication errors
+          if (response.status === 401) {
+            message.error('Your session has expired. Please log out and log back in.');
+            if (typeof window !== 'undefined') {
+              setTimeout(() => {
+                window.location.href = '/login?error=session_expired';
+              }, 2000);
+            }
+            return;
+          }
+          
           throw new Error(errorData.error || 'Failed to create subject');
         }
         

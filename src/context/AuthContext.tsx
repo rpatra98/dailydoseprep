@@ -92,7 +92,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Handle auth state changes - STRICT validation per APPLICATION_SPECIFICATION.md
-  const handleAuthStateChange = async (event: string, session: any) => {
+  const handleAuthStateChange = async (event: string, session: any, error?: any) => {
+    // Handle auth errors (like refresh token failures)
+    if (error) {
+      if (isDev) {
+        console.error('Auth state change error:', error);
+      }
+      
+      if (error.message?.includes('refresh') || 
+          error.message?.includes('Invalid') || 
+          error.message?.includes('Refresh Token Not Found')) {
+        clearBrowserClient();
+        setUser(null);
+        setError('Session expired. Please sign in again.');
+        
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login?error=session_expired';
+        }
+        return;
+      }
+    }
+    
     if (event === 'SIGNED_IN' && session?.user) {
       const userData = await fetchUserData(session.user.id);
       
@@ -190,17 +210,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.error('Session error:', sessionError);
           }
           
-          // If it's a refresh token error, clear the client and try again
-          if (sessionError.message?.includes('refresh') || sessionError.message?.includes('Invalid')) {
+          // If it's a refresh token error, clear the client and force logout
+          if (sessionError.message?.includes('refresh') || 
+              sessionError.message?.includes('Invalid') || 
+              sessionError.message?.includes('Refresh Token Not Found')) {
             clearBrowserClient();
             setError('Session expired. Please sign in again.');
+            
+            if (isActive) {
+              setAuthInitialized(true);
+              setLoading(false);
+              setUser(null);
+              
+              // Force redirect to login
+              if (typeof window !== 'undefined') {
+                window.location.href = '/login?error=session_expired';
+              }
+            }
           } else {
             setError(sessionError.message);
-          }
-          
-          if (isActive) {
-            setAuthInitialized(true);
-            setLoading(false);
+            
+            if (isActive) {
+              setAuthInitialized(true);
+              setLoading(false);
+            }
           }
           return;
         }

@@ -26,11 +26,15 @@ export default function LoginPage() {
   useEffect(() => {
     setIsMounted(true);
     
-    // Check for account configuration error from URL params
+    // Check for errors from URL params
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('error') === 'account_config_error') {
+    const errorParam = urlParams.get('error');
+    
+    if (errorParam === 'account_config_error') {
       setAccountConfigError(true);
       setLocalError('Account configuration error. Please contact administrator.');
+    } else if (errorParam === 'session_expired') {
+      setLocalError('Your session has expired. Please sign in again.');
     }
   }, []);
   
