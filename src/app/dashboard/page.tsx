@@ -19,7 +19,8 @@ import {
   Input,
   Table,
   message,
-  Statistic
+  Statistic,
+  Grid
 } from 'antd';
 import { 
   LogoutOutlined, 
@@ -41,6 +42,7 @@ import AspectRatioLayout from '@/components/AspectRatioLayout';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
+const { useBreakpoint } = Grid;
 
 interface User {
   id: string;
@@ -70,6 +72,7 @@ export default function Dashboard() {
   const [isMounted, setIsMounted] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [form] = Form.useForm();
+  const screens = useBreakpoint();
 
   // Add debug logging
   const addDebug = (message: string) => {
@@ -236,329 +239,398 @@ export default function Dashboard() {
   // Prevent hydration mismatch
   if (!isMounted) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        backgroundColor: '#f5f5f5'
-      }}>
-        <Spin size="large" tip="Loading dashboard..." />
-      </div>
+      <AspectRatioLayout>
+        <div className="center-content">
+          <Spin size="large" tip="Loading dashboard..." />
+        </div>
+      </AspectRatioLayout>
     );
   }
 
   // Show loading state
   if (isLoading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        backgroundColor: '#f5f5f5',
-        flexDirection: 'column'
-      }}>
-        <Spin size="large" tip="Loading your dashboard..." />
-        {process.env.NODE_ENV === 'development' && (
-          <div style={{ 
-            marginTop: 20, 
-            fontFamily: 'monospace', 
-            fontSize: '12px',
-            textAlign: 'center',
-            maxWidth: '400px'
-          }}>
-            {debugInfo.slice(-3).map((info, index) => (
-              <div key={index} style={{ marginBottom: '4px', color: '#666' }}>
-                {info}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <AspectRatioLayout>
+        <div className="center-content">
+          <Spin size="large" tip="Loading your dashboard..." />
+          {process.env.NODE_ENV === 'development' && (
+            <div style={{ 
+              marginTop: 20, 
+              fontFamily: 'monospace', 
+              fontSize: '12px',
+              textAlign: 'center',
+              maxWidth: '400px'
+            }}>
+              {debugInfo.slice(-3).map((info, index) => (
+                <div key={index} style={{ marginBottom: '4px', color: '#666' }}>
+                  {info}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </AspectRatioLayout>
     );
   }
 
   // Show error state
   if (loadError) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        backgroundColor: '#f5f5f5',
-        padding: '20px'
-      }}>
-        <Card style={{ maxWidth: 500, textAlign: 'center' }}>
-          <Alert
-            message="Dashboard Error"
-            description={loadError}
-            type="error"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
-          <Button 
-            type="primary" 
-            icon={<ReloadOutlined />}
-            onClick={handleRetry}
-          >
-            Retry
-          </Button>
-        </Card>
-      </div>
+      <AspectRatioLayout>
+        <Layout className="full-height">
+          <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0 }}>
+              <span className="hidden-mobile">Dashboard</span>
+              <span className="visible-mobile">Dashboard</span>
+            </Title>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Card style={{ textAlign: 'center', maxWidth: 500 }}>
+              <Alert
+                message="Dashboard Error"
+                description={loadError}
+                type="error"
+                showIcon
+                style={{ marginBottom: 24 }}
+              />
+              <Paragraph>
+                We encountered an issue while loading your dashboard.
+              </Paragraph>
+              <Button 
+                type="primary" 
+                icon={<ReloadOutlined />}
+                onClick={handleRetry}
+                style={{ marginTop: 16 }}
+              >
+                Retry
+              </Button>
+            </Card>
+          </Content>
+        </Layout>
+      </AspectRatioLayout>
     );
   }
 
+  const isMobile = isMounted ? screens.xs : false;
+
   // Show dashboard content
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderBottom: '1px solid #f0f0f0',
-        padding: '0 24px'
-      }}>
-        <div>
-          <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-            Daily Dose Prep Dashboard
-          </Title>
-          {user && (
-            <Text type="secondary">
-              Welcome, {user.email} 
-              <Tag color={userRole === 'SUPERADMIN' ? 'red' : userRole === 'QAUTHOR' ? 'blue' : 'green'} 
-                   style={{ marginLeft: 8 }}>
-                {userRole}
-              </Tag>
-            </Text>
-          )}
-        </div>
-        <Button 
-          type="primary" 
-          danger
-          icon={<LogoutOutlined />}
-          onClick={handleSignOut}
-        >
-          Sign Out
-        </Button>
-      </Header>
-
-      <Content style={{ padding: '24px', backgroundColor: '#f5f5f5' }}>
-        {userRole === 'SUPERADMIN' && (
+    <AspectRatioLayout>
+      <Layout className="full-height">
+        <Header style={{ 
+          background: '#fff', 
+          padding: '0 16px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          borderBottom: '1px solid #f0f0f0'
+        }}>
           <div>
-            <Title level={2}>System Administration</Title>
-            <Paragraph>
-              Manage the entire system, create QAUTHOR accounts, and monitor system statistics.
-            </Paragraph>
+            <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
+              <span className="hidden-mobile">Daily Dose Prep Dashboard</span>
+              <span className="visible-mobile">Dashboard</span>
+            </Title>
+            {user && (
+              <Text type="secondary" style={{ fontSize: isMobile ? '12px' : '14px' }}>
+                <span className="hidden-mobile">Welcome, {user.email}</span>
+                <span className="visible-mobile">{user.email}</span>
+                <Tag color={userRole === 'SUPERADMIN' ? 'red' : userRole === 'QAUTHOR' ? 'blue' : 'green'} 
+                     style={{ marginLeft: 8 }}>
+                  {userRole}
+                </Tag>
+              </Text>
+            )}
+          </div>
+          <Button 
+            type="primary" 
+            danger
+            icon={<LogoutOutlined />}
+            onClick={handleSignOut}
+            size={isMobile ? "middle" : "large"}
+          >
+            <span className="hidden-mobile">Sign Out</span>
+          </Button>
+        </Header>
 
-            {/* System Statistics */}
-            {systemStats && (
-              <Card title="System Statistics" style={{ marginBottom: 24 }}>
-                <Row gutter={16}>
-                  <Col span={6}>
-                    <Statistic 
-                      title="Total Users" 
-                      value={systemStats.totalUsers} 
-                      prefix={<TeamOutlined />}
-                    />
+        <Content style={{ padding: isMobile ? '16px' : '24px', flex: 1, overflowY: 'auto' }}>
+          {userRole === 'SUPERADMIN' && (
+            <div>
+              <Title level={2}>System Administration</Title>
+              <Paragraph>
+                Manage the entire system, create QAUTHOR accounts, and monitor system statistics.
+              </Paragraph>
+
+              {/* System Statistics */}
+              {systemStats && (
+                <Card title="System Statistics" style={{ marginBottom: 16 }}>
+                  <Row gutter={[16, 16]}>
+                    <Col xs={12} sm={8} md={6}>
+                      <Statistic 
+                        title="Total Users" 
+                        value={systemStats.totalUsers} 
+                        prefix={<TeamOutlined />}
+                      />
+                    </Col>
+                    <Col xs={12} sm={8} md={6}>
+                      <Statistic 
+                        title="QAUTHORs" 
+                        value={systemStats.totalQAuthors} 
+                        prefix={<UserAddOutlined />}
+                      />
+                    </Col>
+                    <Col xs={12} sm={8} md={6}>
+                      <Statistic 
+                        title="Students" 
+                        value={systemStats.totalStudents} 
+                        prefix={<TeamOutlined />}
+                      />
+                    </Col>
+                    <Col xs={12} sm={8} md={6}>
+                      <Statistic 
+                        title="Subjects" 
+                        value={systemStats.totalSubjects} 
+                        prefix={<BookOutlined />}
+                      />
+                    </Col>
+                    <Col xs={12} sm={8} md={6}>
+                      <Statistic 
+                        title="Total Questions" 
+                        value={systemStats.totalQuestions} 
+                        prefix={<FileTextOutlined />}
+                      />
+                    </Col>
+                  </Row>
+                  
+                  {Object.keys(systemStats.questionsPerSubject).length > 0 && (
+                    <>
+                      <Divider />
+                      <Title level={4}>Questions per Subject</Title>
+                      <Row gutter={[16, 16]}>
+                        {Object.entries(systemStats.questionsPerSubject).map(([subject, count]) => (
+                          <Col xs={12} sm={8} md={6} key={subject}>
+                            <Statistic
+                              title={subject}
+                              value={count}
+                              prefix={<FileTextOutlined />}
+                            />
+                          </Col>
+                        ))}
+                      </Row>
+                    </>
+                  )}
+                </Card>
+              )}
+
+              <Row gutter={[16, 16]}>
+                <Col xs={24} lg={16}>
+                  <Card title="User Management">
+                    <Title level={4}>Create QAUTHOR Account</Title>
+                    <Form
+                      form={form}
+                      layout="vertical"
+                      onFinish={handleCreateQAUTHOR}
+                    >
+                      <Form.Item
+                        name="email"
+                        label="Email"
+                        rules={[
+                          { required: true, message: 'Please enter an email address' },
+                          { type: 'email', message: 'Please enter a valid email address' }
+                        ]}
+                      >
+                        <Input prefix={<MailOutlined />} placeholder="Enter email address" />
+                      </Form.Item>
+                      
+                      <Form.Item
+                        name="password"
+                        label="Password"
+                        rules={[
+                          { required: true, message: 'Please enter a password' },
+                          { min: 6, message: 'Password must be at least 6 characters' }
+                        ]}
+                      >
+                        <Input.Password prefix={<LockOutlined />} placeholder="Enter password" />
+                      </Form.Item>
+                      
+                      <Form.Item>
+                        <Button 
+                          type="primary" 
+                          htmlType="submit" 
+                          icon={<UserAddOutlined />}
+                          loading={createLoading}
+                        >
+                          Create QAUTHOR
+                        </Button>
+                      </Form.Item>
+                    </Form>
+                  </Card>
+                </Col>
+                
+                <Col xs={24} lg={8}>
+                  <Card title="View Questions">
+                    <Paragraph>
+                      As SUPERADMIN, you can view (but not edit) all questions created by QAUTHORs to monitor content quality.
+                    </Paragraph>
+                    <Link href="/admin/questions">
+                      <Button icon={<BookOutlined />} block>
+                        View All Questions
+                      </Button>
+                    </Link>
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* Subject Management */}
+              <Card style={{ marginTop: 16 }}>
+                <SubjectManager />
+              </Card>
+
+              {/* All Users Table */}
+              <Card title="All Users" style={{ marginTop: 16 }}>
+                <Table
+                  dataSource={allUsers}
+                  rowKey="id"
+                  columns={[
+                    {
+                      title: 'Email',
+                      dataIndex: 'email',
+                      key: 'email',
+                    },
+                    {
+                      title: 'Role',
+                      dataIndex: 'role',
+                      key: 'role',
+                      render: (role: UserRole) => (
+                        <Tag color={role === 'SUPERADMIN' ? 'red' : role === 'QAUTHOR' ? 'blue' : 'green'}>
+                          {role}
+                        </Tag>
+                      )
+                    },
+                    {
+                      title: 'Created At',
+                      dataIndex: 'created_at',
+                      key: 'created_at',
+                      render: (date: string) => new Date(date).toLocaleDateString()
+                    }
+                  ]}
+                  pagination={{ pageSize: 10 }}
+                  scroll={{ x: 'max-content' }}
+                />
+              </Card>
+            </div>
+          )}
+
+          {userRole === 'QAUTHOR' && (
+            <div>
+              <Title level={2}>Question Author Dashboard</Title>
+              <Paragraph>
+                Create and manage questions for the daily dose preparation system.
+              </Paragraph>
+
+              <Row gutter={[16, 16]}>
+                <Col span={24}>
+                  <Card>
+                    <Title level={2}>Welcome, Question Author!</Title>
+                    <Paragraph>
+                      As a Question Author, you can create questions for students. Your questions will be reviewed and made available to students in their daily question practice.
+                    </Paragraph>
+                    <Divider />
+                    <Button 
+                      type="primary" 
+                      icon={<PlusOutlined />}
+                      size="large"
+                      onClick={() => router.push('/create-question')}
+                    >
+                      Create New Question
+                    </Button>
+                  </Card>
+                </Col>
+                <Col span={24}>
+                  <QuestionManager />
+                </Col>
+              </Row>
+            </div>
+          )}
+
+          {userRole === 'STUDENT' && (
+            <div>
+              <Title level={2}>Student Dashboard</Title>
+              <Paragraph>
+                Welcome to your learning dashboard. Select subjects and start your daily dose preparation.
+              </Paragraph>
+
+              <Card>
+                <Title level={2}>Welcome to Daily Dose Prep!</Title>
+                <Text>
+                  As a student, you'll receive 10 new questions daily at 6am from your primary subject.
+                  Select your primary subject to start practicing.
+                </Text>
+                <div style={{ marginTop: 24 }}>
+                  {user && <SubjectSelection userId={user.id} />}
+                </div>
+                <Divider />
+                <Row gutter={[16, 16]}>
+                  <Col xs={24} sm={12} md={8}>
+                    <Link href="/daily-questions">
+                      <Button 
+                        type="primary" 
+                        icon={<BookOutlined />}
+                        size="large"
+                        block
+                      >
+                        View Today's Questions
+                      </Button>
+                    </Link>
                   </Col>
-                  <Col span={6}>
-                    <Statistic 
-                      title="QAUTHORs" 
-                      value={systemStats.totalQAuthors} 
-                      prefix={<UserAddOutlined />}
-                    />
+                  <Col xs={24} sm={12} md={8}>
+                    <Link href="/create-question">
+                      <Button 
+                        icon={<PlusOutlined />}
+                        size="large"
+                        block
+                      >
+                        Practice Mode
+                      </Button>
+                    </Link>
                   </Col>
-                  <Col span={6}>
-                    <Statistic 
-                      title="Students" 
-                      value={systemStats.totalStudents} 
-                      prefix={<TeamOutlined />}
-                    />
-                  </Col>
-                  <Col span={6}>
-                    <Statistic 
-                      title="Subjects" 
-                      value={systemStats.totalSubjects} 
-                      prefix={<BookOutlined />}
-                    />
-                  </Col>
-                </Row>
-                <Row gutter={16} style={{ marginTop: 16 }}>
-                  <Col span={6}>
-                    <Statistic 
-                      title="Total Questions" 
-                      value={systemStats.totalQuestions} 
-                      prefix={<FileTextOutlined />}
-                    />
+                  <Col xs={24} sm={12} md={8}>
+                    <Button 
+                      icon={<DatabaseOutlined />}
+                      size="large"
+                      block
+                    >
+                      Progress Tracking
+                    </Button>
                   </Col>
                 </Row>
               </Card>
-            )}
-
-            {/* Create QAUTHOR Account */}
-            <Card title="Create QAUTHOR Account" style={{ marginBottom: 24 }}>
-              <Form
-                form={form}
-                layout="vertical"
-                onFinish={handleCreateQAUTHOR}
-                style={{ maxWidth: 400 }}
-              >
-                <Form.Item
-                  name="email"
-                  label="Email Address"
-                  rules={[
-                    { required: true, message: 'Please enter email address' },
-                    { type: 'email', message: 'Please enter a valid email address' }
-                  ]}
-                >
-                  <Input 
-                    prefix={<MailOutlined />} 
-                    placeholder="Enter QAUTHOR email"
-                  />
-                </Form.Item>
-                
-                <Form.Item
-                  name="password"
-                  label="Password"
-                  rules={[
-                    { required: true, message: 'Please enter password' },
-                    { min: 6, message: 'Password must be at least 6 characters' }
-                  ]}
-                >
-                  <Input.Password 
-                    prefix={<LockOutlined />} 
-                    placeholder="Enter password"
-                  />
-                </Form.Item>
-                
-                <Form.Item>
-                  <Button 
-                    type="primary" 
-                    htmlType="submit" 
-                    loading={createLoading}
-                    icon={<UserAddOutlined />}
-                  >
-                    Create QAUTHOR Account
-                  </Button>
-                </Form.Item>
-              </Form>
-            </Card>
-
-            {/* Subject Management */}
-            <Card title="Subject Management" style={{ marginBottom: 24 }}>
-              <SubjectManager />
-            </Card>
-
-            {/* All Users Table */}
-            <Card title="All Users">
-              <Table
-                dataSource={allUsers}
-                rowKey="id"
-                columns={[
-                  {
-                    title: 'Email',
-                    dataIndex: 'email',
-                    key: 'email',
-                  },
-                  {
-                    title: 'Role',
-                    dataIndex: 'role',
-                    key: 'role',
-                    render: (role: UserRole) => (
-                      <Tag color={role === 'SUPERADMIN' ? 'red' : role === 'QAUTHOR' ? 'blue' : 'green'}>
-                        {role}
-                      </Tag>
-                    )
-                  },
-                  {
-                    title: 'Created At',
-                    dataIndex: 'created_at',
-                    key: 'created_at',
-                    render: (date: string) => new Date(date).toLocaleDateString()
-                  }
-                ]}
-                pagination={{ pageSize: 10 }}
-              />
-            </Card>
-          </div>
-        )}
-
-        {userRole === 'QAUTHOR' && (
-          <div>
-            <Title level={2}>Question Author Dashboard</Title>
-            <Paragraph>
-              Create and manage questions for the daily dose preparation system.
-            </Paragraph>
-
-            <Card title="Question Management">
-              <QuestionManager />
-            </Card>
-          </div>
-        )}
-
-        {userRole === 'STUDENT' && (
-          <div>
-            <Title level={2}>Student Dashboard</Title>
-            <Paragraph>
-              Welcome to your learning dashboard. Select subjects and start your daily dose preparation.
-            </Paragraph>
-
-                         <Card title="Subject Selection">
-               {user && <SubjectSelection userId={user.id} />}
-             </Card>
-
-            <Card title="Quick Actions" style={{ marginTop: 24 }}>
-              <Row gutter={16}>
-                <Col span={8}>
-                  <Link href="/daily-questions">
-                    <Button type="primary" size="large" block icon={<BookOutlined />}>
-                      Daily Questions
-                    </Button>
-                  </Link>
-                </Col>
-                <Col span={8}>
-                  <Link href="/create-question">
-                    <Button size="large" block icon={<PlusOutlined />}>
-                      Practice Mode
-                    </Button>
-                  </Link>
-                </Col>
-                <Col span={8}>
-                  <Button size="large" block icon={<DatabaseOutlined />}>
-                    Progress Tracking
-                  </Button>
-                </Col>
-              </Row>
-            </Card>
-          </div>
-        )}
-
-        {/* Debug Info Panel - Only show in development */}
-        {process.env.NODE_ENV === 'development' && (
-          <Card 
-            title="Debug Information"
-            size="small"
-            style={{ 
-              marginTop: 24,
-              maxWidth: 600
-            }}
-          >
-            <div style={{ fontFamily: 'monospace', fontSize: '12px', maxHeight: '200px', overflowY: 'auto' }}>
-              {debugInfo.map((info, index) => (
-                <div key={index} style={{ marginBottom: '4px' }}>
-                  {info}
-                </div>
-              ))}
-              {debugInfo.length === 0 && (
-                <div style={{ color: '#999' }}>No debug info yet...</div>
-              )}
             </div>
-          </Card>
-        )}
-      </Content>
-    </Layout>
+          )}
+
+          {/* Debug Info Panel - Only show in development */}
+          {process.env.NODE_ENV === 'development' && (
+            <Card 
+              title="Debug Information"
+              size="small"
+              style={{ 
+                marginTop: 24,
+                maxWidth: 600
+              }}
+            >
+              <div style={{ fontFamily: 'monospace', fontSize: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+                {debugInfo.map((info, index) => (
+                  <div key={index} style={{ marginBottom: '4px' }}>
+                    {info}
+                  </div>
+                ))}
+                {debugInfo.length === 0 && (
+                  <div style={{ color: '#999' }}>No debug info yet...</div>
+                )}
+              </div>
+            </Card>
+          )}
+        </Content>
+      </Layout>
+    </AspectRatioLayout>
   );
 } 
