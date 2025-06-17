@@ -5,10 +5,11 @@ import { cookies } from 'next/headers';
 // DELETE a specific question (QAUTHOR can only delete their own questions)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const questionId = params.id;
+    const resolvedParams = await params;
+    const questionId = resolvedParams.id;
     console.log('🔄 Starting QAUTHOR question deletion:', questionId);
     
     const supabase = createRouteHandlerClient({ cookies });
