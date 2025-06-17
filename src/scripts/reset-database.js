@@ -25,6 +25,12 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 async function resetDatabase() {
   try {
     console.log('🧹 Starting database reset...');
+    console.log('⚠️  WARNING: This will delete all users and force logout of active sessions!');
+    console.log('⚠️  Users currently logged in will need to log in again after this operation.');
+    console.log('⚠️  Continuing in 3 seconds...');
+    
+    // Give users a chance to cancel
+    await new Promise(resolve => setTimeout(resolve, 3000));
     
     // Step 1: Delete all existing users from auth (this will cascade to our users table)
     console.log('🗑️  Deleting all existing users...');

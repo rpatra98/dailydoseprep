@@ -19,15 +19,73 @@ export async function middleware(request: NextRequest) {
   if (request.method === 'OPTIONS') {
     return res;
   }
+
+  // Skip auth validation for public routes
+  const publicRoutes = ['/login', '/register', '/api/auth', '/'];
+  const isPublicRoute = publicRoutes.some(route => request.nextUrl.pathname.startsWith(route));
+  
+  if (isPublicRoute) {
+    return res;
+  }
   
   // Create a Supabase client for the middleware
   const supabase = createMiddlewareClient({ req: request, res });
   
   try {
     // Refresh session if expired - necessary for Supabase auth
-    await supabase.auth.getSession();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('Session error in middleware:', sessionError);
+      return res;
+    }
+
+    // If user is authenticated, validate they exist in database
+    if (session?.user) {
+      try {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('id, email, role')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (userError) {
+          console.error('Database user check error:', userError);
+          // Don't block request, let the frontend handle it
+          return res;
+        }
+
+        if (!userData) {
+          // User exists in auth but not in database - SECURITY ISSUE
+          console.warn('SECURITY: User exists in auth but not in database:', session.user.email);
+          
+          // For API routes, return 401
+          if (request.nextUrl.pathname.startsWith('/api/')) {
+            return NextResponse.json(
+              { 
+                error: 'Account not properly configured',
+                details: 'User exists in auth but not in database',
+                action: 'logout_required'
+              }, 
+              { status: 401 }
+            );
+          }
+          
+          // For regular routes, redirect to login with error
+          const loginUrl = new URL('/login', request.url);
+          loginUrl.searchParams.set('error', 'account_config_error');
+          return NextResponse.redirect(loginUrl);
+        }
+
+        // User exists and is valid - continue
+        console.log('User validated in middleware:', userData.email, 'Role:', userData.role);
+      } catch (dbError) {
+        console.error('Database validation error in middleware:', dbError);
+        // Don't block request, let the frontend handle it
+      }
+    }
   } catch (error) {
-    console.error('Error refreshing auth session in middleware:', error);
+    console.error('Error in middleware:', error);
   }
   
   return res;
@@ -36,6 +94,10 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/api/:path*',
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/dashboard/:path*',
+    '/create-question/:path*',
+    '/admin/:path*',
+    '/daily-questions/:path*',
+    '/((?!_next/static|_next/image|favicon.ico|login|register).*)',
   ],
 }; 

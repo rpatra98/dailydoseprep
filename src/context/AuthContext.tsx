@@ -91,103 +91,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Create user record if it doesn't exist
-  const ensureUserExists = async (userId: string, email: string, role: string = 'STUDENT'): Promise<User | null> => {
-    if (!browserSupabase) return null;
-    
-    try {
-      // First check if user exists with timeout
-      const checkPromise = browserSupabase
-        .from('users')
-        .select('id, email, role, created_at, updated_at')
-        .eq('id', userId)
-        .maybeSingle();
-        
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Check user timeout')), 3000);
-      });
-      
-      const { data: existingUser, error: checkError } = await Promise.race([checkPromise, timeoutPromise]) as any;
-      
-      if (checkError) {
-        if (isDev) {
-          console.error('Error checking user existence:', checkError);
-        }
-        // Continue to create user instead of failing
-      }
-      
-      // If user exists, return it
-      if (existingUser) {
-        return existingUser as User;
-      }
-      
-      // User doesn't exist, create it
-      const insertPromise = browserSupabase
-        .from('users')
-        .insert({
-          id: userId,
-          email,
-          role,
-        })
-        .select('id, email, role, created_at, updated_at')
-        .single();
-        
-      const insertTimeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Insert user timeout')), 5000);
-      });
-      
-      const { data: newUser, error: insertError } = await Promise.race([insertPromise, insertTimeoutPromise]) as any;
-      
-      if (insertError) {
-        if (isDev) {
-          console.error('Error creating user record:', insertError);
-        }
-        return null;
-      }
-      
-      return newUser as User;
-    } catch (error) {
-      if (isDev) {
-        console.error('Error in ensureUserExists:', error);
-      }
-      return null;
-    }
-  };
-
-  // Handle auth state changes
+  // Handle auth state changes - STRICT validation per APPLICATION_SPECIFICATION.md
   const handleAuthStateChange = async (event: string, session: any) => {
     if (event === 'SIGNED_IN' && session?.user) {
       const userData = await fetchUserData(session.user.id);
       
       if (userData) {
+        // User exists in database - validate role consistency
         setUser(userData);
-      } else {
-        const createdUser = await ensureUserExists(
-          session.user.id,
-          session.user.email || 'unknown@email.com',
-          'STUDENT'
-        );
-        
-        if (createdUser) {
-          setUser(createdUser);
-        } else {
-          setError('Failed to initialize user data');
+        if (isDev) {
+          console.log('User authenticated successfully:', userData.email, 'Role:', userData.role);
         }
+      } else {
+        // User exists in auth but NOT in database - SECURITY VIOLATION
+        // Per APPLICATION_SPECIFICATION.md: This should not happen in normal flow
+        if (isDev) {
+          console.error('SECURITY ISSUE: User exists in auth but not in database:', session.user.email);
+        }
+        
+        // Force logout and show error - no automatic user creation
+        setError('Account not properly configured. Please contact administrator.');
+        await forceLogout();
+        return;
       }
     } else if (event === 'SIGNED_OUT') {
       setUser(null);
       setError(null);
     } else if (event === 'TOKEN_REFRESHED') {
-      // Handle token refresh - just ensure user data is still valid
+      // Handle token refresh - validate user still exists in database
       if (session?.user && !user) {
         const userData = await fetchUserData(session.user.id);
         if (userData) {
           setUser(userData);
+        } else {
+          // User was deleted from database - force logout
+          if (isDev) {
+            console.warn('User deleted from database during session - forcing logout');
+          }
+          await forceLogout();
+          return;
         }
       }
     }
     
     setLoading(false);
+  };
+
+  // Force logout when user data is inconsistent
+  const forceLogout = async () => {
+    try {
+      if (browserSupabase) {
+        await browserSupabase.auth.signOut();
+      }
+      clearBrowserClient();
+      setUser(null);
+      setError('Session terminated due to account configuration issue.');
+      router.push('/login');
+    } catch (error) {
+      if (isDev) {
+        console.error('Error during force logout:', error);
+      }
+    }
   };
 
   // Setup authentication
@@ -238,21 +202,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (userData) {
               setUser(userData);
             } else {
-              // Try to create the user record
-              const createdUser = await ensureUserExists(
-                session.user.id, 
-                session.user.email || 'unknown@email.com',
-                'STUDENT'
-              );
-              
-              if (createdUser) {
-                setUser(createdUser);
-              } else {
-                if (isDev) {
-                  console.error('Failed to create user record');
-                }
-                setError('Failed to initialize user data');
+              // STRICT: User exists in auth but not in database - force logout
+              if (isDev) {
+                console.error('SECURITY: User in auth but not in database during initialization');
               }
+              setError('Account configuration error. Please contact administrator.');
+              await forceLogout();
+              return;
             }
           }
         } else {
@@ -439,7 +395,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Register student function
+  // Register student function - Per APPLICATION_SPECIFICATION.md: Students can sign up
   const registerStudent = async (email: string, password: string) => {
     if (!browserSupabase) {
       throw new Error('Authentication service not available');
@@ -448,6 +404,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setError(null);
       
+      // First check if user already exists in our users table
+      const { data: existingUser } = await browserSupabase
+        .from('users')
+        .select('id, email, role')
+        .eq('email', email)
+        .maybeSingle();
+      
+      if (existingUser) {
+        throw new Error('User with this email already exists');
+      }
+
+      // Create the auth user
       const { data, error } = await browserSupabase.auth.signUp({
         email,
         password,
@@ -461,14 +429,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Registration failed');
       }
 
-      // Create user record in database
-      const userData = await ensureUserExists(data.user.id, email, 'STUDENT');
-      
-      if (!userData) {
-        throw new Error('Failed to create user profile');
+      // Create user record in database with STUDENT role
+      const { data: userData, error: userError } = await browserSupabase
+        .from('users')
+        .insert({
+          id: data.user.id,
+          email: email,
+          role: 'STUDENT'
+        })
+        .select('id, email, role, created_at, updated_at')
+        .single();
+
+      if (userError) {
+        // Clean up the auth user if user creation failed
+        if (isDev) {
+          console.error('Failed to create user profile:', userError);
+        }
+        throw new Error('Failed to create user profile: ' + userError.message);
       }
 
-      return userData;
+      return userData as User;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Registration failed';
       setError(errorMessage);

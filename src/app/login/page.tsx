@@ -18,12 +18,20 @@ export default function LoginPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [connectionIssue, setConnectionIssue] = useState(false);
+  const [accountConfigError, setAccountConfigError] = useState(false);
   const { user, login, loading, error, authInitialized } = useAuth();
   const router = useRouter();
   const screens = useBreakpoint();
   
   useEffect(() => {
     setIsMounted(true);
+    
+    // Check for account configuration error from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('error') === 'account_config_error') {
+      setAccountConfigError(true);
+      setLocalError('Account configuration error. Please contact administrator.');
+    }
   }, []);
   
   const isMobile = isMounted ? screens.xs : false;
@@ -141,6 +149,16 @@ export default function LoginPage() {
               message="Database Connection Issue"
               description="We're having trouble connecting to our database. This could be due to server maintenance or network issues."
               type="warning"
+              showIcon
+              style={{ marginBottom: 24 }}
+            />
+          )}
+          
+          {accountConfigError && (
+            <Alert
+              message="Account Configuration Error"
+              description="Your account exists in authentication but not in the database. This is a security issue. Please contact the administrator to resolve this."
+              type="error"
               showIcon
               style={{ marginBottom: 24 }}
             />

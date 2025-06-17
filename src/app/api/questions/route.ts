@@ -97,9 +97,9 @@ async function testDatabaseConnectivity(supabase: any) {
       return {
         success: false,
         error: 'User not found in database',
-        details: 'User exists in auth but not in users table',
+        details: 'User exists in auth but not in users table - SECURITY VIOLATION',
         step: 'db_user_test',
-        suggestion: 'User account needs to be created in the database'
+        suggestion: 'Contact administrator - account not properly configured'
       };
     }
     
