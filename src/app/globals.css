@@ -266,9 +266,38 @@ body {
   }
 }
 
+/* Landing page header responsive adjustments */
+.landing-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important; /* Prevent wrapping */
+  min-height: 48px;
+}
+
+@media (max-width: 480px) {
+  .landing-header {
+    min-height: 40px;
+  }
+  
+  /* Ensure buttons stay compact on very small screens */
+  .landing-header .ant-btn {
+    font-size: 11px !important;
+    padding: 2px 8px !important;
+    height: 24px !important;
+    min-width: 50px;
+  }
+  
+  /* Ensure title doesn't get too small */
+  .landing-header .ant-typography {
+    font-size: 16px !important;
+    white-space: nowrap;
+  }
+}
+
 /* Form and card responsive adjustments */
 .responsive-card {
-    width: 100%;
+  width: 100%;
   max-width: 400px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
@@ -321,7 +350,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-    height: 100%;
+  height: 100%;
 }
 
 /* Mobile responsive visibility classes */
