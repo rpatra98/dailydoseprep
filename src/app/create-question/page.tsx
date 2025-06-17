@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
-import { getBrowserClient } from '@/lib/supabase-browser';
 import { UserRole, Question } from '@/types';
 import QuestionForm from '@/components/Question/QuestionForm';
 import { 
@@ -12,64 +10,101 @@ import {
   Button, 
   Card, 
   Spin, 
-  Result
+  Result,
+  Alert
 } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, ExclamationCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import AspectRatioLayout from '@/components/AspectRatioLayout';
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
+interface User {
+  id: string;
+  email: string;
+  role: 'SUPERADMIN' | 'QAUTHOR' | 'STUDENT';
+}
+
+// Only log in development
+const isDev = process.env.NODE_ENV === 'development';
+
 export default function CreateQuestion() {
-  const { user } = useAuth();
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  
-  useEffect(() => {
-    // Redirect if not logged in
-    if (!user) {
-      router.push('/login');
-      return;
+  const [isMounted, setIsMounted] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+
+  const addDebug = (message: string) => {
+    if (isDev) {
+      const timestamp = new Date().toLocaleTimeString();
+      const debugMessage = `[${timestamp}] ${message}`;
+      console.log(debugMessage);
+      setDebugInfo(prev => [...prev.slice(-4), debugMessage]);
     }
+  };
 
-    // Function to fetch user role
-    async function fetchUserRole() {
+  // Check authentication and fetch user data
+  useEffect(() => {
+    setIsMounted(true);
+    
+    const checkAuth = async (retryCount = 0) => {
       try {
-        setLoading(true);
-        // Get user role
-        const supabase = getBrowserClient();
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', user?.id || '')
-          .single();
+        addDebug('🔄 Checking authentication for question creation...');
+        
+        // Check if user is authenticated via session
+        const response = await fetch('/api/auth/me', {
+          method: 'GET',
+          credentials: 'include',
+        });
 
-        if (userError) {
-          console.error('Error fetching user role:', userError);
+        if (!response.ok) {
+          // Retry once in case session is still being established
+          if (retryCount === 0) {
+            addDebug('⚠️ Auth check failed, retrying in 2 seconds...');
+            setTimeout(() => checkAuth(1), 2000);
+            return;
+          }
+          
+          addDebug('❌ Not authenticated, redirecting to login');
+          router.push('/login');
           return;
         }
+
+        const userData = await response.json();
+        addDebug(`✅ User authenticated: ${userData.email} (${userData.role})`);
         
-        if (userData?.role) {
-          setUserRole(userData.role as UserRole);
-          
-          // If not QAUTHOR or SUPERADMIN, redirect to dashboard
-          if (userData.role !== 'QAUTHOR' && userData.role !== 'SUPERADMIN') {
-            router.push('/dashboard');
-          }
+        setUser(userData);
+        setUserRole(userData.role);
+        
+        // Only QAUTHORs and SUPERADMINs can create questions
+        if (userData.role !== 'QAUTHOR' && userData.role !== 'SUPERADMIN') {
+          addDebug('❌ Access denied - not QAUTHOR or SUPERADMIN');
+          setError('Access denied. Only QAUTHORs can create questions.');
+          return;
         }
+
+        addDebug('✅ Access granted for question creation');
+        
       } catch (error) {
-        console.error('Error fetching user data:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+        addDebug(`❌ Auth error: ${errorMessage}`);
+        setError(errorMessage);
+        // Redirect to login on auth failure
+        setTimeout(() => router.push('/login'), 1000);
       } finally {
         setLoading(false);
       }
-    }
+    };
 
-    fetchUserRole();
-  }, [user, router]);
+    checkAuth();
+  }, [router]);
 
   const handleQuestionCreated = (question: Question) => {
+    addDebug('✅ Question created successfully');
     setSuccess(true);
   };
   
@@ -80,17 +115,25 @@ export default function CreateQuestion() {
   const handleCreateAnother = () => {
     setSuccess(false);
   };
-  
-  // If not logged in, don't render anything (will redirect in useEffect)
-  if (!user) {
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    window.location.reload();
+  };
+
+  // Prevent hydration mismatch
+  if (!isMounted) {
     return (
       <AspectRatioLayout>
-        <div className="full-height" style={{ background: '#f0f2f5' }}></div>
+        <div className="center-content">
+          <Spin size="large" tip="Loading question form..." />
+        </div>
       </AspectRatioLayout>
     );
   }
-  
-  // If role not fetched yet, show loading
+
+  // Show loading state
   if (loading) {
     return (
       <AspectRatioLayout>
@@ -100,43 +143,142 @@ export default function CreateQuestion() {
               <span className="hidden-mobile">Create Question</span>
               <span className="visible-mobile">Create</span>
             </Title>
-        </Header>
-        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Card style={{ textAlign: 'center' }}>
-            <Spin tip="Loading user data..." />
-          </Card>
-        </Content>
-      </Layout>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Card style={{ textAlign: 'center' }}>
+              <Spin tip="Loading user data..." />
+              {isDev && (
+                <div style={{ 
+                  marginTop: 20, 
+                  fontFamily: 'monospace', 
+                  fontSize: '12px',
+                  textAlign: 'center',
+                  maxWidth: '400px'
+                }}>
+                  {debugInfo.slice(-3).map((info, index) => (
+                    <div key={index} style={{ marginBottom: '4px', color: '#666' }}>
+                      {info}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </Content>
+        </Layout>
       </AspectRatioLayout>
     );
   }
-  
+
+  // Show error state
+  if (error) {
+    return (
+      <AspectRatioLayout>
+        <Layout className="full-height">
+          <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', alignItems: 'center' }}>
+            <Button 
+              type="text" 
+              icon={<ArrowLeftOutlined />} 
+              onClick={handleBackToDashboard}
+              style={{ marginRight: 8 }}
+            >
+              <span className="hidden-mobile">Back</span>
+            </Button>
+            <Title level={3} style={{ margin: 0 }}>
+              <span className="hidden-mobile">Create Question</span>
+              <span className="visible-mobile">Create</span>
+            </Title>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Card style={{ textAlign: 'center', maxWidth: 500 }}>
+              <div style={{ marginBottom: 16 }}>
+                <ExclamationCircleOutlined style={{ fontSize: '48px', color: '#ff4d4f', marginBottom: '16px' }} />
+                <Title level={4} style={{ color: '#ff4d4f' }}>Error Loading Question Form</Title>
+              </div>
+              <Alert
+                message="Authentication Error"
+                description={error}
+                type="error"
+                showIcon
+                style={{ marginBottom: 24 }}
+              />
+              <div>
+                <Button 
+                  type="primary" 
+                  icon={<ReloadOutlined />}
+                  onClick={handleRetry}
+                  style={{ marginRight: 8 }}
+                >
+                  Retry
+                </Button>
+                <Button onClick={handleBackToDashboard}>
+                  Back to Dashboard
+                </Button>
+              </div>
+            </Card>
+          </Content>
+          
+          {/* Debug Info Panel - Only show in development */}
+          {isDev && debugInfo.length > 0 && (
+            <div style={{ 
+              position: 'fixed', 
+              bottom: 20, 
+              right: 20, 
+              background: 'white', 
+              border: '1px solid #d9d9d9', 
+              borderRadius: 4, 
+              padding: 12, 
+              maxWidth: 400,
+              fontSize: '12px',
+              fontFamily: 'monospace',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: 8 }}>Debug Info:</div>
+              {debugInfo.map((info, index) => (
+                <div key={index} style={{ marginBottom: '4px' }}>
+                  {info}
+                </div>
+              ))}
+            </div>
+          )}
+        </Layout>
+      </AspectRatioLayout>
+    );
+  }
+
   // If not authorized, show message
   if (userRole !== 'QAUTHOR' && userRole !== 'SUPERADMIN') {
     return (
       <AspectRatioLayout>
         <Layout className="full-height">
           <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', alignItems: 'center' }}>
+            <Button 
+              type="text" 
+              icon={<ArrowLeftOutlined />} 
+              onClick={handleBackToDashboard}
+              style={{ marginRight: 8 }}
+            >
+              <span className="hidden-mobile">Back</span>
+            </Button>
             <Title level={3} style={{ margin: 0 }}>
               <span className="hidden-mobile">Create Question</span>
               <span className="visible-mobile">Create</span>
             </Title>
-        </Header>
-        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Card>
-            <Result
-              status="403"
-              title="Not Authorized"
-              subTitle="Sorry, you are not authorized to create questions."
-              extra={
-                <Button type="primary" onClick={handleBackToDashboard}>
-                  Back to Dashboard
-                </Button>
-              }
-            />
-          </Card>
-        </Content>
-      </Layout>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Card>
+              <Result
+                status="403"
+                title="Not Authorized"
+                subTitle="Sorry, you are not authorized to create questions. Only QAUTHORs can create questions."
+                extra={
+                  <Button type="primary" onClick={handleBackToDashboard}>
+                    Back to Dashboard
+                  </Button>
+                }
+              />
+            </Card>
+          </Content>
+        </Layout>
       </AspectRatioLayout>
     );
   }
@@ -150,25 +292,25 @@ export default function CreateQuestion() {
               <span className="hidden-mobile">Create Question</span>
               <span className="visible-mobile">Create</span>
             </Title>
-        </Header>
-        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Card>
-            <Result
-              status="success"
-              title="Question Created Successfully!"
-              subTitle="Your question has been added to the database and will be available for students."
-              extra={[
-                <Button type="primary" key="another" onClick={handleCreateAnother}>
-                  Create Another Question
-                </Button>,
-                <Button key="dashboard" onClick={handleBackToDashboard}>
-                  Back to Dashboard
-                </Button>,
-              ]}
-            />
-          </Card>
-        </Content>
-      </Layout>
+          </Header>
+          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Card>
+              <Result
+                status="success"
+                title="Question Created Successfully!"
+                subTitle="Your question has been added to the database and will be available for students."
+                extra={[
+                  <Button type="primary" key="another" onClick={handleCreateAnother}>
+                    Create Another Question
+                  </Button>,
+                  <Button key="dashboard" onClick={handleBackToDashboard}>
+                    Back to Dashboard
+                  </Button>,
+                ]}
+              />
+            </Card>
+          </Content>
+        </Layout>
       </AspectRatioLayout>
     );
   }
@@ -177,27 +319,30 @@ export default function CreateQuestion() {
     <AspectRatioLayout>
       <Layout className="full-height">
         <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', alignItems: 'center' }}>
-        <Button 
-          type="text" 
-          icon={<ArrowLeftOutlined />} 
-          onClick={handleBackToDashboard}
+          <Button 
+            type="text" 
+            icon={<ArrowLeftOutlined />} 
+            onClick={handleBackToDashboard}
             style={{ marginRight: 8 }}
-        >
+          >
             <span className="hidden-mobile">Back</span>
-        </Button>
+          </Button>
           <Title level={3} style={{ margin: 0 }}>
             <span className="hidden-mobile">Create Question</span>
             <span className="visible-mobile">Create</span>
           </Title>
-      </Header>
+        </Header>
         <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
           <div style={{ maxWidth: 800, margin: '0 auto' }}>
-        <Card>
-          <QuestionForm onComplete={handleQuestionCreated} onCancel={handleBackToDashboard} />
-        </Card>
+            <Card>
+              <QuestionForm 
+                onComplete={handleQuestionCreated} 
+                onCancel={handleBackToDashboard} 
+              />
+            </Card>
           </div>
-      </Content>
-    </Layout>
+        </Content>
+      </Layout>
     </AspectRatioLayout>
   );
 } 

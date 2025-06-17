@@ -16,7 +16,6 @@ import {
   SaveOutlined, 
   CloseOutlined 
 } from '@ant-design/icons';
-import { useAuth } from '@/context/AuthContext';
 import { Question, DifficultyLevel, ExamCategory, Option, Subject } from '@/types';
 
 const { Title, Text } = Typography;
@@ -34,7 +33,6 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
   
   // Fetch subjects on component mount
   useEffect(() => {
@@ -70,16 +68,6 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
     try {
       setSubmitting(true);
       setError(null);
-      
-      // Check if user is authenticated
-      if (!user) {
-        throw new Error('You must be logged in to create questions');
-      }
-      
-      // Debug authentication state
-      console.log('User object:', user);
-      console.log('User role:', user.role);
-      console.log('User email:', user.email);
       
       console.log('Submitting question with values:', {
         ...values,
@@ -322,7 +310,6 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
               htmlType="submit" 
               loading={submitting}
               icon={<SaveOutlined />}
-              disabled={!user}
             >
               Submit Question
             </Button>
