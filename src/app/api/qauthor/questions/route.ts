@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
       console.log('✅ QAUTHOR access confirmed');
     }
 
-    // Fetch questions created by this QAUTHOR
+    // Fetch questions created by this QAUTHOR - Fixed PostgREST syntax
     const { data: questions, error: questionsError } = await supabase
       .from('questions')
       .select(`
@@ -67,10 +67,12 @@ export async function GET(req: NextRequest) {
         correct_answer,
         explanation,
         difficulty,
+        exam_category,
+        year,
         source,
         created_at,
         updated_at,
-        subjects!inner(
+        subjects!subject_id(
           id,
           name
         )
@@ -79,6 +81,9 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (questionsError) {
+      if (isDev) {
+        console.error('❌ Error fetching questions:', questionsError);
+      }
       throw questionsError;
     }
 
@@ -86,7 +91,10 @@ export async function GET(req: NextRequest) {
       console.log('✅ QAUTHOR questions fetched successfully:', questions?.length || 0, 'questions');
     }
 
-    return NextResponse.json(questions || []);
+    // Return in the format expected by QuestionManager component
+    return NextResponse.json({
+      questions: questions || []
+    });
 
   } catch (error) {
     if (isDev) {
