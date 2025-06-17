@@ -77,10 +77,10 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         optionB: values.optionB ? 'present' : 'missing',
         optionC: values.optionC ? 'present' : 'missing',
         optionD: values.optionD ? 'present' : 'missing',
-        correctAnswer: values.correctAnswer,
+        correctOption: values.correctOption,
         explanation: values.explanation ? 'present' : 'missing',
         difficulty: values.difficulty,
-        subjectId: values.subjectId,
+        subject: values.subject,
         source: values.source || 'not provided'
       });
     }
@@ -96,10 +96,12 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         optionB: values.optionB,
         optionC: values.optionC,
         optionD: values.optionD,
-        correctAnswer: values.correctAnswer,
+        correctAnswer: values.correctOption,
         explanation: values.explanation,
         difficulty: values.difficulty,
-        subjectId: values.subjectId,
+        subject: values.subject,
+        examCategory: values.examCategory,
+        year: values.year,
         source: values.source || null
       };
 
