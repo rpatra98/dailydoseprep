@@ -70,6 +70,18 @@ export default function Dashboard() {
     }
   }, [user, router, authInitialized]);
 
+  // Add timeout for loading state to prevent infinite loading
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (isLoading && !loadError) {
+        setLoadError('Loading timeout - please refresh the page');
+        setIsLoading(false);
+      }
+    }, 15000); // 15 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [isLoading, loadError]);
+
   // Fetch user role and additional data
   useEffect(() => {
     if (!user || !authInitialized) return;

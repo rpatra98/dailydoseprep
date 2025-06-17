@@ -146,7 +146,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       clearBrowserClient();
       setUser(null);
       setError('Session terminated due to account configuration issue.');
-      router.push('/login');
+      
+      // Use window.location instead of router to avoid dependency issues
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login?error=account_config_error';
+      }
     } catch (error) {
       if (isDev) {
         console.error('Error during force logout:', error);
@@ -172,8 +176,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         setError(null);
         
-        // Get initial session
-        const { data: { session }, error: sessionError } = await browserSupabase.auth.getSession();
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Authentication initialization timeout')), 10000);
+        });
+        
+        // Get initial session with timeout
+        const sessionPromise = browserSupabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await Promise.race([sessionPromise, timeoutPromise]) as any;
         
         if (sessionError) {
           if (isDev) {
@@ -207,7 +217,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 console.error('SECURITY: User in auth but not in database during initialization');
               }
               setError('Account configuration error. Please contact administrator.');
-              await forceLogout();
+              
+              // Set loading to false before force logout to prevent infinite loading
+              setLoading(false);
+              setAuthInitialized(true);
+              
+              // Delay the force logout to ensure state is set
+              setTimeout(() => {
+                forceLogout();
+              }, 100);
               return;
             }
           }
