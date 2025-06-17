@@ -11,18 +11,28 @@ import {
   message, 
   Tooltip,
   Typography,
-  Popconfirm
+  Popconfirm,
+  Alert,
+  Spin,
+  Result,
+  Empty
 } from 'antd';
 import { 
   EditOutlined, 
   DeleteOutlined, 
   EyeOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  BookOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
-import { getBrowserClient } from '@/lib/supabase-browser';
-import { useAuth } from '@/context/AuthContext';
 
 const { Title, Text } = Typography;
+
+interface User {
+  id: string;
+  email: string;
+  role: 'SUPERADMIN' | 'QAUTHOR' | 'STUDENT';
+}
 
 interface Question {
   id: string;
@@ -44,67 +54,127 @@ interface Question {
   };
 }
 
+// Only log in development
+const isDev = process.env.NODE_ENV === 'development';
+
 export default function QuestionManager() {
-  const { user } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (user) {
-      fetchQuestions();
+  const addDebug = (message: string) => {
+    if (isDev) {
+      const timestamp = new Date().toLocaleTimeString();
+      const debugMessage = `[${timestamp}] ${message}`;
+      console.log(debugMessage);
+      setDebugInfo(prev => [...prev.slice(-4), debugMessage]);
     }
-  }, [user]);
+  };
 
-  const fetchQuestions = async () => {
+  // Check authentication and fetch user data
+  useEffect(() => {
+    setIsMounted(true);
+    
+    const checkAuth = async () => {
+      try {
+        addDebug('🔄 Checking QAUTHOR authentication...');
+        
+        // Check if user is authenticated via session
+        const response = await fetch('/api/auth/me', {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          addDebug('❌ Not authenticated');
+          setError('Authentication required. Please log out and log back in.');
+          return;
+        }
+
+        const userData = await response.json();
+        addDebug(`✅ User authenticated: ${userData.email} (${userData.role})`);
+        
+        setUser(userData);
+        
+        // Only QAUTHORs can use this component
+        if (userData.role !== 'QAUTHOR') {
+          addDebug('❌ Access denied - not QAUTHOR');
+          setError('Access denied. Only QAUTHORs can manage questions.');
+          return;
+        }
+
+        // Fetch user's questions
+        addDebug('🔄 Fetching QAUTHOR questions...');
+        await fetchQuestions(userData.id);
+        addDebug('✅ Questions loaded');
+        
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+        addDebug(`❌ Auth error: ${errorMessage}`);
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  const fetchQuestions = async (userId?: string) => {
     try {
-      setLoading(true);
-      const supabase = getBrowserClient();
+      setError(null);
+      addDebug('🔄 Fetching questions from API...');
       
-      const { data, error } = await supabase
-        .from('questions')
-        .select(`
-          *,
-          subjects (
-            name
-          )
-        `)
-        .eq('created_by', user?.id)
-        .order('created_at', { ascending: false });
+      const response = await fetch('/api/qauthor/questions', {
+        method: 'GET',
+        credentials: 'include',
+      });
 
-      if (error) {
-        message.error('Failed to fetch questions: ' + error.message);
-        return;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch questions');
       }
 
-      setQuestions(data || []);
+      const data = await response.json();
+      addDebug(`✅ Questions fetched: ${data.questions?.length || 0} questions`);
+      setQuestions(data.questions || []);
     } catch (error) {
-      message.error('Failed to fetch questions');
-    } finally {
-      setLoading(false);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch questions';
+      addDebug(`❌ Failed to fetch questions: ${errorMessage}`);
+      setError(errorMessage);
     }
   };
 
   const handleDelete = async (questionId: string) => {
     try {
-      const supabase = getBrowserClient();
+      addDebug(`🔄 Deleting question: ${questionId}`);
       
-      const { error } = await supabase
-        .from('questions')
-        .delete()
-        .eq('id', questionId)
-        .eq('created_by', user?.id); // Ensure user can only delete their own questions
+      const response = await fetch(`/api/qauthor/questions/${questionId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
 
-      if (error) {
-        message.error('Failed to delete question: ' + error.message);
-        return;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete question');
       }
 
+      addDebug('✅ Question deleted successfully');
       message.success('Question deleted successfully');
-      fetchQuestions(); // Refresh the list
+      
+      // Refresh the questions list
+      if (user) {
+        await fetchQuestions(user.id);
+      }
     } catch (error) {
-      message.error('Failed to delete question');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete question';
+      addDebug(`❌ Delete failed: ${errorMessage}`);
+      message.error(errorMessage);
     }
   };
 
@@ -113,17 +183,95 @@ export default function QuestionManager() {
     setPreviewVisible(true);
   };
 
+  const handleRefresh = async () => {
+    if (user) {
+      setLoading(true);
+      await fetchQuestions(user.id);
+      setLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    window.location.reload();
+  };
+
+  // Prevent hydration mismatch
+  if (!isMounted) {
+    return (
+      <Card>
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <Spin size="large" tip="Loading questions..." />
+        </div>
+      </Card>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Card 
+        title={
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <ExclamationCircleOutlined style={{ color: '#ff4d4f', marginRight: 8 }} />
+            <Title level={4} style={{ margin: 0 }}>My Questions</Title>
+          </div>
+        }
+      >
+        <Alert
+          message="Error Loading Questions"
+          description={error}
+          type="error"
+          showIcon
+          style={{ marginBottom: 24 }}
+        />
+        <div style={{ textAlign: 'center' }}>
+          <Button 
+            type="primary" 
+            icon={<ReloadOutlined />}
+            onClick={handleRetry}
+          >
+            Retry
+          </Button>
+        </div>
+        
+        {/* Debug Info Panel - Only show in development */}
+        {isDev && (
+          <Card 
+            title="Debug Information"
+            size="small"
+            style={{ marginTop: 16 }}
+          >
+            <div style={{ fontFamily: 'monospace', fontSize: '12px', maxHeight: '150px', overflowY: 'auto' }}>
+              {debugInfo.map((info, index) => (
+                <div key={index} style={{ marginBottom: '4px' }}>
+                  {info}
+                </div>
+              ))}
+              {debugInfo.length === 0 && (
+                <div style={{ color: '#999' }}>No debug info yet...</div>
+              )}
+            </div>
+          </Card>
+        )}
+      </Card>
+    );
+  }
+
   const columns = [
     {
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
+      width: 200,
+      ellipsis: true,
       render: (title: string, record: Question) => (
         <div>
           <Text strong>{title}</Text>
           <br />
           <Text type="secondary" ellipsis style={{ fontSize: '12px' }}>
-            {record.content.substring(0, 100)}...
+            {record.content.substring(0, 80)}...
           </Text>
         </div>
       ),
@@ -132,6 +280,7 @@ export default function QuestionManager() {
       title: 'Subject',
       dataIndex: ['subjects', 'name'],
       key: 'subject',
+      width: 120,
       render: (subject: string) => (
         <Tag color="blue">{subject || 'Unknown'}</Tag>
       ),
@@ -140,6 +289,7 @@ export default function QuestionManager() {
       title: 'Difficulty',
       dataIndex: 'difficulty',
       key: 'difficulty',
+      width: 100,
       render: (difficulty: string) => {
         const color = difficulty === 'EASY' ? 'green' : difficulty === 'MEDIUM' ? 'orange' : 'red';
         return <Tag color={color}>{difficulty}</Tag>;
@@ -149,19 +299,22 @@ export default function QuestionManager() {
       title: 'Category',
       dataIndex: 'exam_category',
       key: 'exam_category',
+      width: 120,
       render: (category: string) => (
-        <Tag>{category}</Tag>
+        <Tag color="green">{category}</Tag>
       ),
     },
     {
       title: 'Created',
       dataIndex: 'created_at',
       key: 'created_at',
+      width: 120,
       render: (date: string) => new Date(date).toLocaleDateString(),
     },
     {
       title: 'Actions',
       key: 'actions',
+      width: 120,
       render: (_: any, record: Question) => (
         <Space>
           <Tooltip title="Preview Question">
@@ -169,6 +322,7 @@ export default function QuestionManager() {
               type="text" 
               icon={<EyeOutlined />} 
               onClick={() => handlePreview(record)}
+              size="small"
             />
           </Tooltip>
           <Popconfirm
@@ -177,12 +331,14 @@ export default function QuestionManager() {
             onConfirm={() => handleDelete(record.id)}
             okText="Yes"
             cancelText="No"
+            icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
           >
             <Tooltip title="Delete Question">
               <Button 
                 type="text" 
                 danger 
                 icon={<DeleteOutlined />}
+                size="small"
               />
             </Tooltip>
           </Popconfirm>
@@ -198,8 +354,9 @@ export default function QuestionManager() {
           <Title level={4} style={{ margin: 0 }}>My Questions</Title>
           <Button 
             icon={<ReloadOutlined />} 
-            onClick={fetchQuestions}
+            onClick={handleRefresh}
             loading={loading}
+            size="small"
           >
             Refresh
           </Button>
@@ -219,6 +376,17 @@ export default function QuestionManager() {
             `${range[0]}-${range[1]} of ${total} questions`,
         }}
         scroll={{ x: 'max-content' }}
+        locale={{
+          emptyText: (
+            <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+              <BookOutlined style={{ fontSize: '48px', color: '#d9d9d9', marginBottom: '16px' }} />
+              <Title level={4} style={{ color: '#999' }}>No Questions Yet</Title>
+              <Text type="secondary">
+                You haven't created any questions yet. Click "Create New Question" to get started.
+              </Text>
+            </div>
+          )
+        }}
       />
 
       {/* Question Preview Modal */}
@@ -262,7 +430,7 @@ export default function QuestionManager() {
               </div>
             )}
 
-            <div style={{ marginTop: 16, display: 'flex', gap: 16 }}>
+            <div style={{ marginTop: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               <div>
                 <Text strong>Difficulty: </Text>
                 <Tag color={selectedQuestion.difficulty === 'EASY' ? 'green' : selectedQuestion.difficulty === 'MEDIUM' ? 'orange' : 'red'}>
@@ -271,7 +439,7 @@ export default function QuestionManager() {
               </div>
               <div>
                 <Text strong>Category: </Text>
-                <Tag>{selectedQuestion.exam_category}</Tag>
+                <Tag color="green">{selectedQuestion.exam_category}</Tag>
               </div>
               {selectedQuestion.year && (
                 <div>
@@ -290,6 +458,23 @@ export default function QuestionManager() {
           </div>
         )}
       </Modal>
+      
+      {/* Debug Info Panel - Only show in development */}
+      {isDev && debugInfo.length > 0 && (
+        <Card 
+          title="Debug Information"
+          size="small"
+          style={{ marginTop: 16 }}
+        >
+          <div style={{ fontFamily: 'monospace', fontSize: '12px', maxHeight: '150px', overflowY: 'auto' }}>
+            {debugInfo.map((info, index) => (
+              <div key={index} style={{ marginBottom: '4px' }}>
+                {info}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </Card>
   );
 } 
