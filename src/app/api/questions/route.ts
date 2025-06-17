@@ -585,7 +585,7 @@ export async function GET(req: NextRequest) {
       .select('role')
       .eq('id', authData.user.id)
       .single();
-
+    
     if (userError || !userData) {
       if (isDev) {
         console.log('❌ User not found in database');
@@ -676,7 +676,7 @@ export async function POST(req: NextRequest) {
     
     // Validate required fields
     if (!content || !optionA || !optionB || !optionC || !optionD || !correctAnswer || !subject) {
-      return NextResponse.json({
+      return NextResponse.json({ 
         error: 'Missing required fields',
         details: 'content, optionA, optionB, optionC, optionD, correctAnswer, and subject are required'
       }, { status: 400 });
@@ -724,11 +724,11 @@ export async function POST(req: NextRequest) {
       year: year || null,                      // INTEGER (nullable) - Year the question was from
       source: source || null,                  // TEXT (nullable) - Source/reference information
       questionhash: generateQuestionHash({     // TEXT (nullable) - Unique hash to prevent duplicates
-        content,
-        optionA,
-        optionB,
-        optionC,
-        optionD,
+      content,
+      optionA,
+      optionB,
+      optionC,
+      optionD,
         subject
       }),
       subject_id: subject,                     // UUID (nullable) - Foreign key to subjects.id

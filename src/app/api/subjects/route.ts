@@ -174,8 +174,7 @@ export async function POST(req: NextRequest) {
     // Create the subject
     const subjectData = {
       name: trimmedName,
-      examcategory: examcategory || 'OTHER',
-      created_by: userData.id
+      examcategory: examcategory || 'OTHER'
     };
     
     const { data: newSubject, error: createError } = await supabase
