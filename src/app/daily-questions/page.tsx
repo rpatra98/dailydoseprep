@@ -166,13 +166,13 @@ export default function DailyQuestions() {
               <span className="hidden-mobile">Daily Questions</span>
               <span className="visible-mobile">Questions</span>
             </Title>
-          </Header>
-          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Card style={{ textAlign: 'center' }}>
-              <Spin tip="Loading your daily questions..." />
-            </Card>
-          </Content>
-        </Layout>
+        </Header>
+        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Card style={{ textAlign: 'center' }}>
+            <Spin tip="Loading your daily questions..." />
+          </Card>
+        </Content>
+      </Layout>
       </AspectRatioLayout>
     );
   }
@@ -183,38 +183,38 @@ export default function DailyQuestions() {
       <AspectRatioLayout>
         <Layout className="full-height">
           <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', alignItems: 'center' }}>
-            <Button 
-              type="text" 
-              icon={<ArrowLeftOutlined />} 
-              onClick={handleBackToDashboard}
+          <Button 
+            type="text" 
+            icon={<ArrowLeftOutlined />} 
+            onClick={handleBackToDashboard}
               style={{ marginRight: 8 }}
-            >
+          >
               <span className="hidden-mobile">Back</span>
-            </Button>
+          </Button>
             <Title level={3} style={{ margin: 0 }}>
               <span className="hidden-mobile">Daily Questions</span>
               <span className="visible-mobile">Questions</span>
             </Title>
-          </Header>
-          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Card>
-              <Result
-                status="info"
-                title={currentSet?.message || "No questions available"}
-                subTitle={
-                  currentSet?.message 
-                    ? "You've completed all available questions for your primary subject!"
-                    : "Please select a primary subject in your dashboard to receive daily questions."
-                }
-                extra={
-                  <Button type="primary" onClick={handleBackToDashboard}>
-                    Back to Dashboard
-                  </Button>
-                }
-              />
-            </Card>
-          </Content>
-        </Layout>
+        </Header>
+        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Card>
+            <Result
+              status="info"
+              title={currentSet?.message || "No questions available"}
+              subTitle={
+                currentSet?.message 
+                  ? "You've completed all available questions for your primary subject!"
+                  : "Please select a primary subject in your dashboard to receive daily questions."
+              }
+              extra={
+                <Button type="primary" onClick={handleBackToDashboard}>
+                  Back to Dashboard
+                </Button>
+              }
+            />
+          </Card>
+        </Content>
+      </Layout>
       </AspectRatioLayout>
     );
   }
@@ -225,22 +225,22 @@ export default function DailyQuestions() {
       <AspectRatioLayout>
         <Layout className="full-height">
           <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', alignItems: 'center' }}>
-            <Button 
-              type="text" 
-              icon={<ArrowLeftOutlined />} 
-              onClick={handleBackToDashboard}
+          <Button 
+            type="text" 
+            icon={<ArrowLeftOutlined />} 
+            onClick={handleBackToDashboard}
               style={{ marginRight: 8 }}
-            >
+          >
               <span className="hidden-mobile">Back</span>
-            </Button>
+          </Button>
             <Title level={3} style={{ margin: 0 }}>
               <span className="hidden-mobile">Daily Questions</span>
               <span className="visible-mobile">Questions</span>
             </Title>
-          </Header>
-          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        </Header>
+        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Card style={{ textAlign: 'center', maxWidth: 600 }}>
-              <Result
+            <Result
                 status="success"
                 title="Questions Completed!"
                 subTitle={`You scored ${currentSet.score || 0} out of ${currentSet.questions.length} questions.`}
@@ -255,10 +255,10 @@ export default function DailyQuestions() {
                 type="circle" 
                 percent={Math.round(((currentSet.score || 0) / currentSet.questions.length) * 100)}
                 format={() => `${currentSet.score || 0}/${currentSet.questions.length}`}
-              />
-            </Card>
-          </Content>
-        </Layout>
+            />
+          </Card>
+        </Content>
+      </Layout>
       </AspectRatioLayout>
     );
   }
@@ -269,14 +269,14 @@ export default function DailyQuestions() {
       <Layout className="full-height">
         <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Button 
-              type="text" 
-              icon={<ArrowLeftOutlined />} 
-              onClick={handleBackToDashboard}
+        <Button 
+          type="text" 
+          icon={<ArrowLeftOutlined />} 
+          onClick={handleBackToDashboard}
               style={{ marginRight: 8 }}
-            >
+        >
               <span className="hidden-mobile">Back</span>
-            </Button>
+        </Button>
             <Title level={3} style={{ margin: 0 }}>
               <span className="hidden-mobile">Daily Questions</span>
               <span className="visible-mobile">Questions</span>
@@ -286,32 +286,32 @@ export default function DailyQuestions() {
             <span className="hidden-mobile">{Object.keys(selectedAnswers).length} / {currentSet.questions.length} answered</span>
             <span className="visible-mobile">{Object.keys(selectedAnswers).length}/{currentSet.questions.length}</span>
           </Text>
-        </Header>
+      </Header>
         <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
           <div style={{ maxWidth: 800, margin: '0 auto' }}>
-            {error && (
-              <Alert
+        {error && (
+          <Alert
                 message={error}
-                type="error"
-                showIcon
+            type="error"
+            showIcon
                 style={{ marginBottom: 24 }}
-                closable
-                onClose={() => setError(null)}
-              />
-            )}
-            
+            closable
+            onClose={() => setError(null)}
+          />
+        )}
+        
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              {currentSet.questions.map((question, index) => (
-                <Card 
-                  key={question.id}
+        {currentSet.questions.map((question, index) => (
+          <Card 
+            key={question.id} 
                   title={`Question ${index + 1}`}
                   style={{ width: '100%' }}
-                >
+          >
                   <Title level={4}>{question.title}</Title>
-                  <Paragraph>{question.content}</Paragraph>
+            <Paragraph>{question.content}</Paragraph>
                   
-                  <Radio.Group
-                    value={selectedAnswers[question.id]}
+            <Radio.Group 
+              value={selectedAnswers[question.id]}
                     onChange={(e) => handleAnswerChange(question.id, e.target.value)}
                     style={{ width: '100%' }}
                   >
@@ -319,28 +319,28 @@ export default function DailyQuestions() {
                       {question.options.map((option) => (
                         <Radio key={option.key} value={option.key} style={{ width: '100%' }}>
                           {option.value}
-                        </Radio>
-                      ))}
-                    </Space>
-                  </Radio.Group>
-                </Card>
+                </Radio>
               ))}
+                    </Space>
+            </Radio.Group>
+          </Card>
+        ))}
             </Space>
-            
+        
             <div style={{ textAlign: 'center', marginTop: 32 }}>
-              <Button
-                type="primary"
-                size="large"
+          <Button 
+            type="primary" 
+            size="large"
                 loading={submitting}
-                onClick={handleSubmitAnswers}
+            onClick={handleSubmitAnswers}
                 icon={<CheckCircleOutlined />}
-              >
+          >
                 {submitting ? 'Submitting...' : 'Submit Answers'}
-              </Button>
+          </Button>
             </div>
           </div>
-        </Content>
-      </Layout>
+      </Content>
+    </Layout>
     </AspectRatioLayout>
   );
 } 

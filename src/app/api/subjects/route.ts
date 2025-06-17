@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRouteHandlerClient, getServiceRoleClient } from '@/lib/supabase-server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { Subject } from '@/types';
 
 // GET all subjects
 export async function GET() {
   try {
-    const supabase = getRouteHandlerClient();
+    const supabase = createRouteHandlerClient({ cookies });
     
     const { data, error } = await supabase
       .from('subjects')
@@ -37,97 +38,192 @@ export async function OPTIONS() {
   });
 }
 
-// POST a new subject - protected for SUPERADMIN only
+// POST a new subject - SUPERADMIN only (Session-based authentication)
 export async function POST(req: NextRequest) {
   try {
-    console.log('POST /api/subjects: Starting request');
+    console.log('🔄 POST /api/subjects: Starting subject creation request');
     
-    // Use service role client for admin operations
-    const supabaseAdmin = getServiceRoleClient();
+    // Use single client for consistent authentication context
+    const supabase = createRouteHandlerClient({ cookies });
     
-    // Also create route handler client for session management
-    const supabase = getRouteHandlerClient();
+    // Step 1: Validate authentication session
+    console.log('🔐 Step 1: Validating authentication session...');
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    // Get the session from cookies
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError) {
-      console.error('Authentication error getting session:', sessionError);
-      return NextResponse.json({ error: 'Authentication error', details: sessionError.message }, { status: 401 });
+    if (authError) {
+      console.error('❌ Authentication error:', authError.message);
+      return NextResponse.json({ 
+        error: 'Authentication failed', 
+        details: authError.message,
+        suggestion: 'Please log out and log back in'
+      }, { status: 401 });
     }
     
-    if (!sessionData.session) {
-      console.error('No session found');
-      return NextResponse.json({ error: 'Not authenticated - no session found' }, { status: 401 });
+    if (!user) {
+      console.error('❌ No authenticated user found');
+      return NextResponse.json({ 
+        error: 'Authentication required', 
+        details: 'No valid session found',
+        suggestion: 'Please log in to continue'
+      }, { status: 401 });
     }
     
-    const userId = sessionData.session.user.id;
-    console.log(`User ID from session: ${userId}`);
+    console.log('✅ User authenticated:', user.email, 'ID:', user.id);
     
-    // Check if user is SUPERADMIN
-    const { data: userData, error: userError } = await supabaseAdmin
+    // Step 2: Verify user exists in database and check role
+    console.log('👤 Step 2: Checking user role in database...');
+    const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('role')
-      .eq('id', userId)
+      .select('id, email, role')
+      .eq('id', user.id)
       .single();
     
     if (userError) {
-      console.error('Error fetching user role:', userError);
-      return NextResponse.json({ error: 'Failed to verify user role', details: userError.message }, { status: 500 });
+      console.error('❌ Error fetching user from database:', userError.message);
+      return NextResponse.json({ 
+        error: 'User verification failed', 
+        details: userError.message,
+        suggestion: 'User account may not be properly configured'
+      }, { status: 500 });
     }
     
-    console.log(`User role: ${userData?.role}`);
-    
-    if (userData?.role !== 'SUPERADMIN') {
-      return NextResponse.json({ error: 'Unauthorized. Only SUPERADMIN can create subjects' }, { status: 403 });
+    if (!userData) {
+      console.error('❌ User not found in database');
+      return NextResponse.json({ 
+        error: 'User not found', 
+        details: 'User exists in auth but not in users table',
+        suggestion: 'Contact administrator - account not properly configured'
+      }, { status: 500 });
     }
     
-    // Parse request body
-    const body = await req.json();
-    const { name } = body;
+    console.log('✅ User found in database:', userData.email, 'Role:', userData.role);
     
-    if (!name) {
-      return NextResponse.json({ error: 'Subject name is required' }, { status: 400 });
+    // Step 3: Check SUPERADMIN role permission
+    if (userData.role !== 'SUPERADMIN') {
+      console.error('❌ Insufficient permissions. User role:', userData.role);
+      return NextResponse.json({ 
+        error: 'Insufficient permissions', 
+        details: `User role '${userData.role}' cannot create subjects. Only SUPERADMIN can create subjects.`,
+        suggestion: 'Contact administrator for proper permissions'
+      }, { status: 403 });
     }
     
-    console.log(`Creating subject with name: ${name}`);
+    console.log('✅ SUPERADMIN role verified');
     
-    // Check if subject already exists
-    const { data: existingSubject, error: existingError } = await supabaseAdmin
+    // Step 4: Parse and validate request body
+    console.log('📝 Step 4: Parsing request body...');
+    let body;
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      console.error('❌ Invalid request body:', parseError);
+      return NextResponse.json({ 
+        error: 'Invalid request body', 
+        details: 'Could not parse JSON request'
+      }, { status: 400 });
+    }
+    
+    const { name, description } = body;
+    
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return NextResponse.json({ 
+        error: 'Invalid subject name', 
+        details: 'Subject name is required and must be a non-empty string'
+      }, { status: 400 });
+    }
+    
+    const trimmedName = name.trim();
+    console.log('✅ Subject name validated:', trimmedName);
+    
+    // Step 5: Check for duplicate subject names
+    console.log('🔍 Step 5: Checking for duplicate subject names...');
+    const { data: existingSubject, error: duplicateError } = await supabase
       .from('subjects')
-      .select('id')
-      .eq('name', name)
-      .single();
+      .select('id, name')
+      .eq('name', trimmedName)
+      .maybeSingle(); // Use maybeSingle to avoid error when no results
       
-    if (existingError && existingError.code !== 'PGRST116') {
-      console.error('Error checking existing subject:', existingError);
-      return NextResponse.json({ error: 'Error checking existing subject', details: existingError.message }, { status: 500 });
+    if (duplicateError) {
+      console.error('❌ Error checking for duplicates:', duplicateError.message);
+      return NextResponse.json({ 
+        error: 'Database error', 
+        details: duplicateError.message
+      }, { status: 500 });
     }
       
     if (existingSubject) {
-      return NextResponse.json({ error: 'Subject with this name already exists' }, { status: 409 });
+      console.error('❌ Subject already exists:', trimmedName);
+      return NextResponse.json({ 
+        error: 'Subject already exists', 
+        details: `A subject with the name '${trimmedName}' already exists`
+      }, { status: 409 });
     }
     
-    // Create new subject with default values
-    const { data, error } = await supabaseAdmin
+    console.log('✅ No duplicate found, proceeding with creation');
+    
+    // Step 6: Create new subject (RLS policies will enforce permissions)
+    console.log('➕ Step 6: Creating new subject...');
+    const subjectData = {
+      name: trimmedName,
+      description: description?.trim() || null
+    };
+    
+    const { data: newSubject, error: createError } = await supabase
       .from('subjects')
-      .insert({
-        name,
-        description: null
-      })
-      .select()
+      .insert(subjectData)
+      .select('*')
       .single();
       
-    if (error) {
-      console.error('Error creating subject:', error);
-      return NextResponse.json({ error: 'Failed to create subject', details: error.message }, { status: 500 });
+    if (createError) {
+      console.error('❌ Error creating subject:', createError.message);
+      
+      // Provide specific error analysis
+      let errorAnalysis = 'Unknown database error';
+      let suggestion = 'Check database configuration';
+      
+      if (createError.message?.includes('permission denied') || createError.message?.includes('policy')) {
+        errorAnalysis = 'Permission denied by database policy';
+        suggestion = 'RLS policies may need to be updated';
+      } else if (createError.message?.includes('unique constraint')) {
+        errorAnalysis = 'Subject name must be unique';
+        suggestion = 'Try a different subject name';
+      } else if (createError.message?.includes('check constraint')) {
+        errorAnalysis = 'Data validation failed';
+        suggestion = 'Check subject name format and requirements';
+      }
+      
+      return NextResponse.json({ 
+        error: 'Failed to create subject', 
+        details: createError.message,
+        analysis: errorAnalysis,
+        suggestion: suggestion
+      }, { status: 500 });
     }
     
-    console.log('Subject created successfully:', data);
-    return NextResponse.json(data, { status: 201 });
-  } catch (err) {
-    console.error('Exception in subject creation:', err);
-    const errorMessage = err instanceof Error ? err.message : 'Unknown server error';
-    return NextResponse.json({ error: 'Server error', details: errorMessage }, { status: 500 });
+    if (!newSubject) {
+      console.error('❌ Subject creation succeeded but no data returned');
+      return NextResponse.json({ 
+        error: 'Subject creation incomplete', 
+        details: 'Database operation succeeded but no subject data was returned'
+      }, { status: 500 });
+    }
+    
+    console.log('✅ Subject created successfully:', newSubject.id, newSubject.name);
+    
+    // Step 7: Return success response
+    return NextResponse.json({
+      success: true,
+      message: 'Subject created successfully',
+      subject: newSubject
+    }, { status: 201 });
+    
+  } catch (error) {
+    console.error('💥 Unexpected error in subject creation:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: errorMessage,
+      suggestion: 'Please try again or contact support if the issue persists'
+    }, { status: 500 });
   }
 } 

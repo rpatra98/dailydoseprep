@@ -16,9 +16,6 @@ export default function LoginPage() {
   const [localError, setLocalError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [loginAttempts, setLoginAttempts] = useState(0);
-  const [connectionIssue, setConnectionIssue] = useState(false);
-  const [accountConfigError, setAccountConfigError] = useState(false);
   const { user, login, loading, error, authInitialized } = useAuth();
   const router = useRouter();
   const screens = useBreakpoint();
@@ -31,7 +28,6 @@ export default function LoginPage() {
     const errorParam = urlParams.get('error');
     
     if (errorParam === 'account_config_error') {
-      setAccountConfigError(true);
       setLocalError('Account configuration error. Please contact administrator.');
     } else if (errorParam === 'session_expired') {
       setLocalError('Your session has expired. Please sign in again.');
@@ -42,40 +38,29 @@ export default function LoginPage() {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user && authInitialized) {
+    if (user && authInitialized && !loading) {
+      console.log('🔄 User already logged in, redirecting to dashboard...');
       router.push('/dashboard');
     }
-  }, [user, router, authInitialized]);
-
-  // Monitor for timeout issues
-  useEffect(() => {
-    if (loginAttempts > 0 && !isSubmitting && !user) {
-      const timeoutId = setTimeout(() => {
-        if (!user && localError.includes('timeout')) {
-          setConnectionIssue(true);
-        }
-      }, 5000);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [loginAttempts, isSubmitting, user, localError]);
+  }, [user, router, authInitialized, loading]);
 
   const handleSubmit = async (values: { email: string; password: string }) => {
     const { email, password } = values;
     setLocalError('');
-    setConnectionIssue(false);
     setIsSubmitting(true);
-    setLoginAttempts(prev => prev + 1);
     
     try {
-      await login(email, password);
+      console.log('🔄 Submitting login form...');
+      const result = await login(email, password);
+      
+      if (result && !result.success) {
+        setLocalError(result.error || 'Login failed');
+      }
+      // If successful, the AuthContext will handle the redirect
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed';
+      console.error('❌ Login form error:', errorMessage);
       setLocalError(errorMessage);
-      
-      if (errorMessage.includes('timeout') || errorMessage.includes('network')) {
-        setConnectionIssue(true);
-      }
     } finally {
       setIsSubmitting(false);
     }
@@ -83,14 +68,18 @@ export default function LoginPage() {
   
   // Don't render during SSR to avoid hydration issues
   if (!isMounted) {
-    return <div className="center-content"><Spin size="large" /></div>;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Spin size="large" />
+      </div>
+    );
   }
 
   // Show loading if authentication is initializing
   if (!authInitialized) {
     return (
       <AspectRatioLayout>
-        <div className="center-content">
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           <Spin size="large" tip="Initializing authentication..." />
         </div>
       </AspectRatioLayout>
@@ -101,7 +90,7 @@ export default function LoginPage() {
   if (loading || isSubmitting) {
     return (
       <AspectRatioLayout>
-        <div className="center-content">
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           <Spin size="large" tip={isSubmitting ? "Signing you in..." : "Loading..."} />
         </div>
       </AspectRatioLayout>
@@ -113,7 +102,11 @@ export default function LoginPage() {
 
   return (
     <AspectRatioLayout>
-      <div className="center-content" style={{ 
+      <div style={{ 
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100%',
         padding: isMobile ? '16px' : '24px',
         position: 'relative'
       }}>
@@ -134,37 +127,25 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        <Card className={isMobile ? 'mobile-full-card responsive-card' : 'responsive-card'}>
+        <Card 
+          className={isMobile ? 'mobile-full-card responsive-card' : 'responsive-card'}
+          style={{ width: '100%', maxWidth: 400 }}
+        >
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
             <Title level={isMobile ? 3 : 2}>Sign in to your account</Title>
           </div>
           
           {displayError && (
             <Alert
-              message={displayError}
+              message="Login Error"
+              description={displayError}
               type="error"
               showIcon
               style={{ marginBottom: 24 }}
-            />
-          )}
-          
-          {connectionIssue && (
-            <Alert
-              message="Database Connection Issue"
-              description="We're having trouble connecting to our database. This could be due to server maintenance or network issues."
-              type="warning"
-              showIcon
-              style={{ marginBottom: 24 }}
-            />
-          )}
-          
-          {accountConfigError && (
-            <Alert
-              message="Account Configuration Error"
-              description="Your account exists in authentication but not in the database. This is a security issue. Please contact the administrator to resolve this."
-              type="error"
-              showIcon
-              style={{ marginBottom: 24 }}
+              closable
+              onClose={() => {
+                setLocalError('');
+              }}
             />
           )}
           
@@ -173,6 +154,9 @@ export default function LoginPage() {
             layout="vertical"
             onFinish={handleSubmit}
             size={isMobile ? "middle" : "large"}
+            initialValues={{
+              email: 'superadmin@ddp.com', // Pre-fill for testing
+            }}
           >
             <Form.Item
               name="email"
@@ -204,23 +188,22 @@ export default function LoginPage() {
             </Form.Item>
             
             <Form.Item style={{ marginBottom: 0 }}>
-              <Button 
-                type="primary" 
-                htmlType="submit" 
-                block
-                disabled={isSubmitting}
+              <Button
+                type="primary"
+                htmlType="submit"
                 loading={isSubmitting}
+                disabled={loading}
+                style={{ width: '100%' }}
+                size={isMobile ? "middle" : "large"}
               >
-                {isSubmitting ? 'Signing in...' : 'Sign in'}
+                {isSubmitting ? 'Signing in...' : 'Sign In'}
               </Button>
             </Form.Item>
           </Form>
           
-          <div style={{ textAlign: 'center', marginTop: 24 }}>
-            <span>Don't have an account? </span>
-            <Link href="/register" style={{ color: '#1677ff' }}>
-              Create one here
-            </Link>
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <span style={{ color: '#666' }}>Don't have an account? </span>
+            <Link href="/register" style={{ color: '#1890ff' }}>Create one here</Link>
           </div>
         </Card>
       </div>

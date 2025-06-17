@@ -16,7 +16,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
-  const [initError, setInitError] = useState<Error | null>(null);
   const [loginInProgress, setLoginInProgress] = useState(false);
   const router = useRouter();
   
@@ -28,108 +27,79 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const client = getBrowserClient();
       setBrowserSupabase(client);
+      if (isDev) {
+        console.log('✅ Supabase client initialized');
+      }
     } catch (err) {
       if (isDev) {
-        console.error("Failed to initialize Supabase client:", err);
+        console.error("❌ Failed to initialize Supabase client:", err);
       }
-      setInitError(err instanceof Error ? err : new Error(String(err)));
+      setError('Failed to initialize authentication service');
+      setLoading(false);
+      setAuthInitialized(true);
     }
   }, []);
 
-  // Fetch user data from the database with timeout and retry
-  const fetchUserData = async (userId: string, retryCount = 0): Promise<User | null> => {
+  // Simplified user data fetch
+  const fetchUserData = async (userId: string): Promise<User | null> => {
     if (!browserSupabase) {
       return null;
     }
     
     try {
-      // Shorter timeout - 5 seconds max
-      const timeoutPromise = new Promise<null>((_, reject) => {
-        setTimeout(() => reject(new Error('User data fetch timeout')), 5000);
-      });
-      
-      // Create the fetch promise with simpler logic
-      const fetchPromise = async (): Promise<User | null> => {
-        try {
-          const { data: userData, error: userError } = await browserSupabase
-            .from('users')
-            .select('id, email, role, created_at, updated_at')
-            .eq('id', userId)
-            .maybeSingle();
-  
-          if (userError) {
-            if (isDev) {
-              console.error('Error fetching user data:', userError);
-            }
-            return null;
-          }
-          
-          if (!userData) {
-            if (isDev) {
-              console.warn(`No user data found for ID: ${userId}`);
-            }
-            return null;
-          }
-          
-          return userData as User;
-        } catch (error) {
-          if (isDev) {
-            console.error("Error in fetchUserData promise:", error);
-          }
-          return null;
+      const { data: userData, error: userError } = await browserSupabase
+        .from('users')
+        .select('id, email, role, created_at, updated_at')
+        .eq('id', userId)
+        .single();
+
+      if (userError) {
+        if (isDev) {
+          console.error('❌ Error fetching user data:', userError.message);
         }
-      };
+        return null;
+      }
       
-      // Race the fetch against the timeout
-      const result = await Promise.race([fetchPromise(), timeoutPromise]) as User | null;
-      return result;
+      if (!userData) {
+        if (isDev) {
+          console.warn(`⚠️ No user data found for ID: ${userId}`);
+        }
+        return null;
+      }
+      
+      if (isDev) {
+        console.log('✅ User data fetched:', userData.email, 'Role:', userData.role);
+      }
+      
+      return userData as User;
     } catch (error) {
       if (isDev) {
-        console.error("Error or timeout in fetchUserData:", error);
+        console.error("❌ Exception in fetchUserData:", error);
       }
       return null;
     }
   };
 
-  // Handle auth state changes - STRICT validation per APPLICATION_SPECIFICATION.md
-  const handleAuthStateChange = async (event: string, session: any, error?: any) => {
-    // Handle auth errors (like refresh token failures)
-    if (error) {
-      if (isDev) {
-        console.error('Auth state change error:', error);
-      }
-      
-      if (error.message?.includes('refresh') || 
-          error.message?.includes('Invalid') || 
-          error.message?.includes('Refresh Token Not Found')) {
-        clearBrowserClient();
-        setUser(null);
-        setError('Session expired. Please sign in again.');
-        
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login?error=session_expired';
-        }
-        return;
-      }
+  // Simplified auth state change handler
+  const handleAuthStateChange = async (event: string, session: any) => {
+    if (isDev) {
+      console.log('🔄 Auth state change:', event, session ? 'with session' : 'no session');
     }
     
     if (event === 'SIGNED_IN' && session?.user) {
       const userData = await fetchUserData(session.user.id);
       
       if (userData) {
-        // User exists in database - validate role consistency
         setUser(userData);
+        setError(null);
         if (isDev) {
-          console.log('User authenticated successfully:', userData.email, 'Role:', userData.role);
+          console.log('✅ User signed in:', userData.email, 'Role:', userData.role);
         }
       } else {
         // User exists in auth but NOT in database - SECURITY VIOLATION
-        // Per APPLICATION_SPECIFICATION.md: This should not happen in normal flow
         if (isDev) {
-          console.error('SECURITY ISSUE: User exists in auth but not in database:', session.user.email);
+          console.error('🚨 SECURITY ISSUE: User exists in auth but not in database:', session.user.email);
         }
-        
-        // Force logout and show error - no automatic user creation
         setError('Account not properly configured. Please contact administrator.');
         await forceLogout();
         return;
@@ -137,17 +107,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else if (event === 'SIGNED_OUT') {
       setUser(null);
       setError(null);
-    } else if (event === 'TOKEN_REFRESHED') {
-      // Handle token refresh - validate user still exists in database
-      if (session?.user && !user) {
+      if (isDev) {
+        console.log('✅ User signed out');
+      }
+    } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+      // Only fetch user data if we don't have it
+      if (!user) {
         const userData = await fetchUserData(session.user.id);
         if (userData) {
           setUser(userData);
         } else {
-          // User was deleted from database - force logout
-          if (isDev) {
-            console.warn('User deleted from database during session - forcing logout');
-          }
           await forceLogout();
           return;
         }
@@ -167,149 +136,96 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null);
       setError('Session terminated due to account configuration issue.');
       
-      // Use window.location instead of router to avoid dependency issues
       if (typeof window !== 'undefined') {
         window.location.href = '/login?error=account_config_error';
       }
     } catch (error) {
       if (isDev) {
-        console.error('Error during force logout:', error);
+        console.error('❌ Error during force logout:', error);
       }
     }
   };
 
-  // Setup authentication
+  // Simplified authentication setup
   useEffect(() => {
     if (!browserSupabase) {
       return;
     }
 
-    if (initError) {
-      setLoading(false);
-      setAuthInitialized(true);
-      return;
-    }
-
-    let isActive = true;
-    
     const initializeAuth = async () => {
       try {
-        setError(null);
+        if (isDev) {
+          console.log('🔄 Initializing authentication...');
+        }
         
-        // Add timeout to prevent hanging
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Authentication initialization timeout')), 10000);
-        });
-        
-        // Get initial session with timeout
-        const sessionPromise = browserSupabase.auth.getSession();
-        const { data: { session }, error: sessionError } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        // Get current session
+        const { data: { session }, error: sessionError } = await browserSupabase.auth.getSession();
         
         if (sessionError) {
           if (isDev) {
-            console.error('Session error:', sessionError);
+            console.error('❌ Session error:', sessionError.message);
           }
-          
-          // If it's a refresh token error, clear the client and force logout
-          if (sessionError.message?.includes('refresh') || 
-              sessionError.message?.includes('Invalid') || 
-              sessionError.message?.includes('Refresh Token Not Found')) {
-            clearBrowserClient();
-            setError('Session expired. Please sign in again.');
-            
-            if (isActive) {
-              setAuthInitialized(true);
-              setLoading(false);
-              setUser(null);
-              
-              // Force redirect to login
-              if (typeof window !== 'undefined') {
-                window.location.href = '/login?error=session_expired';
-              }
-            }
-          } else {
-            setError(sessionError.message);
-            
-            if (isActive) {
-              setAuthInitialized(true);
-              setLoading(false);
-            }
-          }
+          setError('Session initialization failed');
+          setLoading(false);
+          setAuthInitialized(true);
           return;
         }
         
+        // Handle existing session
         if (session?.user) {
-          const userData = await fetchUserData(session.user.id);
-          
-          if (isActive) {
-            if (userData) {
-              setUser(userData);
-            } else {
-              // STRICT: User exists in auth but not in database - force logout
-              if (isDev) {
-                console.error('SECURITY: User in auth but not in database during initialization');
-              }
-              setError('Account configuration error. Please contact administrator.');
-              
-              // Set loading to false before force logout to prevent infinite loading
-              setLoading(false);
-              setAuthInitialized(true);
-              
-              // Delay the force logout to ensure state is set
-              setTimeout(() => {
-                forceLogout();
-              }, 100);
-              return;
-            }
-          }
+          await handleAuthStateChange('SIGNED_IN', session);
         } else {
-          if (isActive) {
-            setUser(null);
-          }
+          setLoading(false);
         }
         
-        if (isActive) {
-          setAuthInitialized(true);
-          setLoading(false);
-        }
-      } catch (err) {
+        setAuthInitialized(true);
+        
         if (isDev) {
-          console.error('Auth setup error:', err);
+          console.log('✅ Authentication initialized');
         }
-        if (isActive) {
-          setError(err instanceof Error ? err.message : 'Authentication error');
-          setAuthInitialized(true);
-          setLoading(false);
+      } catch (error) {
+        if (isDev) {
+          console.error('❌ Error initializing auth:', error);
         }
+        setError('Authentication initialization failed');
+        setLoading(false);
+        setAuthInitialized(true);
       }
     };
 
-    // Setup auth state change listener
+    // Setup auth state listener
     const { data: { subscription } } = browserSupabase.auth.onAuthStateChange(handleAuthStateChange);
 
-    // Initial auth setup
+    // Initialize
     initializeAuth();
 
-    // Cleanup on unmount
+    // Cleanup
     return () => {
-      isActive = false;
       subscription.unsubscribe();
     };
-  }, [browserSupabase, initError]);
+  }, [browserSupabase]);
 
-  // Login function
+  // Simplified login method
   const login = async (email: string, password: string): Promise<LoginResponse | void> => {
     if (!browserSupabase) {
       throw new Error('Authentication service not available');
     }
 
     if (loginInProgress) {
+      if (isDev) {
+        console.log('⚠️ Login already in progress, skipping...');
+      }
       return;
     }
 
     try {
       setLoginInProgress(true);
       setError(null);
+      setLoading(true);
+      
+      if (isDev) {
+        console.log('🔄 Attempting login for:', email);
+      }
       
       const { data, error } = await browserSupabase.auth.signInWithPassword({
         email,
@@ -317,7 +233,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (error) {
+        if (isDev) {
+          console.error('❌ Login error:', error.message);
+        }
         setError(error.message);
+        setLoading(false);
         return {
           success: false,
           error: error.message,
@@ -325,16 +245,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data.user) {
+        if (isDev) {
+          console.log('✅ Authentication successful, fetching user data...');
+        }
+        
         const userData = await fetchUserData(data.user.id);
         
         if (userData) {
           setUser(userData);
+          setLoading(false);
+          
+          if (isDev) {
+            console.log('✅ Login complete:', userData.email, 'Role:', userData.role);
+          }
+          
+          // Redirect based on role
+          setTimeout(() => {
+            if (userData.role === 'SUPERADMIN') {
+              router.push('/dashboard');
+            } else if (userData.role === 'QAUTHOR') {
+              router.push('/dashboard');
+            } else if (userData.role === 'STUDENT') {
+              router.push('/dashboard');
+            } else {
+              router.push('/dashboard');
+            }
+          }, 100);
+          
           return {
             success: true,
             user: userData,
           };
         } else {
-          setError('User data not found');
+          setError('User data not found in database');
+          setLoading(false);
           return {
             success: false,
             error: 'User data not found',
@@ -342,13 +286,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
+      setLoading(false);
       return {
         success: false,
         error: 'Login failed',
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed';
+      if (isDev) {
+        console.error('❌ Login exception:', errorMessage);
+      }
       setError(errorMessage);
+      setLoading(false);
       return {
         success: false,
         error: errorMessage,
@@ -373,7 +322,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw error;
       }
       
-      // Clear the browser client and user state
       clearBrowserClient();
       setUser(null);
       router.push('/login');
@@ -446,7 +394,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Register student function - Per APPLICATION_SPECIFICATION.md: Students can sign up
+  // Register student function
   const registerStudent = async (email: string, password: string) => {
     if (!browserSupabase) {
       throw new Error('Authentication service not available');
@@ -511,11 +459,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user,
     loading,
     error,
+    authInitialized,
     login,
     logout,
     createQAUTHOR,
     registerStudent,
-    authInitialized,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -100,13 +100,13 @@ export default function CreateQuestion() {
               <span className="hidden-mobile">Create Question</span>
               <span className="visible-mobile">Create</span>
             </Title>
-          </Header>
-          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Card style={{ textAlign: 'center' }}>
-              <Spin tip="Loading user data..." />
-            </Card>
-          </Content>
-        </Layout>
+        </Header>
+        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Card style={{ textAlign: 'center' }}>
+            <Spin tip="Loading user data..." />
+          </Card>
+        </Content>
+      </Layout>
       </AspectRatioLayout>
     );
   }
@@ -121,22 +121,22 @@ export default function CreateQuestion() {
               <span className="hidden-mobile">Create Question</span>
               <span className="visible-mobile">Create</span>
             </Title>
-          </Header>
-          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Card>
-              <Result
-                status="403"
-                title="Not Authorized"
-                subTitle="Sorry, you are not authorized to create questions."
-                extra={
-                  <Button type="primary" onClick={handleBackToDashboard}>
-                    Back to Dashboard
-                  </Button>
-                }
-              />
-            </Card>
-          </Content>
-        </Layout>
+        </Header>
+        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Card>
+            <Result
+              status="403"
+              title="Not Authorized"
+              subTitle="Sorry, you are not authorized to create questions."
+              extra={
+                <Button type="primary" onClick={handleBackToDashboard}>
+                  Back to Dashboard
+                </Button>
+              }
+            />
+          </Card>
+        </Content>
+      </Layout>
       </AspectRatioLayout>
     );
   }
@@ -150,25 +150,25 @@ export default function CreateQuestion() {
               <span className="hidden-mobile">Create Question</span>
               <span className="visible-mobile">Create</span>
             </Title>
-          </Header>
-          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Card>
-              <Result
-                status="success"
-                title="Question Created Successfully!"
-                subTitle="Your question has been added to the database and will be available for students."
-                extra={[
-                  <Button type="primary" key="another" onClick={handleCreateAnother}>
-                    Create Another Question
-                  </Button>,
-                  <Button key="dashboard" onClick={handleBackToDashboard}>
-                    Back to Dashboard
-                  </Button>,
-                ]}
-              />
-            </Card>
-          </Content>
-        </Layout>
+        </Header>
+        <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Card>
+            <Result
+              status="success"
+              title="Question Created Successfully!"
+              subTitle="Your question has been added to the database and will be available for students."
+              extra={[
+                <Button type="primary" key="another" onClick={handleCreateAnother}>
+                  Create Another Question
+                </Button>,
+                <Button key="dashboard" onClick={handleBackToDashboard}>
+                  Back to Dashboard
+                </Button>,
+              ]}
+            />
+          </Card>
+        </Content>
+      </Layout>
       </AspectRatioLayout>
     );
   }
@@ -177,27 +177,27 @@ export default function CreateQuestion() {
     <AspectRatioLayout>
       <Layout className="full-height">
         <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', alignItems: 'center' }}>
-          <Button 
-            type="text" 
-            icon={<ArrowLeftOutlined />} 
-            onClick={handleBackToDashboard}
+        <Button 
+          type="text" 
+          icon={<ArrowLeftOutlined />} 
+          onClick={handleBackToDashboard}
             style={{ marginRight: 8 }}
-          >
+        >
             <span className="hidden-mobile">Back</span>
-          </Button>
+        </Button>
           <Title level={3} style={{ margin: 0 }}>
             <span className="hidden-mobile">Create Question</span>
             <span className="visible-mobile">Create</span>
           </Title>
-        </Header>
+      </Header>
         <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
           <div style={{ maxWidth: 800, margin: '0 auto' }}>
-            <Card>
-              <QuestionForm onComplete={handleQuestionCreated} onCancel={handleBackToDashboard} />
-            </Card>
+        <Card>
+          <QuestionForm onComplete={handleQuestionCreated} onCancel={handleBackToDashboard} />
+        </Card>
           </div>
-        </Content>
-      </Layout>
+      </Content>
+    </Layout>
     </AspectRatioLayout>
   );
 } 
