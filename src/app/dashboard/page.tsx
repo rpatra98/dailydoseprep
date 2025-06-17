@@ -342,19 +342,21 @@ export default function Dashboard() {
           alignItems: 'center',
           borderBottom: '1px solid #f0f0f0'
         }}>
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '12px' }}>
             <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
               <span className="hidden-mobile">Daily Dose Prep</span>
               <span className="visible-mobile">DDP</span>
             </Title>
             {user && (
-              <Text type="secondary" style={{ fontSize: isMobile ? '11px' : '13px' }}>
-                {user.email}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Text type="secondary" style={{ fontSize: isMobile ? '11px' : '13px' }}>
+                  {user.email}
+                </Text>
                 <Tag color={userRole === 'SUPERADMIN' ? 'red' : userRole === 'QAUTHOR' ? 'blue' : 'green'} 
-                     style={{ marginLeft: 6, fontSize: isMobile ? '10px' : '12px' }}>
+                     style={{ fontSize: isMobile ? '10px' : '12px', margin: 0 }}>
                   {userRole}
                 </Tag>
-              </Text>
+              </div>
             )}
           </div>
           <Button 
