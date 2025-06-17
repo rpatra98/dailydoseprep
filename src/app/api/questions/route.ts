@@ -191,21 +191,23 @@ async function testDatabaseConnectivity(supabase: any) {
 async function testQuestionInsertion(supabase: any, user: any, subjects: any[]) {
   const testSubject = subjects[0];
   
-  // Test data matching actual database schema
+  // Test data matching actual database schema per APPLICATION_SPECIFICATION.md
   const testData = {
-    subject: testSubject.id,                 // UUID from subjects table
-    question_text: 'Test question - will be deleted immediately',  // TEXT
-    options: {                               // JSONB field
-      A: 'Test Option A',
-      B: 'Test Option B',
-      C: 'Test Option C',
-      D: 'Test Option D'
-    },
-    correct_answer: 'A',                     // TEXT
-    explanation: 'This is a test explanation',          // TEXT
-    difficulty: 'EASY',                      // TEXT
-    questionHash: 'test-hash-' + Date.now() + '-' + Math.random(), // TEXT (unique)
-    created_by: user.id                      // UUID from auth
+    title: 'Test Question',                  // TEXT NOT NULL - Brief question title/heading
+    content: 'Test question - will be deleted immediately',  // TEXT NOT NULL - Full detailed question text
+    option_a: 'Test Option A',               // TEXT NOT NULL - Answer option A text
+    option_b: 'Test Option B',               // TEXT NOT NULL - Answer option B text  
+    option_c: 'Test Option C',               // TEXT NOT NULL - Answer option C text
+    option_d: 'Test Option D',               // TEXT NOT NULL - Answer option D text
+    correct_option: 'A',                     // CHARACTER NOT NULL - Single character: 'A', 'B', 'C', or 'D'
+    explanation: 'This is a test explanation', // TEXT NOT NULL - Detailed explanation
+    difficulty: 'EASY',                      // TEXT NOT NULL - 'EASY', 'MEDIUM', 'HARD'
+    exam_category: 'OTHER',                  // TEXT NOT NULL - 'UPSC', 'JEE', 'NEET', 'SSC', 'OTHER'
+    year: 2024,                              // INTEGER (nullable) - Year the question was from
+    source: 'Test Source',                   // TEXT (nullable) - Source/reference information
+    questionhash: 'test-hash-' + Date.now() + '-' + Math.random(), // TEXT (nullable) - Unique hash
+    subject_id: testSubject.id,              // UUID (nullable) - Foreign key to subjects.id
+    created_by: user.id                      // UUID NOT NULL - Foreign key to users.id (QAUTHOR)
   };
   
   try {
@@ -565,18 +567,19 @@ export async function POST(req: NextRequest) {
     }
     
     const questionData = {
-      subject: subject,                        // UUID field matching schema
-      question_text: content,                  // TEXT field matching schema
-      options: {                               // JSONB field matching schema
-        A: optionA,
-        B: optionB,
-        C: optionC,
-        D: optionD
-      },
-      correct_answer: correctAnswer,           // TEXT field matching schema
-      explanation: explanation || '',
-      difficulty: difficulty || 'MEDIUM',
-      questionHash: generateQuestionHash({     // camelCase as per schema
+      title: title || 'Question',             // TEXT NOT NULL - Brief question title/heading
+      content: content,                        // TEXT NOT NULL - Full detailed question text  
+      option_a: optionA,                       // TEXT NOT NULL - Answer option A text
+      option_b: optionB,                       // TEXT NOT NULL - Answer option B text
+      option_c: optionC,                       // TEXT NOT NULL - Answer option C text
+      option_d: optionD,                       // TEXT NOT NULL - Answer option D text
+      correct_option: correctAnswer,           // CHARACTER NOT NULL - Single character: 'A', 'B', 'C', or 'D'
+      explanation: explanation || '',          // TEXT NOT NULL - Detailed explanation
+      difficulty: difficulty || 'MEDIUM',     // TEXT NOT NULL - 'EASY', 'MEDIUM', 'HARD'
+      exam_category: examCategory || 'OTHER', // TEXT NOT NULL - 'UPSC', 'JEE', 'NEET', 'SSC', 'OTHER'
+      year: year || null,                      // INTEGER (nullable) - Year the question was from
+      source: source || null,                  // TEXT (nullable) - Source/reference information
+      questionhash: generateQuestionHash({     // TEXT (nullable) - Unique hash to prevent duplicates
         content,
         optionA,
         optionB,
@@ -584,7 +587,8 @@ export async function POST(req: NextRequest) {
         optionD,
         subject
       }),
-      created_by: connectivityTest.user.id
+      subject_id: subject,                     // UUID (nullable) - Foreign key to subjects.id
+      created_by: connectivityTest.user.id    // UUID NOT NULL - Foreign key to users.id (QAUTHOR)
     };
     
     const { data: finalResult, error: finalError } = await supabase
