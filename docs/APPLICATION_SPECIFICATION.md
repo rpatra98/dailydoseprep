@@ -3,50 +3,144 @@
 ## Database Conventions & Technical Standards
 
 ### **CRITICAL: Database Naming Convention**
-- **The actual database schema uses MIXED naming conventions** (from supabase-manual-setup.sql)
-- **Most columns use snake_case**: `question_text`, `correct_answer`, `created_at`, `updated_at`
-- **Some columns use camelCase**: `questionHash`, `primarySubject`, `examCategory`
-- **ALWAYS use supabase-manual-setup.sql as the single source of truth**
-- **src/db/schema.sql has been updated to match supabase-manual-setup.sql exactly**
+- **The actual database schema uses MIXED naming conventions** (verified from live database inspection)
+- **Most columns use snake_case**: `subject_id`, `option_a`, `option_b`, `option_c`, `option_d`, `correct_option`, `correct_answer`, `exam_category`, `created_at`, `updated_at`
+- **Some columns use lowercase**: `examcategory`, `primarysubject`, `questionhash`
+- **This specification reflects the ACTUAL database structure as of latest inspection**
 
 ### Database Schema - Single Source of Truth
-**AUTHORITATIVE SCHEMA**: `supabase-manual-setup.sql` and `src/db/schema.sql` (now synchronized)
+**AUTHORITATIVE SCHEMA**: Live database structure (verified via SQL inspection)
 
-### Key Database Tables Structure (CORRECT COLUMN NAMES)
+### Key Database Tables Structure (ACTUAL COLUMN NAMES AND TYPES)
 
-#### questions table:
-- `id` UUID PRIMARY KEY
-- `subject` UUID (foreign key to subjects.id) - **NOT subject_id**
-- `question_text` TEXT - **NOT content or title**
-- `options` JSONB - **Contains {A: "...", B: "...", C: "...", D: "..."}**
-- `correct_answer` TEXT - **NOT correctOption or correctAnswer**
-- `explanation` TEXT
-- `difficulty` TEXT
-- `questionHash` TEXT (camelCase)
-- `created_by` UUID (foreign key to users.id)
-- `created_at` TIMESTAMP
-- `updated_at` TIMESTAMP
+#### questions table (COMPLETE STRUCTURE):
+- `id` UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+- `title` TEXT NOT NULL - **Brief question title/heading**
+- `content` TEXT NOT NULL - **Full detailed question text**
+- `option_a` TEXT NOT NULL - **Answer option A text**
+- `option_b` TEXT NOT NULL - **Answer option B text**
+- `option_c` TEXT NOT NULL - **Answer option C text**
+- `option_d` TEXT NOT NULL - **Answer option D text**
+- `correct_option` CHARACTER NOT NULL - **Single character: 'A', 'B', 'C', or 'D'**
+- `correct_answer` TEXT (nullable) - **Full text of the correct answer (redundant with option text)**
+- `explanation` TEXT NOT NULL - **Detailed explanation of why the answer is correct**
+- `difficulty` TEXT NOT NULL - **Difficulty level: 'EASY', 'MEDIUM', 'HARD'**
+- `exam_category` TEXT NOT NULL - **Exam type: 'UPSC', 'JEE', 'NEET', 'SSC', 'OTHER'**
+- `year` INTEGER (nullable) - **Year the question was from (if applicable)**
+- `source` TEXT (nullable) - **Source/reference information**
+- `questionhash` TEXT (nullable) - **Unique hash to prevent duplicate questions**
+- `options` JSONB (nullable) - **Alternative JSON storage: {"A": "text", "B": "text", "C": "text", "D": "text"}**
+- `subject_id` UUID (nullable) - **Foreign key to subjects.id**
+- `created_by` UUID NOT NULL - **Foreign key to users.id (QAUTHOR who created this)**
+- `created_at` TIMESTAMP WITH TIME ZONE DEFAULT now()
+- `updated_at` TIMESTAMP WITH TIME ZONE DEFAULT now()
 
-#### users table:
-- `id` UUID PRIMARY KEY
-- `email` TEXT
-- `role` TEXT ('SUPERADMIN', 'QAUTHOR', 'STUDENT')
-- `primarySubject` UUID (camelCase, foreign key to subjects.id)
-- `created_at` TIMESTAMP
-- `updated_at` TIMESTAMP
+#### users table (COMPLETE STRUCTURE - HYBRID AUTH + CUSTOM):
+**Note: This table combines Supabase Auth fields with custom application fields**
 
-#### subjects table:
-- `id` UUID PRIMARY KEY
-- `name` TEXT
-- `examCategory` TEXT (camelCase)
-- `description` TEXT
-- `created_at` TIMESTAMP
-- `updated_at` TIMESTAMP
+**Custom Application Fields:**
+- `id` UUID PRIMARY KEY - **References auth.users.id**
+- `email` TEXT NOT NULL - **User email address**
+- `role` USER-DEFINED NOT NULL - **Application role: 'SUPERADMIN', 'QAUTHOR', 'STUDENT'**
+- `primarysubject` UUID (nullable) - **Foreign key to subjects.id (for STUDENT users)**
+- `created_at` TIMESTAMP WITH TIME ZONE DEFAULT now()
+- `updated_at` TIMESTAMP WITH TIME ZONE DEFAULT now()
+
+**Supabase Auth Fields (automatically managed):**
+- `instance_id` UUID (nullable)
+- `password_hash` TEXT (nullable)
+- `aud` CHARACTER VARYING (nullable)
+- `encrypted_password` CHARACTER VARYING (nullable)
+- `email_confirmed_at` TIMESTAMP WITH TIME ZONE (nullable)
+- `invited_at` TIMESTAMP WITH TIME ZONE (nullable)
+- `confirmation_token` CHARACTER VARYING (nullable)
+- `confirmation_sent_at` TIMESTAMP WITH TIME ZONE (nullable)
+- `recovery_token` CHARACTER VARYING (nullable)
+- `recovery_sent_at` TIMESTAMP WITH TIME ZONE (nullable)
+- `email_change_token_new` CHARACTER VARYING (nullable)
+- `email_change` CHARACTER VARYING (nullable)
+- `email_change_sent_at` TIMESTAMP WITH TIME ZONE (nullable)
+- `last_sign_in_at` TIMESTAMP WITH TIME ZONE (nullable)
+- `raw_app_meta_data` JSONB (nullable)
+- `raw_user_meta_data` JSONB (nullable)
+- `is_super_admin` BOOLEAN (nullable)
+- `phone` TEXT (nullable)
+- `phone_confirmed_at` TIMESTAMP WITH TIME ZONE (nullable)
+- `phone_change` TEXT (nullable)
+- `phone_change_token` CHARACTER VARYING (nullable)
+- `phone_change_sent_at` TIMESTAMP WITH TIME ZONE (nullable)
+- `confirmed_at` TIMESTAMP WITH TIME ZONE (nullable)
+- `email_change_token_current` CHARACTER VARYING (nullable)
+- `email_change_confirm_status` SMALLINT (nullable)
+- `banned_until` TIMESTAMP WITH TIME ZONE (nullable)
+- `reauthentication_token` CHARACTER VARYING (nullable)
+- `reauthentication_sent_at` TIMESTAMP WITH TIME ZONE (nullable)
+- `is_sso_user` BOOLEAN NOT NULL DEFAULT false
+- `deleted_at` TIMESTAMP WITH TIME ZONE (nullable)
+- `is_anonymous` BOOLEAN NOT NULL DEFAULT false
+
+#### subjects table (COMPLETE STRUCTURE):
+- `id` UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+- `name` TEXT NOT NULL UNIQUE - **Subject name (e.g., 'Mathematics', 'Physics')**
+- `examcategory` USER-DEFINED DEFAULT 'OTHER' - **Enum: exam categories**
+- `description` TEXT (nullable) - **Optional subject description**
+- `created_at` TIMESTAMP WITH TIME ZONE DEFAULT now()
+- `updated_at` TIMESTAMP WITH TIME ZONE DEFAULT now()
+
+#### student_attempts table (COMPLETE STRUCTURE):
+- `id` UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+- `studentId` UUID NOT NULL - **Foreign key to auth.users.id**
+- `questionId` UUID NOT NULL - **Foreign key to questions.id**
+- `selectedOption` TEXT NOT NULL CHECK (selectedOption IN ('A', 'B', 'C', 'D'))
+- `isCorrect` BOOLEAN NOT NULL
+- `attemptedAt` TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+- UNIQUE constraint on (studentId, questionId) - **One attempt per question per student**
+
+#### daily_question_sets table (COMPLETE STRUCTURE):
+- `id` UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+- `studentId` UUID NOT NULL - **Foreign key to auth.users.id**
+- `date` TEXT NOT NULL - **Date in YYYY-MM-DD format**
+- `questions` UUID[] NOT NULL - **Array of question IDs**
+- `completed` BOOLEAN DEFAULT FALSE
+- `score` INT (nullable) - **Number of correct answers**
+- `created_at` TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+
+### Database Relationships (FOREIGN KEY CONSTRAINTS)
+1. `users.primarysubject` → `subjects.id`
+2. `questions.created_by` → `users.id`
+3. `questions.subject_id` → `subjects.id`
+4. `student_attempts.studentId` → `auth.users.id`
+5. `student_attempts.questionId` → `questions.id`
+6. `daily_question_sets.studentId` → `auth.users.id`
 
 ### API Implementation Guidelines
 - Use `createRouteHandlerClient({ cookies })` for server-side API routes
 - Always validate user authentication and role before database operations
-- Use snake_case when interfacing with database, transform to camelCase for frontend if needed
+- **CRITICAL**: Use exact column names as specified above (case-sensitive)
+- For questions API: send `title`, `content`, `option_a/b/c/d`, `correct_option`, `subject_id`
+- For subjects API: send `name` (examcategory auto-defaults to 'OTHER')
+- Transform camelCase frontend data to snake_case for database operations
+
+### Data Validation Rules
+#### Questions:
+- `title`: Required, max 200 characters
+- `content`: Required, max 2000 characters
+- `option_a/b/c/d`: Required, max 500 characters each
+- `correct_option`: Required, must be exactly 'A', 'B', 'C', or 'D'
+- `explanation`: Required, max 1000 characters
+- `difficulty`: Required, must be 'EASY', 'MEDIUM', or 'HARD'
+- `exam_category`: Required, must be valid exam category
+- `subject_id`: Required, must exist in subjects table
+- `created_by`: Required, must be valid QAUTHOR user ID
+
+#### Users:
+- `email`: Required, valid email format, unique
+- `role`: Required, must be 'SUPERADMIN', 'QAUTHOR', or 'STUDENT'
+- `primarysubject`: Optional for STUDENT, forbidden for others
+
+#### Subjects:
+- `name`: Required, unique, max 100 characters
+- `description`: Optional, max 500 characters
 
 ## Overview
 Daily Dose Prep is a competitive exam preparation platform that provides students with practice questions for various competitive exams in India. The platform allows QAUTHORs to create and manage questions, while students can practice and track their progress.
@@ -99,7 +193,7 @@ The platform supports preparation for various competitive exams in India:
 
 ### Basic Format
 - Multiple Choice Questions (MCQ)
-- 4 options per question
+- 4 options per question (A, B, C, D)
 - 1 correct answer
 - Difficulty levels: Easy, Medium, Hard
 - Detailed explanation for the correct answer
@@ -114,17 +208,28 @@ The platform supports preparation for various competitive exams in India:
 - Timestamp of question upload
 - Unique identifier to prevent duplicate questions
 
+### Question Storage Format
+Each question is stored with:
+- **Title**: Brief heading (e.g., "Photosynthesis Process")
+- **Content**: Full question text (e.g., "Which of the following is the primary product of photosynthesis?")
+- **Options**: Four separate text fields (option_a, option_b, option_c, option_d)
+- **Correct Option**: Single character ('A', 'B', 'C', or 'D')
+- **Explanation**: Detailed explanation of why the answer is correct
+- **Alternative Storage**: Optional JSONB field for flexible option storage
+
 ## Features
 
 ### QAUTHOR Features
 - Dedicated dashboard accessible upon login
 - Button to open question creation page
 - Create and manage questions with complete information:
-  - Question text
+  - Question title and detailed content
   - Four answer options (A, B, C, D)
   - Marking one correct answer
   - Subject selection from predefined list
-- Set difficulty levels
+  - Difficulty level selection
+  - Exam category assignment
+  - Year and source information (optional)
 - Provide detailed explanations
 - Categorize questions by exam and topic
 - Track question performance
@@ -184,6 +289,8 @@ The platform supports preparation for various competitive exams in India:
 - Questions are stored with QAUTHOR information and timestamps
 - Subject databases are maintained separately for better organization
 - Complete audit trail for all question creation and modifications
+- Foreign key constraints ensure referential integrity
+- Unique constraints prevent duplicate data
 
 ## Security Notes
 - SUPERADMIN credentials should be changed after initial setup
@@ -192,6 +299,15 @@ The platform supports preparation for various competitive exams in India:
 - Only QAUTHORs can create questions
 - Only students can answer questions
 - Only SUPERADMINs can view system-wide stats and manage subjects
+- Row Level Security (RLS) policies enforce role-based access
+- Authentication session validation prevents unauthorized access
+
+## Performance Considerations
+- Database indexes on frequently queried columns
+- Efficient foreign key relationships
+- JSONB storage for flexible data when needed
+- Separate storage for individual options and JSON options for query flexibility
+- Timestamp tracking for audit and performance monitoring
 
 ## Future Considerations
 - Role-based access control (RBAC) implementation
