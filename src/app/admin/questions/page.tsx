@@ -405,6 +405,17 @@ export default function AdminQuestionsPage() {
               }}
               scroll={{ x: 'max-content' }}
               loading={loading}
+              locale={{
+                emptyText: (
+                  <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                    <BookOutlined style={{ fontSize: '48px', color: '#d9d9d9', marginBottom: '16px' }} />
+                    <Title level={4} style={{ color: '#999' }}>No Questions Yet</Title>
+                    <Text type="secondary">
+                      No questions have been created yet. QAUTHORs can create questions from their dashboard.
+                    </Text>
+                  </div>
+                )
+              }}
             />
           </Card>
 

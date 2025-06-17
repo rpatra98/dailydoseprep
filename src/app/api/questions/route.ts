@@ -484,27 +484,80 @@ function mapDataToSchema(data: any, schemaInfo: any) {
 // GET questions with optional filters
 export async function GET(req: NextRequest) {
   try {
+    console.log('🔄 Starting questions fetch...');
     const supabase = createRouteHandlerClient({ cookies });
     
+    // Check authentication first
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !authData?.user) {
+      console.log('❌ Authentication failed in questions API');
+      return NextResponse.json({ 
+        error: 'Authentication required',
+        details: 'Please log in to access questions'
+      }, { status: 401 });
+    }
+
+    console.log('✅ User authenticated:', authData.user.email);
+
+    // Check user role - only SUPERADMIN can view all questions
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (userError || !userData) {
+      console.log('❌ User not found in database');
+      return NextResponse.json({ 
+        error: 'User not found',
+        details: 'User account not properly configured'
+      }, { status: 403 });
+    }
+
+    if (userData.role !== 'SUPERADMIN') {
+      console.log('❌ Access denied - user role:', userData.role);
+      return NextResponse.json({ 
+        error: 'Access denied',
+        details: 'Only SUPERADMIN can view all questions'
+      }, { status: 403 });
+    }
+
+    console.log('✅ SUPERADMIN access confirmed');
+
+    // Fetch questions with proper column names from APPLICATION_SPECIFICATION.md
     const { data: questions, error } = await supabase
       .from('questions')
       .select(`
         *,
         subjects (
           name,
-          examCategory
+          examcategory
+        ),
+        users (
+          email
         )
       `)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching questions:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('❌ Error fetching questions:', error);
+      return NextResponse.json({ 
+        error: 'Failed to fetch questions',
+        details: error.message 
+      }, { status: 500 });
     }
 
-    return NextResponse.json(questions);
+    console.log('✅ Questions fetched successfully:', questions?.length || 0, 'questions');
+
+    // Return in the format expected by the admin page
+    return NextResponse.json({ 
+      questions: questions || [],
+      total: questions?.length || 0
+    });
+
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('❌ Unexpected error in questions GET:', error);
     return NextResponse.json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'
