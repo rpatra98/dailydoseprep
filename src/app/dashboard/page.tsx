@@ -75,10 +75,15 @@ export default function Dashboard() {
   const [statsLoading, setStatsLoading] = useState(false);
   const screens = useBreakpoint();
 
+  // Only log in development
+  const isDev = process.env.NODE_ENV === 'development';
+
   // Add debug logging
   const addDebug = (message: string) => {
-    console.log(message);
-    setDebugInfo(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${message}`]);
+    if (isDev) {
+      console.log(message);
+      setDebugInfo(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${message}`]);
+    }
   };
 
   // Handle mounting
@@ -270,7 +275,7 @@ export default function Dashboard() {
       <AspectRatioLayout>
         <div className="center-content">
           <Spin size="large" tip="Loading your dashboard..." />
-          {process.env.NODE_ENV === 'development' && (
+          {isDev && (
             <div style={{ 
               marginTop: 20, 
               fontFamily: 'monospace', 
@@ -643,7 +648,7 @@ export default function Dashboard() {
           )}
 
           {/* Debug Info Panel - Only show in development */}
-          {process.env.NODE_ENV === 'development' && (
+          {isDev && (
             <Card 
               title="Debug Information"
               size="small"

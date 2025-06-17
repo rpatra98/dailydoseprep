@@ -19,10 +19,15 @@ export default function LoginPage() {
   const router = useRouter();
   const screens = useBreakpoint();
   
+  // Only log in development
+  const isDev = process.env.NODE_ENV === 'development';
+  
   // Add debug logging
   const addDebug = (message: string) => {
-    console.log(message);
-    setDebugInfo(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${message}`]);
+    if (isDev) {
+      console.log(message);
+      setDebugInfo(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${message}`]);
+    }
   };
   
   useEffect(() => {
@@ -224,7 +229,7 @@ export default function LoginPage() {
           </Card>
           
           {/* Debug Info Panel - Only show in development */}
-          {process.env.NODE_ENV === 'development' && (
+          {isDev && (
             <Card 
               title="Debug Information"
               size="small"

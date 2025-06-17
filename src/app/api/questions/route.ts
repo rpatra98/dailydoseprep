@@ -4,30 +4,39 @@ import { cookies } from 'next/headers';
 import { Question } from '@/types';
 import crypto from 'crypto';
 
+// Only log in development
+const isDev = process.env.NODE_ENV === 'development';
+
 // Helper function to generate a unique hash for a question to prevent duplicates
 function generateQuestionHash(question: any): string {
   const stringToHash = `${question.content}-${question.optionA}-${question.optionB}-${question.optionC}-${question.optionD}-${question.subject}`;
   return crypto.createHash('md5').update(stringToHash).digest('hex');
 }
 
-// Enhanced error logging function
+// Enhanced error logging function - only log in development
 function logError(step: string, error: any, context?: any) {
-  console.error(`❌ [${step}] Error:`, error);
-  if (error?.message) console.error(`❌ [${step}] Message:`, error.message);
-  if (error?.code) console.error(`❌ [${step}] Code:`, error.code);
-  if (error?.details) console.error(`❌ [${step}] Details:`, error.details);
-  if (error?.hint) console.error(`❌ [${step}] Hint:`, error.hint);
-  if (context) console.error(`❌ [${step}] Context:`, JSON.stringify(context, null, 2));
-  console.error(`❌ [${step}] Full Error Object:`, JSON.stringify(error, null, 2));
+  if (isDev) {
+    console.error(`❌ [${step}] Error:`, error);
+    if (error?.message) console.error(`❌ [${step}] Message:`, error.message);
+    if (error?.code) console.error(`❌ [${step}] Code:`, error.code);
+    if (error?.details) console.error(`❌ [${step}] Details:`, error.details);
+    if (error?.hint) console.error(`❌ [${step}] Hint:`, error.hint);
+    if (context) console.error(`❌ [${step}] Context:`, JSON.stringify(context, null, 2));
+    console.error(`❌ [${step}] Full Error Object:`, JSON.stringify(error, null, 2));
+  }
 }
 
 // Comprehensive database connectivity test
 async function testDatabaseConnectivity(supabase: any) {
-  console.log('🔍 Testing database connectivity...');
+  if (isDev) {
+    console.log('🔍 Testing database connectivity...');
+  }
   
   try {
     // Test 1: Basic connection
-    console.log('📡 Testing basic Supabase connection...');
+    if (isDev) {
+      console.log('📡 Testing basic Supabase connection...');
+    }
     const { data: connectionTest, error: connectionError } = await supabase
       .from('subjects')
       .select('count')
@@ -43,10 +52,14 @@ async function testDatabaseConnectivity(supabase: any) {
       };
     }
     
-    console.log('✅ Basic connection successful');
+    if (isDev) {
+      console.log('✅ Basic connection successful');
+    }
     
     // Test 2: Authentication - with better error handling
-    console.log('🔐 Testing authentication...');
+    if (isDev) {
+      console.log('🔐 Testing authentication...');
+    }
     const { data: authData, error: authError } = await supabase.auth.getUser();
     
     if (authError) {
@@ -62,7 +75,9 @@ async function testDatabaseConnectivity(supabase: any) {
     
     const user = authData?.user;
     if (!user) {
-      console.log('❌ No authenticated user found');
+      if (isDev) {
+        console.log('❌ No authenticated user found');
+      }
       return {
         success: false,
         error: 'Authentication failed',
@@ -72,10 +87,14 @@ async function testDatabaseConnectivity(supabase: any) {
       };
     }
     
-    console.log('✅ Authentication successful:', user.email);
+    if (isDev) {
+      console.log('✅ Authentication successful:', user.email);
+    }
     
     // Test 3: Check if user exists in database
-    console.log('👤 Checking user in database...');
+    if (isDev) {
+      console.log('👤 Checking user in database...');
+    }
     const { data: dbUser, error: dbUserError } = await supabase
       .from('users')
       .select('id, email, role')
@@ -103,7 +122,9 @@ async function testDatabaseConnectivity(supabase: any) {
       };
     }
     
-    console.log('✅ User found in database:', dbUser.email, 'Role:', dbUser.role);
+    if (isDev) {
+      console.log('✅ User found in database:', dbUser.email, 'Role:', dbUser.role);
+    }
     
     // Test 4: Check user role - ONLY QAUTHOR can create questions per specification
     if (dbUser.role !== 'QAUTHOR') {
@@ -117,7 +138,9 @@ async function testDatabaseConnectivity(supabase: any) {
     }
     
     // Test 5: Subjects table
-    console.log('📋 Testing subjects table...');
+    if (isDev) {
+      console.log('📋 Testing subjects table...');
+    }
     const { data: subjects, error: subjectsError } = await supabase
       .from('subjects')
       .select('id, name')
@@ -134,7 +157,9 @@ async function testDatabaseConnectivity(supabase: any) {
     }
     
     if (!subjects || subjects.length === 0) {
-      console.log('❌ No subjects found in database');
+      if (isDev) {
+        console.log('❌ No subjects found in database');
+      }
       return {
         success: false,
         error: 'No subjects found',
@@ -143,10 +168,14 @@ async function testDatabaseConnectivity(supabase: any) {
       };
     }
     
-    console.log('✅ Subjects table accessible:', subjects.length, 'subjects found');
+    if (isDev) {
+      console.log('✅ Subjects table accessible:', subjects.length, 'subjects found');
+    }
     
     // Test 6: Questions table structure
-    console.log('❓ Testing questions table structure...');
+    if (isDev) {
+      console.log('❓ Testing questions table structure...');
+    }
     const { data: questionsTest, error: questionsError } = await supabase
       .from('questions')
       .select('*')
@@ -162,11 +191,13 @@ async function testDatabaseConnectivity(supabase: any) {
       };
     }
     
-    console.log('✅ Questions table accessible');
-    if (questionsTest && questionsTest.length > 0) {
-      console.log('📊 Existing questions found, columns:', Object.keys(questionsTest[0]));
-    } else {
-      console.log('📊 Questions table is empty (this is normal for new setup)');
+    if (isDev) {
+      console.log('✅ Questions table accessible');
+      if (questionsTest && questionsTest.length > 0) {
+        console.log('📊 Existing questions found, columns:', Object.keys(questionsTest[0]));
+      } else {
+        console.log('📊 Questions table is empty (this is normal for new setup)');
+      }
     }
     
     return {
@@ -278,7 +309,9 @@ async function testQuestionInsertion(supabase: any, user: any, subjects: any[]) 
 
 // Dynamic schema discovery and mapping
 async function discoverQuestionsSchema(supabase: any) {
-  console.log('🔍 Discovering questions table schema...');
+  if (isDev) {
+    console.log('🔍 Discovering questions table schema...');
+  }
   
   // First, try to get existing data to see actual columns
   const { data: existingQuestions, error: existingError } = await supabase
@@ -288,7 +321,9 @@ async function discoverQuestionsSchema(supabase: any) {
   
   if (!existingError && existingQuestions && existingQuestions.length > 0) {
     const columns = Object.keys(existingQuestions[0]);
-    console.log('✅ Found existing data with columns:', columns);
+    if (isDev) {
+      console.log('✅ Found existing data with columns:', columns);
+    }
     return {
       success: true,
       columns: columns,
@@ -298,7 +333,9 @@ async function discoverQuestionsSchema(supabase: any) {
   
   // Check if questions table exists at all
   if (existingError) {
-    console.log('❌ Questions table error:', existingError.message);
+    if (isDev) {
+      console.log('❌ Questions table error:', existingError.message);
+    }
     if (existingError.message?.includes('relation') || existingError.message?.includes('does not exist')) {
       return {
         success: false,
@@ -309,14 +346,18 @@ async function discoverQuestionsSchema(supabase: any) {
   }
   
   // Check if subjects table exists and has data
-  console.log('📋 Checking subjects table...');
+  if (isDev) {
+    console.log('📋 Checking subjects table...');
+  }
   const { data: subjects, error: subjectsError } = await supabase
     .from('subjects')
     .select('id, name')
     .limit(1);
   
   if (subjectsError) {
-    console.log('❌ Subjects table error:', subjectsError.message);
+    if (isDev) {
+      console.log('❌ Subjects table error:', subjectsError.message);
+    }
     return {
       success: false,
       error: 'Subjects table does not exist. Please run supabase-manual-setup.sql script.',
@@ -325,7 +366,9 @@ async function discoverQuestionsSchema(supabase: any) {
   }
   
   if (!subjects || subjects.length === 0) {
-    console.log('❌ No subjects found in database');
+    if (isDev) {
+      console.log('❌ No subjects found in database');
+    }
     return {
       success: false,
       error: 'No subjects found in database. Please run supabase-manual-setup.sql script to insert default subjects.',
@@ -334,12 +377,16 @@ async function discoverQuestionsSchema(supabase: any) {
   }
   
   const testSubjectId = subjects[0].id;
-  console.log('📋 Using test subject:', subjects[0].name, '(', testSubjectId, ')');
+  if (isDev) {
+    console.log('📋 Using test subject:', subjects[0].name, '(', testSubjectId, ')');
+  }
   
   // Check authentication
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError) {
-    console.log('❌ Auth error:', userError.message);
+    if (isDev) {
+      console.log('❌ Auth error:', userError.message);
+    }
     return {
       success: false,
       error: 'Authentication failed. Please log in again.',
@@ -348,7 +395,9 @@ async function discoverQuestionsSchema(supabase: any) {
   }
   
   if (!user) {
-    console.log('❌ No authenticated user');
+    if (isDev) {
+      console.log('❌ No authenticated user');
+    }
     return {
       success: false,
       error: 'No authenticated user. Please log in.',
@@ -357,10 +406,14 @@ async function discoverQuestionsSchema(supabase: any) {
   }
   
   const testUserId = user.id;
-  console.log('👤 Using test user:', user.email, '(', testUserId, ')');
+  if (isDev) {
+    console.log('👤 Using test user:', user.email, '(', testUserId, ')');
+  }
   
   // Try the exact supabase-manual-setup.sql schema first
-  console.log('🧪 Testing exact supabase-manual-setup.sql schema...');
+  if (isDev) {
+    console.log('🧪 Testing exact supabase-manual-setup.sql schema...');
+  }
   
   const testData = {
     subject_id: testSubjectId,                // UUID from subjects table
@@ -377,7 +430,9 @@ async function discoverQuestionsSchema(supabase: any) {
     created_by: testUserId                   // UUID from auth
   };
   
-  console.log('📝 Test data:', testData);
+  if (isDev) {
+    console.log('📝 Test data:', testData);
+  }
   
   const { data: insertResult, error: insertError } = await supabase
     .from('questions')
@@ -385,11 +440,15 @@ async function discoverQuestionsSchema(supabase: any) {
     .select('*');
   
   if (!insertError && insertResult && insertResult.length > 0) {
-    console.log('✅ Schema discovery successful! Columns:', Object.keys(insertResult[0]));
+    if (isDev) {
+      console.log('✅ Schema discovery successful! Columns:', Object.keys(insertResult[0]));
+    }
     
     // Clean up test data
     await supabase.from('questions').delete().eq('id', insertResult[0].id);
-    console.log('🧹 Test data cleaned up');
+    if (isDev) {
+      console.log('🧹 Test data cleaned up');
+    }
     
     return {
       success: true,
@@ -399,8 +458,10 @@ async function discoverQuestionsSchema(supabase: any) {
       sampleData: insertResult[0]
     };
   } else {
-    console.log('❌ Schema test failed:', insertError?.message);
-    console.log('🔍 Full error details:', JSON.stringify(insertError, null, 2));
+    if (isDev) {
+      console.log('❌ Schema test failed:', insertError?.message);
+      console.log('🔍 Full error details:', JSON.stringify(insertError, null, 2));
+    }
     
     // Try to identify the specific issue
     if (insertError?.message?.includes('violates foreign key constraint')) {
@@ -446,13 +507,23 @@ function mapDataToSchema(data: any, schemaInfo: any) {
   if (columns.includes('subject')) mapped.subject = subject;
   else if (columns.includes('subject_id')) mapped.subject_id = subject;
   
-  // Map question text
-  if (columns.includes('question_text')) mapped.question_text = content;
-  else if (columns.includes('content')) mapped.content = content;
+  // Map content/title
+  if (columns.includes('title')) mapped.title = data.title || 'Question';
+  if (columns.includes('content')) mapped.content = content;
   else if (columns.includes('question')) mapped.question = content;
   
-  // Map options (usually JSONB)
-  if (columns.includes('options')) {
+  // Map options
+  if (columns.includes('option_a')) {
+    mapped.option_a = optionA;
+    mapped.option_b = optionB;
+    mapped.option_c = optionC;
+    mapped.option_d = optionD;
+  } else if (columns.includes('optionA')) {
+    mapped.optionA = optionA;
+    mapped.optionB = optionB;
+    mapped.optionC = optionC;
+    mapped.optionD = optionD;
+  } else if (columns.includes('options')) {
     mapped.options = { A: optionA, B: optionB, C: optionC, D: optionD };
   }
   
@@ -477,28 +548,36 @@ function mapDataToSchema(data: any, schemaInfo: any) {
   if (columns.includes('questionHash')) mapped.questionHash = questionHash;
   else if (columns.includes('question_hash')) mapped.question_hash = questionHash;
   
-  console.log('📋 Mapped data:', mapped);
+  if (isDev) {
+    console.log('📋 Mapped data:', mapped);
+  }
   return mapped;
 }
 
 // GET questions with optional filters
 export async function GET(req: NextRequest) {
   try {
-    console.log('🔄 Starting questions fetch...');
+    if (isDev) {
+      console.log('🔄 Starting questions fetch...');
+    }
     const supabase = createRouteHandlerClient({ cookies });
     
     // Check authentication first
     const { data: authData, error: authError } = await supabase.auth.getUser();
     
     if (authError || !authData?.user) {
-      console.log('❌ Authentication failed in questions API');
+      if (isDev) {
+        console.log('❌ Authentication failed in questions API');
+      }
       return NextResponse.json({ 
         error: 'Authentication required',
         details: 'Please log in to access questions'
       }, { status: 401 });
     }
 
-    console.log('✅ User authenticated:', authData.user.email);
+    if (isDev) {
+      console.log('✅ User authenticated:', authData.user.email);
+    }
 
     // Check user role - only SUPERADMIN can view all questions
     const { data: userData, error: userError } = await supabase
@@ -508,7 +587,9 @@ export async function GET(req: NextRequest) {
       .single();
 
     if (userError || !userData) {
-      console.log('❌ User not found in database');
+      if (isDev) {
+        console.log('❌ User not found in database');
+      }
       return NextResponse.json({ 
         error: 'User not found',
         details: 'User account not properly configured'
@@ -516,14 +597,18 @@ export async function GET(req: NextRequest) {
     }
 
     if (userData.role !== 'SUPERADMIN') {
-      console.log('❌ Access denied - user role:', userData.role);
+      if (isDev) {
+        console.log('❌ Access denied - user role:', userData.role);
+      }
       return NextResponse.json({ 
         error: 'Access denied',
         details: 'Only SUPERADMIN can view all questions'
       }, { status: 403 });
     }
 
-    console.log('✅ SUPERADMIN access confirmed');
+    if (isDev) {
+      console.log('✅ SUPERADMIN access confirmed');
+    }
 
     // Fetch questions with proper column names from APPLICATION_SPECIFICATION.md
     const { data: questions, error } = await supabase
@@ -541,14 +626,18 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('❌ Error fetching questions:', error);
+      if (isDev) {
+        console.error('❌ Error fetching questions:', error);
+      }
       return NextResponse.json({ 
         error: 'Failed to fetch questions',
         details: error.message 
       }, { status: 500 });
     }
 
-    console.log('✅ Questions fetched successfully:', questions?.length || 0, 'questions');
+    if (isDev) {
+      console.log('✅ Questions fetched successfully:', questions?.length || 0, 'questions');
+    }
 
     // Return in the format expected by the admin page
     return NextResponse.json({ 
@@ -557,7 +646,9 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ Unexpected error in questions GET:', error);
+    if (isDev) {
+      console.error('❌ Unexpected error in questions GET:', error);
+    }
     return NextResponse.json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'

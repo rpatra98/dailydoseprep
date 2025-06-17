@@ -147,21 +147,6 @@ export default function CreateQuestion() {
           <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Card style={{ textAlign: 'center' }}>
               <Spin tip="Loading user data..." />
-              {isDev && (
-                <div style={{ 
-                  marginTop: 20, 
-                  fontFamily: 'monospace', 
-                  fontSize: '12px',
-                  textAlign: 'center',
-                  maxWidth: '400px'
-                }}>
-                  {debugInfo.slice(-3).map((info, index) => (
-                    <div key={index} style={{ marginBottom: '4px', color: '#666' }}>
-                      {info}
-                    </div>
-                  ))}
-                </div>
-              )}
             </Card>
           </Content>
         </Layout>
@@ -216,30 +201,6 @@ export default function CreateQuestion() {
               </div>
             </Card>
           </Content>
-          
-          {/* Debug Info Panel - Only show in development */}
-          {isDev && debugInfo.length > 0 && (
-            <div style={{ 
-              position: 'fixed', 
-              bottom: 20, 
-              right: 20, 
-              background: 'white', 
-              border: '1px solid #d9d9d9', 
-              borderRadius: 4, 
-              padding: 12, 
-              maxWidth: 400,
-              fontSize: '12px',
-              fontFamily: 'monospace',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-            }}>
-              <div style={{ fontWeight: 'bold', marginBottom: 8 }}>Debug Info:</div>
-              {debugInfo.map((info, index) => (
-                <div key={index} style={{ marginBottom: '4px' }}>
-                  {info}
-                </div>
-              ))}
-            </div>
-          )}
         </Layout>
       </AspectRatioLayout>
     );

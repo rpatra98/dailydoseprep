@@ -9,7 +9,8 @@ import {
   Typography,
   Space,
   Divider,
-  Spin
+  Spin,
+  message
 } from 'antd';
 import { 
   QuestionCircleOutlined, 
@@ -65,19 +66,29 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
   }, []);
   
   const handleSubmit = async (values: any) => {
-    try {
-      setSubmitting(true);
-      setError(null);
-      
+    // Only log in development
+    const isDev = process.env.NODE_ENV === 'development';
+    
+    if (isDev) {
       console.log('Submitting question with values:', {
-        ...values,
+        title: values.title,
+        content: values.content,
         optionA: values.optionA ? 'present' : 'missing',
         optionB: values.optionB ? 'present' : 'missing',
         optionC: values.optionC ? 'present' : 'missing',
         optionD: values.optionD ? 'present' : 'missing',
+        correctAnswer: values.correctAnswer,
+        explanation: values.explanation ? 'present' : 'missing',
+        difficulty: values.difficulty,
+        subjectId: values.subjectId,
+        source: values.source || 'not provided'
       });
-      
-      // Prepare the question object
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
       const questionData = {
         title: values.title,
         content: values.content,
@@ -85,60 +96,54 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         optionB: values.optionB,
         optionC: values.optionC,
         optionD: values.optionD,
-        correctAnswer: values.correctOption,
+        correctAnswer: values.correctAnswer,
         explanation: values.explanation,
-        difficulty: values.difficulty || 'MEDIUM', // Default to MEDIUM if not provided
-        examCategory: values.examCategory || 'OTHER', // Default to OTHER if not provided
-        subject: values.subject,
-        year: values.year ? parseInt(values.year, 10) : null,
-        source: values.source || null,
+        difficulty: values.difficulty,
+        subjectId: values.subjectId,
+        source: values.source || null
       };
-      
-      console.log('Sending question data to API:', questionData);
-      
-      // Make API call to create the question
+
+      if (isDev) {
+        console.log('Sending question data to API:', questionData);
+      }
+
       const response = await fetch('/api/questions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', // Include cookies for authentication
+        credentials: 'include',
         body: JSON.stringify(questionData),
       });
-      
-      console.log('API response status:', response.status);
-      
+
+      if (isDev) {
+        console.log('API response status:', response.status);
+      }
+
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('API error response:', errorData);
-        
-        // Provide more specific error messages
-        if (errorData.step === 'auth_test') {
-          throw new Error('Authentication failed - please log out and log back in');
-        } else if (errorData.step === 'db_user_test') {
-          throw new Error('User account not properly set up in database');
-        } else if (errorData.step === 'permission_test') {
-          throw new Error('You do not have permission to create questions. Only QAUTHORs can create questions.');
-        } else {
-          throw new Error(errorData.error || `Failed to create question (${response.status})`);
-        }
+        throw new Error(errorData.error || 'Failed to create question');
       }
-      
-      const createdQuestion = await response.json();
-      console.log('Question created successfully:', createdQuestion.id);
-      
-      // Reset the form
+
+      const result = await response.json();
+      const createdQuestion = result.question || result;
+
+      if (isDev) {
+        console.log('Question created successfully:', createdQuestion.id);
+      }
+
+      message.success('Question created successfully!');
       form.resetFields();
       
-      // Call the onComplete callback if provided
-      if (onComplete) {
+      if (onComplete && createdQuestion) {
         onComplete(createdQuestion);
       }
-    } catch (err) {
-      console.error('Error in handleSubmit:', err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create question';
+      setError(errorMessage);
+      message.error(errorMessage);
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
   

@@ -1,185 +1,140 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getBrowserClient, clearBrowserClient } from '@/lib/supabase-browser';
-import { AuthContextType, User, LoginResponse } from '@/types';
-import { SupabaseClient } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { User, Session } from '@supabase/supabase-js';
+import { UserRole } from '@/types';
 
 // Only log in development
 const isDev = process.env.NODE_ENV === 'development';
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [authInitialized, setAuthInitialized] = useState(false);
-  const [loginInProgress, setLoginInProgress] = useState(false);
-  const router = useRouter();
-  
-  // Get the singleton browser client instance
-  const [browserSupabase, setBrowserSupabase] = useState<SupabaseClient | null>(null);
-  
-  // Initialize the Supabase client
-  useEffect(() => {
-    try {
-      const client = getBrowserClient();
-      setBrowserSupabase(client);
-      if (isDev) {
-        console.log('✅ Supabase client initialized');
-      }
-    } catch (err) {
-      if (isDev) {
-        console.error("❌ Failed to initialize Supabase client:", err);
-      }
-      setError('Failed to initialize authentication service');
-      setLoading(false);
-      setAuthInitialized(true);
-    }
-  }, []);
+interface AuthUser {
+  id: string;
+  email: string;
+  role: UserRole;
+}
 
-  // Simplified user data fetch
-  const fetchUserData = async (userId: string): Promise<User | null> => {
-    if (!browserSupabase) {
-      return null;
-    }
-    
+interface AuthContextType {
+  user: AuthUser | null;
+  session: Session | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  const supabase = createClientComponentClient();
+  
+  if (isDev) {
+    console.log('✅ Supabase client initialized');
+  }
+
+  // Fetch user data from our users table
+  const fetchUserData = async (authUser: User): Promise<AuthUser | null> => {
     try {
-      const { data: userData, error: userError } = await browserSupabase
+      const { data, error } = await supabase
         .from('users')
-        .select('id, email, role, created_at, updated_at')
-        .eq('id', userId)
+        .select('id, email, role')
+        .eq('id', authUser.id)
         .single();
 
-      if (userError) {
-        if (isDev) {
-          console.error('❌ Error fetching user data:', userError.message);
-        }
-        return null;
+      if (error) {
+        throw error;
       }
-      
-      if (!userData) {
-        if (isDev) {
-          console.warn(`⚠️ No user data found for ID: ${userId}`);
-        }
-        return null;
+
+      if (!data) {
+        throw new Error('User not found in database');
       }
-      
+
+      const userData: AuthUser = {
+        id: data.id,
+        email: data.email,
+        role: data.role as UserRole
+      };
+
       if (isDev) {
         console.log('✅ User data fetched:', userData.email, 'Role:', userData.role);
       }
-      
-      return userData as User;
+
+      return userData;
     } catch (error) {
       if (isDev) {
-        console.error("❌ Exception in fetchUserData:", error);
+        console.error('❌ Error fetching user data:', error);
       }
       return null;
     }
   };
 
-  // Simplified auth state change handler
-  const handleAuthStateChange = async (event: string, session: any) => {
-    if (isDev) {
-      console.log('🔄 Auth state change:', event, session ? 'with session' : 'no session');
-    }
-    
-    if (event === 'SIGNED_IN' && session?.user) {
-      const userData = await fetchUserData(session.user.id);
-      
-      if (userData) {
-        setUser(userData);
-        setError(null);
-        if (isDev) {
-          console.log('✅ User signed in:', userData.email, 'Role:', userData.role);
-        }
-      } else {
-        // User exists in auth but NOT in database - SECURITY VIOLATION
-        if (isDev) {
-          console.error('🚨 SECURITY ISSUE: User exists in auth but not in database:', session.user.email);
-        }
-        setError('Account not properly configured. Please contact administrator.');
-        await forceLogout();
-        return;
-      }
-    } else if (event === 'SIGNED_OUT') {
-      setUser(null);
-      setError(null);
-      if (isDev) {
-        console.log('✅ User signed out');
-      }
-    } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-      // Only fetch user data if we don't have it
-      if (!user) {
-        const userData = await fetchUserData(session.user.id);
-        if (userData) {
-          setUser(userData);
-        } else {
-          await forceLogout();
-          return;
-        }
-      }
-    }
-    
-    setLoading(false);
-  };
-
-  // Force logout when user data is inconsistent
-  const forceLogout = async () => {
-    try {
-      if (browserSupabase) {
-        await browserSupabase.auth.signOut();
-      }
-      clearBrowserClient();
-      setUser(null);
-      setError('Session terminated due to account configuration issue.');
-      
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login?error=account_config_error';
-      }
-    } catch (error) {
-      if (isDev) {
-        console.error('❌ Error during force logout:', error);
-      }
-    }
-  };
-
-  // Simplified authentication setup
+  // Handle auth state changes
   useEffect(() => {
-    if (!browserSupabase) {
-      return;
-    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (isDev) {
+          console.log('🔄 Auth state change:', event, session ? 'with session' : 'no session');
+        }
 
+        setSession(session);
+
+        if (session?.user) {
+          // User signed in
+          const userData = await fetchUserData(session.user);
+          if (userData) {
+            setUser(userData);
+            if (isDev) {
+              console.log('✅ User signed in:', userData.email, 'Role:', userData.role);
+            }
+          } else {
+            setUser(null);
+            if (isDev) {
+              console.error('❌ Failed to fetch user data after sign in');
+            }
+          }
+        } else {
+          // User signed out
+          setUser(null);
+          if (isDev) {
+            console.log('✅ User signed out');
+          }
+        }
+
+        setLoading(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
+
+  // Initialize auth state
+  useEffect(() => {
     const initializeAuth = async () => {
       try {
+        setLoading(true);
+        
         if (isDev) {
           console.log('🔄 Initializing authentication...');
         }
+
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        // Get current session
-        const { data: { session }, error: sessionError } = await browserSupabase.auth.getSession();
-        
-        if (sessionError) {
-          if (isDev) {
-            console.error('❌ Session error:', sessionError.message);
-          }
-          setError('Session initialization failed');
-          setLoading(false);
-          setAuthInitialized(true);
-          return;
+        if (error) {
+          throw error;
         }
-        
-        // Handle existing session
+
         if (session?.user) {
-          await handleAuthStateChange('SIGNED_IN', session);
-        } else {
-          setLoading(false);
+          const userData = await fetchUserData(session.user);
+          if (userData) {
+            setUser(userData);
+            setSession(session);
+          }
         }
-        
-        setAuthInitialized(true);
-        
+
         if (isDev) {
           console.log('✅ Authentication initialized');
         }
@@ -187,292 +142,113 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (isDev) {
           console.error('❌ Error initializing auth:', error);
         }
-        setError('Authentication initialization failed');
+      } finally {
         setLoading(false);
-        setAuthInitialized(true);
       }
     };
 
-    // Setup auth state listener
-    const { data: { subscription } } = browserSupabase.auth.onAuthStateChange(handleAuthStateChange);
-
-    // Initialize
     initializeAuth();
+  }, [supabase.auth]);
 
-    // Cleanup
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [browserSupabase]);
-
-  // Simplified login method
-  const login = async (email: string, password: string): Promise<LoginResponse | void> => {
-    if (!browserSupabase) {
-      throw new Error('Authentication service not available');
-    }
-
-    if (loginInProgress) {
-      if (isDev) {
-        console.log('⚠️ Login already in progress, skipping...');
-      }
-      return;
-    }
-
+  const signIn = async (email: string, password: string) => {
     try {
-      setLoginInProgress(true);
-      setError(null);
       setLoading(true);
-      
+
+      // Check if already signing in
+      if (loading) {
+        if (isDev) {
+          console.log('⚠️ Login already in progress, skipping...');
+        }
+        return { success: false, error: 'Login already in progress' };
+      }
+
       if (isDev) {
         console.log('🔄 Attempting login for:', email);
       }
-      
-      const { data, error } = await browserSupabase.auth.signInWithPassword({
-        email,
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.toLowerCase().trim(),
         password,
       });
 
       if (error) {
-        if (isDev) {
-          console.error('❌ Login error:', error.message);
-        }
-        setError(error.message);
-        setLoading(false);
-        return {
-          success: false,
-          error: error.message,
-        };
-      }
-
-      if (data.user) {
-        if (isDev) {
-          console.log('✅ Authentication successful, fetching user data...');
-        }
-        
-        const userData = await fetchUserData(data.user.id);
-        
-        if (userData) {
-          setUser(userData);
-          setLoading(false);
-          
-          if (isDev) {
-            console.log('✅ Login complete:', userData.email, 'Role:', userData.role);
-          }
-          
-          // Redirect based on role
-          setTimeout(() => {
-            if (userData.role === 'SUPERADMIN') {
-              router.push('/dashboard');
-            } else if (userData.role === 'QAUTHOR') {
-              router.push('/dashboard');
-            } else if (userData.role === 'STUDENT') {
-              router.push('/dashboard');
-            } else {
-              router.push('/dashboard');
-            }
-          }, 100);
-          
-          return {
-            success: true,
-            user: userData,
-          };
-        } else {
-          setError('User data not found in database');
-          setLoading(false);
-          return {
-            success: false,
-            error: 'User data not found',
-          };
-        }
-      }
-
-      setLoading(false);
-      return {
-        success: false,
-        error: 'Login failed',
-      };
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Login failed';
-      if (isDev) {
-        console.error('❌ Login exception:', errorMessage);
-      }
-      setError(errorMessage);
-      setLoading(false);
-      return {
-        success: false,
-        error: errorMessage,
-      };
-    } finally {
-      setLoginInProgress(false);
-    }
-  };
-
-  // Logout function
-  const logout = async () => {
-    if (!browserSupabase) {
-      return;
-    }
-
-    try {
-      setError(null);
-      const { error } = await browserSupabase.auth.signOut();
-      
-      if (error) {
-        setError(error.message);
         throw error;
       }
-      
-      clearBrowserClient();
-      setUser(null);
-      router.push('/login');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Logout failed';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    }
-  };
-
-  // Create QAUTHOR function
-  const createQAUTHOR = async (email: string, password: string) => {
-    if (!browserSupabase) {
-      throw new Error('Authentication service not available');
-    }
-
-    try {
-      setError(null);
-      
-      // First check if user already exists in our users table
-      const { data: existingUser } = await browserSupabase
-        .from('users')
-        .select('id, email, role')
-        .eq('email', email)
-        .maybeSingle();
-      
-      if (existingUser) {
-        throw new Error('User with this email already exists');
-      }
-
-      // Create the auth user
-      const { data, error } = await browserSupabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: undefined, // Skip email confirmation for admin-created accounts
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message);
-      }
 
       if (!data.user) {
-        throw new Error('Failed to create user account');
+        throw new Error('No user data returned');
       }
 
-      // Create the user record with QAUTHOR role
-      const { data: userData, error: userError } = await browserSupabase
-        .from('users')
-        .insert({
-          id: data.user.id,
-          email: email,
-          role: 'QAUTHOR'
-        })
-        .select('id, email, role, created_at, updated_at')
-        .single();
-
-      if (userError) {
-        // Clean up the auth user if user creation failed
-        await browserSupabase.auth.admin.deleteUser(data.user.id);
-        throw new Error('Failed to create user profile: ' + userError.message);
+      // The auth state change handler will handle setting the user
+      if (isDev) {
+        console.log('✅ Authentication successful, fetching user data...');
       }
 
-      return userData as User;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create QAUTHOR';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    }
-  };
+      // Wait a bit for the auth state change to process
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-  // Register student function
-  const registerStudent = async (email: string, password: string) => {
-    if (!browserSupabase) {
-      throw new Error('Authentication service not available');
-    }
-
-    try {
-      setError(null);
-      
-      // First check if user already exists in our users table
-      const { data: existingUser } = await browserSupabase
-        .from('users')
-        .select('id, email, role')
-        .eq('email', email)
-        .maybeSingle();
-      
-      if (existingUser) {
-        throw new Error('User with this email already exists');
-      }
-
-      // Create the auth user
-      const { data, error } = await browserSupabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      if (!data.user) {
-        throw new Error('Registration failed');
-      }
-
-      // Create user record in database with STUDENT role
-      const { data: userData, error: userError } = await browserSupabase
-        .from('users')
-        .insert({
-          id: data.user.id,
-          email: email,
-          role: 'STUDENT'
-        })
-        .select('id, email, role, created_at, updated_at')
-        .single();
-
-      if (userError) {
-        // Clean up the auth user if user creation failed
+      const userData = await fetchUserData(data.user);
+      if (userData) {
+        setUser(userData);
         if (isDev) {
-          console.error('Failed to create user profile:', userError);
+          console.log('✅ Login complete:', userData.email, 'Role:', userData.role);
         }
-        throw new Error('Failed to create user profile: ' + userError.message);
+        return { success: true };
+      } else {
+        throw new Error('Failed to fetch user profile');
       }
 
-      return userData as User;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Registration failed';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      if (isDev) {
+        console.error('❌ Login error:', errorMessage);
+      }
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
     }
   };
 
-  const value: AuthContextType = {
+  const signOut = async () => {
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      setUser(null);
+      setSession(null);
+    } catch (error) {
+      if (isDev) {
+        console.error('❌ Sign out error:', error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshUser = async () => {
+    if (session?.user) {
+      const userData = await fetchUserData(session.user);
+      setUser(userData);
+    }
+  };
+
+  const value = {
     user,
+    session,
     loading,
-    error,
-    authInitialized,
-    login,
-    logout,
-    createQAUTHOR,
-    registerStudent,
+    signIn,
+    signOut,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
+}
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}; 
+} 
