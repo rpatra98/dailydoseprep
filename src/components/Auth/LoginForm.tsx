@@ -1,26 +1,86 @@
 import { useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+
+// Only log in development
+const isDev = process.env.NODE_ENV === 'development';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
-  const { login } = useAuth();
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
 
+    if (isDev) {
+      console.log('🔄 Starting login process for:', email);
+    }
+
     try {
-      await login(email, password);
+      // Call the login API
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: email.toLowerCase().trim(),
+          password,
+        }),
+      });
+
+      if (isDev) {
+        console.log('📡 Login API response status:', response.status);
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (isDev) {
+          console.error('❌ Login failed:', errorData.error);
+        }
+        throw new Error(errorData.error || 'Login failed');
+      }
+
+      const result = await response.json();
+      if (isDev) {
+        console.log('✅ Login successful for user:', result.user?.email);
+      }
+
       setMessage({ type: 'success', text: 'Logged in successfully!' });
+      
+      // Redirect based on user role
+      setTimeout(() => {
+        if (result.user?.role === 'ADMIN') {
+          if (isDev) {
+            console.log('🔄 Redirecting ADMIN to admin dashboard...');
+          }
+          router.push('/admin/questions');
+        } else if (result.user?.role === 'QAUTHOR') {
+          if (isDev) {
+            console.log('🔄 Redirecting QAUTHOR to question creation...');
+          }
+          router.push('/create-question');
+        } else {
+          if (isDev) {
+            console.log('🔄 Redirecting STUDENT to dashboard...');
+          }
+          router.push('/dashboard');
+        }
+      }, 1000);
+
     } catch (error) {
-      console.error('Error logging in:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to login';
+      if (isDev) {
+        console.error('❌ Login error:', errorMessage);
+      }
       setMessage({ 
         type: 'error', 
-        text: error instanceof Error ? error.message : 'Failed to login' 
+        text: errorMessage
       });
     } finally {
       setLoading(false);
@@ -50,7 +110,8 @@ export default function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Enter your email"
           />
         </div>
         
@@ -64,14 +125,15 @@ export default function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Enter your password"
           />
         </div>
         
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? 'Logging in...' : 'Login'}
         </button>
