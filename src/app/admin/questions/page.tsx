@@ -1,9 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { getBrowserClient } from '@/lib/supabase-browser';
 import { UserRole } from '@/types';
 import { 
   Layout, 
@@ -17,7 +15,8 @@ import {
   Tooltip,
   message,
   Spin,
-  Alert
+  Alert,
+  Grid
 } from 'antd';
 import { 
   ArrowLeftOutlined,
@@ -30,7 +29,14 @@ import {
 import AspectRatioLayout from '@/components/AspectRatioLayout';
 
 const { Header, Content } = Layout;
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
+const { useBreakpoint } = Grid;
+
+interface User {
+  id: string;
+  email: string;
+  role: UserRole;
+}
 
 interface Question {
   id: string;
@@ -56,94 +62,107 @@ interface Question {
 }
 
 export default function AdminQuestionsPage() {
-  const { user, authInitialized } = useAuth();
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const screens = useBreakpoint();
 
-  // Redirect if not logged in
+  // Add debug logging
+  const addDebug = (message: string) => {
+    console.log(message);
+    setDebugInfo(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${message}`]);
+  };
+
+  // Handle mounting
   useEffect(() => {
-    if (authInitialized && !user) {
-      router.push('/login');
-    }
-  }, [user, router, authInitialized]);
+    addDebug('🔄 Admin Questions page mounting...');
+    setIsMounted(true);
+    addDebug('✅ Admin Questions page mounted');
+  }, []);
 
-  // Check user role and fetch data
+  // Check authentication and fetch user data
   useEffect(() => {
-    if (!user || !authInitialized) return;
+    if (!isMounted) return;
 
-    const checkRoleAndFetchData = async () => {
+    const checkAuth = async (retryCount = 0) => {
       try {
-        setLoading(true);
-        setError(null);
+        addDebug('🔄 Checking authentication...');
         
-        // Get user role
-        const supabase = getBrowserClient();
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', user.id)
-          .maybeSingle();
+        // Check if user is authenticated via session
+        const response = await fetch('/api/auth/me', {
+          method: 'GET',
+          credentials: 'include',
+        });
 
-        if (userError) {
-          throw new Error(`Failed to load user data: ${userError.message}`);
+        if (!response.ok) {
+          // Retry once in case session is still being established
+          if (retryCount === 0) {
+            addDebug('⚠️ Auth check failed, retrying in 2 seconds...');
+            setTimeout(() => checkAuth(1), 2000);
+            return;
+          }
+          
+          addDebug('❌ Not authenticated, redirecting to login');
+          router.push('/login');
+          return;
         }
+
+        const userData = await response.json();
+        addDebug(`✅ User authenticated: ${userData.email} (${userData.role})`);
         
-        if (!userData) {
-          throw new Error('User not found in database');
-        }
-        
-        const role = userData.role as UserRole;
-        setUserRole(role);
+        setUser(userData);
+        setUserRole(userData.role);
         
         // Only SUPERADMIN can access this page
-        if (role !== 'SUPERADMIN') {
+        if (userData.role !== 'SUPERADMIN') {
+          addDebug('❌ Access denied - not SUPERADMIN');
           router.push('/dashboard');
           return;
         }
 
-        // Fetch all questions with QAUTHOR and subject details
+        // Fetch all questions
+        addDebug('🔄 Fetching questions...');
         await fetchAllQuestions();
+        addDebug('✅ Questions loaded');
         
       } catch (error) {
-        setError(error instanceof Error ? error.message : 'Failed to load data');
+        const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+        addDebug(`❌ Auth error: ${errorMessage}`);
+        setError(errorMessage);
+        // Redirect to login on auth failure
+        setTimeout(() => router.push('/login'), 1000);
       } finally {
         setLoading(false);
       }
     };
 
-    checkRoleAndFetchData();
-  }, [user, authInitialized, router]);
+    checkAuth();
+  }, [isMounted, router]);
 
   const fetchAllQuestions = async () => {
     try {
-      const supabase = getBrowserClient();
-      
-      const { data, error } = await supabase
-        .from('questions')
-        .select(`
-          *,
-          subjects (
-            name
-          ),
-          users (
-            email
-          )
-        `)
-        .order('created_at', { ascending: false });
+      const response = await fetch('/api/questions', {
+        method: 'GET',
+        credentials: 'include',
+      });
 
-      if (error) {
-        throw new Error('Failed to fetch questions: ' + error.message);
+      if (!response.ok) {
+        throw new Error('Failed to fetch questions');
       }
 
-      setQuestions(data || []);
+      const data = await response.json();
+      setQuestions(data.questions || []);
     } catch (error) {
-      message.error('Failed to fetch questions');
-      setError(error instanceof Error ? error.message : 'Failed to fetch questions');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch questions';
+      addDebug(`❌ Failed to fetch questions: ${errorMessage}`);
+      setError(errorMessage);
     }
   };
 
@@ -156,8 +175,14 @@ export default function AdminQuestionsPage() {
     router.push('/dashboard');
   };
 
-  // Show loading while checking auth
-  if (!authInitialized || loading) {
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    window.location.reload();
+  };
+
+  // Prevent hydration mismatch
+  if (!isMounted) {
     return (
       <AspectRatioLayout>
         <div className="center-content">
@@ -167,7 +192,33 @@ export default function AdminQuestionsPage() {
     );
   }
 
-  // Show error if any
+  // Show loading state
+  if (loading) {
+    return (
+      <AspectRatioLayout>
+        <div className="center-content">
+          <Spin size="large" tip="Loading questions..." />
+          {process.env.NODE_ENV === 'development' && (
+            <div style={{ 
+              marginTop: 20, 
+              fontFamily: 'monospace', 
+              fontSize: '12px',
+              textAlign: 'center',
+              maxWidth: '400px'
+            }}>
+              {debugInfo.slice(-3).map((info, index) => (
+                <div key={index} style={{ marginBottom: '4px', color: '#666' }}>
+                  {info}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </AspectRatioLayout>
+    );
+  }
+
+  // Show error state
   if (error) {
     return (
       <AspectRatioLayout>
@@ -197,8 +248,8 @@ export default function AdminQuestionsPage() {
               />
               <Button 
                 type="primary" 
-                icon={<ReloadOutlined />} 
-                onClick={() => window.location.reload()}
+                icon={<ReloadOutlined />}
+                onClick={handleRetry}
               >
                 Retry
               </Button>
@@ -209,158 +260,151 @@ export default function AdminQuestionsPage() {
     );
   }
 
-  // Redirect non-SUPERADMIN users
-  if (userRole !== 'SUPERADMIN') {
-    return (
-      <AspectRatioLayout>
-        <div className="center-content">
-          <Spin size="large" tip="Redirecting..." />
-        </div>
-      </AspectRatioLayout>
-    );
-  }
+  const isMobile = isMounted ? screens.xs : false;
 
   const columns = [
     {
-      title: 'Question',
+      title: 'Title',
       dataIndex: 'title',
       key: 'title',
-      render: (title: string, record: Question) => (
-        <div>
-          <Text strong>{title}</Text>
-          <br />
-          <Text type="secondary" ellipsis style={{ fontSize: '12px' }}>
-            {record.content.substring(0, 80)}...
-          </Text>
-        </div>
+      width: 200,
+      ellipsis: true,
+      render: (text: string) => (
+        <Tooltip title={text}>
+          <Text strong>{text}</Text>
+        </Tooltip>
       ),
-      width: 300,
     },
     {
       title: 'Subject',
-      dataIndex: ['subjects', 'name'],
+      dataIndex: 'subjects',
       key: 'subject',
-      render: (subject: string) => (
-        <Tag color="blue" icon={<BookOutlined />}>
-          {subject || 'Unknown'}
+      width: 120,
+      render: (subjects: any) => (
+        <Tag color="blue">
+          {subjects?.name || 'Unknown'}
         </Tag>
       ),
-      width: 120,
     },
     {
-      title: 'QAUTHOR',
-      dataIndex: ['users', 'email'],
-      key: 'qauthor',
-      render: (email: string) => (
-        <Tag color="purple" icon={<UserOutlined />}>
-          {email ? email.split('@')[0] : 'Unknown'}
-        </Tag>
+      title: 'Exam Category',
+      dataIndex: 'exam_category',
+      key: 'exam_category',
+      width: 120,
+      render: (category: string) => (
+        <Tag color="green">{category}</Tag>
       ),
-      width: 150,
     },
     {
       title: 'Difficulty',
       dataIndex: 'difficulty',
       key: 'difficulty',
+      width: 100,
       render: (difficulty: string) => {
         const color = difficulty === 'EASY' ? 'green' : difficulty === 'MEDIUM' ? 'orange' : 'red';
         return <Tag color={color}>{difficulty}</Tag>;
       },
-      width: 100,
     },
     {
-      title: 'Category',
-      dataIndex: 'exam_category',
-      key: 'exam_category',
-      render: (category: string) => (
-        <Tag>{category}</Tag>
+      title: 'Created By',
+      dataIndex: 'users',
+      key: 'created_by',
+      width: 150,
+      render: (users: any) => (
+        <Space>
+          <UserOutlined />
+          <Text>{users?.email || 'Unknown'}</Text>
+        </Space>
       ),
-      width: 100,
     },
     {
-      title: 'Created',
+      title: 'Created At',
       dataIndex: 'created_at',
       key: 'created_at',
-      render: (date: string) => (
-        <div>
-          <CalendarOutlined style={{ marginRight: 4 }} />
-          <Text style={{ fontSize: '12px' }}>
-            {new Date(date).toLocaleDateString()}
-          </Text>
-          <br />
-          <Text type="secondary" style={{ fontSize: '11px' }}>
-            {new Date(date).toLocaleTimeString()}
-          </Text>
-        </div>
-      ),
       width: 120,
+      render: (date: string) => (
+        <Space>
+          <CalendarOutlined />
+          <Text>{new Date(date).toLocaleDateString()}</Text>
+        </Space>
+      ),
     },
     {
       title: 'Actions',
       key: 'actions',
+      width: 100,
       render: (_: any, record: Question) => (
-        <Space>
-          <Tooltip title="Preview Question">
-            <Button 
-              type="text" 
-              icon={<EyeOutlined />} 
-              onClick={() => handlePreview(record)}
-            />
-          </Tooltip>
-        </Space>
+        <Button
+          type="primary"
+          size="small"
+          icon={<EyeOutlined />}
+          onClick={() => handlePreview(record)}
+        >
+          <span className="hidden-mobile">Preview</span>
+        </Button>
       ),
-      width: 80,
     },
   ];
 
   return (
     <AspectRatioLayout>
       <Layout className="full-height">
-        <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Button 
-              type="text" 
-              icon={<ArrowLeftOutlined />} 
-              onClick={handleBackToDashboard}
-              style={{ marginRight: 8 }}
-            >
-              <span className="hidden-mobile">Back</span>
-            </Button>
-            <Title level={3} style={{ margin: 0 }}>
-              <span className="hidden-mobile">All Questions</span>
-              <span className="visible-mobile">Questions</span>
-            </Title>
-          </div>
+        <Header style={{ 
+          background: '#fff', 
+          padding: '0 16px', 
+          display: 'flex', 
+          alignItems: 'center',
+          borderBottom: '1px solid #f0f0f0'
+        }}>
           <Button 
-            icon={<ReloadOutlined />} 
-            onClick={fetchAllQuestions}
-            loading={loading}
+            type="text" 
+            icon={<ArrowLeftOutlined />} 
+            onClick={handleBackToDashboard}
+            style={{ marginRight: 8 }}
+            size={isMobile ? "middle" : "large"}
           >
-            <span className="hidden-mobile">Refresh</span>
+            <span className="hidden-mobile">Back</span>
           </Button>
+          <Title level={3} style={{ margin: 0 }}>
+            <span className="hidden-mobile">All Questions</span>
+            <span className="visible-mobile">Questions</span>
+          </Title>
+          <div style={{ marginLeft: 'auto' }}>
+            <Button 
+              icon={<ReloadOutlined />}
+              onClick={fetchAllQuestions}
+              size={isMobile ? "middle" : "large"}
+            >
+              <span className="hidden-mobile">Refresh</span>
+            </Button>
+          </div>
         </Header>
-        <Content style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+
+        <Content style={{ padding: isMobile ? '16px' : '24px', flex: 1, overflowY: 'auto' }}>
           <Card>
             <div style={{ marginBottom: 16 }}>
-              <Title level={4}>Questions Overview</Title>
+              <Title level={4}>
+                <BookOutlined style={{ marginRight: 8 }} />
+                Questions Database ({questions.length} questions)
+              </Title>
               <Text type="secondary">
-                Monitor all questions created by QAUTHORs. Total questions: {questions.length}
+                As SUPERADMIN, you can view all questions created by QAUTHORs to monitor content quality.
               </Text>
             </div>
-            
+
             <Table
               dataSource={questions}
               columns={columns}
               rowKey="id"
-              loading={loading}
               pagination={{
-                pageSize: 20,
+                pageSize: 10,
                 showSizeChanger: true,
                 showQuickJumper: true,
                 showTotal: (total, range) => 
                   `${range[0]}-${range[1]} of ${total} questions`,
               }}
               scroll={{ x: 'max-content' }}
+              loading={loading}
             />
           </Card>
 
@@ -378,75 +422,96 @@ export default function AdminQuestionsPage() {
           >
             {selectedQuestion && (
               <div>
-                <div style={{ marginBottom: 16, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
-                  <Space>
-                    <Tag color="purple" icon={<UserOutlined />}>
-                      {selectedQuestion.users?.email?.split('@')[0] || 'Unknown QAUTHOR'}
-                    </Tag>
-                    <Tag color="blue" icon={<BookOutlined />}>
-                      {selectedQuestion.subjects?.name || 'Unknown Subject'}
-                    </Tag>
-                    <Tag icon={<CalendarOutlined />}>
-                      {new Date(selectedQuestion.created_at).toLocaleString()}
-                    </Tag>
-                  </Space>
-                </div>
-
-                <Title level={5}>{selectedQuestion.title}</Title>
-                <Text>{selectedQuestion.content}</Text>
-                
-                <div style={{ marginTop: 16 }}>
-                  <Text strong>Options:</Text>
-                  <ul style={{ marginTop: 8 }}>
-                    <li>A. {selectedQuestion.option_a}</li>
-                    <li>B. {selectedQuestion.option_b}</li>
-                    <li>C. {selectedQuestion.option_c}</li>
-                    <li>D. {selectedQuestion.option_d}</li>
-                  </ul>
-                </div>
-
-                <div style={{ marginTop: 16 }}>
-                  <Text strong>Correct Answer: </Text>
-                  <Tag color="green">{selectedQuestion.correct_option}</Tag>
-                </div>
-
-                {selectedQuestion.explanation && (
-                  <div style={{ marginTop: 16 }}>
-                    <Text strong>Explanation:</Text>
-                    <div style={{ marginTop: 8, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
-                      <Text>{selectedQuestion.explanation}</Text>
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ marginTop: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                  <div>
-                    <Text strong>Difficulty: </Text>
+                <div style={{ marginBottom: 16 }}>
+                  <Space wrap>
+                    <Tag color="blue">{selectedQuestion.subjects?.name || 'Unknown Subject'}</Tag>
+                    <Tag color="green">{selectedQuestion.exam_category}</Tag>
                     <Tag color={selectedQuestion.difficulty === 'EASY' ? 'green' : selectedQuestion.difficulty === 'MEDIUM' ? 'orange' : 'red'}>
                       {selectedQuestion.difficulty}
                     </Tag>
-                  </div>
-                  <div>
-                    <Text strong>Category: </Text>
-                    <Tag>{selectedQuestion.exam_category}</Tag>
-                  </div>
-                  {selectedQuestion.year && (
-                    <div>
-                      <Text strong>Year: </Text>
-                      <Tag>{selectedQuestion.year}</Tag>
-                    </div>
-                  )}
+                    {selectedQuestion.year && <Tag color="purple">Year: {selectedQuestion.year}</Tag>}
+                  </Space>
                 </div>
 
-                {selectedQuestion.source && (
-                  <div style={{ marginTop: 16 }}>
-                    <Text strong>Source: </Text>
-                    <Text>{selectedQuestion.source}</Text>
+                <Title level={4}>{selectedQuestion.title}</Title>
+                <Paragraph style={{ fontSize: '16px', marginBottom: 24 }}>
+                  {selectedQuestion.content}
+                </Paragraph>
+
+                <div style={{ marginBottom: 24 }}>
+                  <Title level={5}>Options:</Title>
+                  <div style={{ paddingLeft: 16 }}>
+                    <div style={{ marginBottom: 8 }}>
+                      <Text strong={selectedQuestion.correct_option === 'A'}>
+                        A. {selectedQuestion.option_a}
+                        {selectedQuestion.correct_option === 'A' && <Tag color="green" style={{ marginLeft: 8 }}>Correct</Tag>}
+                      </Text>
+                    </div>
+                    <div style={{ marginBottom: 8 }}>
+                      <Text strong={selectedQuestion.correct_option === 'B'}>
+                        B. {selectedQuestion.option_b}
+                        {selectedQuestion.correct_option === 'B' && <Tag color="green" style={{ marginLeft: 8 }}>Correct</Tag>}
+                      </Text>
+                    </div>
+                    <div style={{ marginBottom: 8 }}>
+                      <Text strong={selectedQuestion.correct_option === 'C'}>
+                        C. {selectedQuestion.option_c}
+                        {selectedQuestion.correct_option === 'C' && <Tag color="green" style={{ marginLeft: 8 }}>Correct</Tag>}
+                      </Text>
+                    </div>
+                    <div style={{ marginBottom: 8 }}>
+                      <Text strong={selectedQuestion.correct_option === 'D'}>
+                        D. {selectedQuestion.option_d}
+                        {selectedQuestion.correct_option === 'D' && <Tag color="green" style={{ marginLeft: 8 }}>Correct</Tag>}
+                      </Text>
+                    </div>
                   </div>
-                )}
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <Title level={5}>Explanation:</Title>
+                  <Paragraph>{selectedQuestion.explanation}</Paragraph>
+                </div>
+
+                <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
+                  <Space>
+                    <Text type="secondary">Created by: {selectedQuestion.users?.email || 'Unknown'}</Text>
+                    <Text type="secondary">•</Text>
+                    <Text type="secondary">Created: {new Date(selectedQuestion.created_at).toLocaleDateString()}</Text>
+                    {selectedQuestion.source && (
+                      <>
+                        <Text type="secondary">•</Text>
+                        <Text type="secondary">Source: {selectedQuestion.source}</Text>
+                      </>
+                    )}
+                  </Space>
+                </div>
               </div>
             )}
           </Modal>
+
+          {/* Debug Info Panel - Only show in development */}
+          {process.env.NODE_ENV === 'development' && (
+            <Card 
+              title="Debug Information"
+              size="small"
+              style={{ 
+                marginTop: 24,
+                maxWidth: 600
+              }}
+            >
+              <div style={{ fontFamily: 'monospace', fontSize: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+                {debugInfo.map((info, index) => (
+                  <div key={index} style={{ marginBottom: '4px' }}>
+                    {info}
+                  </div>
+                ))}
+                {debugInfo.length === 0 && (
+                  <div style={{ color: '#999' }}>No debug info yet...</div>
+                )}
+              </div>
+            </Card>
+          )}
         </Content>
       </Layout>
     </AspectRatioLayout>
