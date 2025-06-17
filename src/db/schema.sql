@@ -120,10 +120,10 @@ CREATE POLICY "Allow public read access to questions"
     ON public.questions FOR SELECT 
     USING (true);
 
-CREATE POLICY "Allow QAUTHOR and SUPERADMIN to create questions" 
+CREATE POLICY "Allow QAUTHOR to create questions" 
     ON public.questions FOR INSERT 
     TO authenticated 
-    USING ((SELECT role FROM public.users WHERE id = auth.uid()) IN ('QAUTHOR', 'SUPERADMIN'));
+    USING ((SELECT role FROM public.users WHERE id = auth.uid()) = 'QAUTHOR');
 
 CREATE POLICY "Allow question creator to update their questions" 
     ON public.questions FOR UPDATE 

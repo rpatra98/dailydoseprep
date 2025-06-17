@@ -105,14 +105,14 @@ async function testDatabaseConnectivity(supabase: any) {
     
     console.log('✅ User found in database:', dbUser.email, 'Role:', dbUser.role);
     
-    // Test 4: Check user role
-    if (dbUser.role !== 'QAUTHOR' && dbUser.role !== 'SUPERADMIN') {
+    // Test 4: Check user role - ONLY QAUTHOR can create questions per specification
+    if (dbUser.role !== 'QAUTHOR') {
       return {
         success: false,
         error: 'Insufficient permissions',
         details: `User role '${dbUser.role}' cannot create questions`,
         step: 'permission_test',
-        suggestion: 'Only QAUTHOR and SUPERADMIN can create questions'
+        suggestion: 'Only QAUTHOR can create questions'
       };
     }
     
