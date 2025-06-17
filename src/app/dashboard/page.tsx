@@ -88,7 +88,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!isMounted) return;
 
-    const checkAuth = async () => {
+    const checkAuth = async (retryCount = 0) => {
       try {
         addDebug('🔄 Checking authentication...');
         
@@ -99,6 +99,13 @@ export default function Dashboard() {
         });
 
         if (!response.ok) {
+          // Retry once in case session is still being established
+          if (retryCount === 0) {
+            addDebug('⚠️ Auth check failed, retrying in 2 seconds...');
+            setTimeout(() => checkAuth(1), 2000);
+            return;
+          }
+          
           addDebug('❌ Not authenticated, redirecting to login');
           router.push('/login');
           return;
@@ -249,9 +256,25 @@ export default function Dashboard() {
         justifyContent: 'center', 
         alignItems: 'center', 
         height: '100vh',
-        backgroundColor: '#f5f5f5'
+        backgroundColor: '#f5f5f5',
+        flexDirection: 'column'
       }}>
         <Spin size="large" tip="Loading your dashboard..." />
+        {process.env.NODE_ENV === 'development' && (
+          <div style={{ 
+            marginTop: 20, 
+            fontFamily: 'monospace', 
+            fontSize: '12px',
+            textAlign: 'center',
+            maxWidth: '400px'
+          }}>
+            {debugInfo.slice(-3).map((info, index) => (
+              <div key={index} style={{ marginBottom: '4px', color: '#666' }}>
+                {info}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }

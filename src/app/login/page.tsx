@@ -61,10 +61,10 @@ export default function LoginPage() {
       if (response.ok) {
         const data = await response.json();
         addDebug('✅ Login successful, redirecting...');
-        // Small delay to let user see success
+        // Small delay to ensure session is established
         setTimeout(() => {
           router.push('/dashboard');
-        }, 500);
+        }, 1000);
       } else {
         const errorData = await response.json();
         addDebug(`❌ Login failed: ${errorData.error}`);
