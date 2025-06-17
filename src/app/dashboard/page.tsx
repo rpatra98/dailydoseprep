@@ -72,6 +72,7 @@ export default function Dashboard() {
   const [isMounted, setIsMounted] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [form] = Form.useForm();
+  const [statsLoading, setStatsLoading] = useState(false);
   const screens = useBreakpoint();
 
   // Add debug logging
@@ -162,6 +163,7 @@ export default function Dashboard() {
 
   const fetchSystemStats = async () => {
     try {
+      setStatsLoading(true);
       const response = await fetch('/api/admin/stats', {
         method: 'GET',
         credentials: 'include',
@@ -173,6 +175,8 @@ export default function Dashboard() {
       }
     } catch (error) {
       addDebug(`⚠️ Failed to fetch stats: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -222,7 +226,13 @@ export default function Dashboard() {
         addDebug('✅ QAUTHOR created successfully');
         message.success(`QAUTHOR account created successfully for ${values.email}`);
         form.resetFields();
-        fetchAllUsers(); // Refresh the users list
+        
+        // Refresh both users list and system statistics
+        await Promise.all([
+          fetchAllUsers(),
+          fetchSystemStats()
+        ]);
+        addDebug('✅ Statistics refreshed after QAUTHOR creation');
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to create QAUTHOR');
@@ -234,6 +244,13 @@ export default function Dashboard() {
     } finally {
       setCreateLoading(false);
     }
+  };
+
+  // Callback function to refresh statistics when subjects are modified
+  const handleSubjectChange = async () => {
+    addDebug('🔄 Refreshing statistics after subject change...');
+    await fetchSystemStats();
+    addDebug('✅ Statistics refreshed after subject change');
   };
 
   // Prevent hydration mismatch
@@ -362,7 +379,24 @@ export default function Dashboard() {
 
               {/* System Statistics */}
               {systemStats && (
-                <Card title="System Statistics" style={{ marginBottom: 16 }}>
+                <Card 
+                  title={
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>System Statistics</span>
+                      <Button 
+                        icon={<ReloadOutlined />}
+                        onClick={fetchSystemStats}
+                        size="small"
+                        type="text"
+                        title="Refresh Statistics"
+                        loading={statsLoading}
+                      >
+                        <span className="hidden-mobile">Refresh</span>
+                      </Button>
+                    </div>
+                  }
+                  style={{ marginBottom: 16 }}
+                >
                   <Row gutter={[16, 16]}>
                     <Col xs={12} sm={8} md={6}>
                       <Statistic 
@@ -482,7 +516,7 @@ export default function Dashboard() {
 
               {/* Subject Management */}
               <Card style={{ marginTop: 16 }}>
-                <SubjectManager />
+                <SubjectManager onSubjectChange={handleSubjectChange} />
               </Card>
 
               {/* All Users Table */}

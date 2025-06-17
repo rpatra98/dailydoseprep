@@ -12,10 +12,14 @@ interface Subject {
   created_at: string;
 }
 
+interface SubjectManagerProps {
+  onSubjectChange?: () => Promise<void>;
+}
+
 // Only log in development
 const isDev = process.env.NODE_ENV === 'development';
 
-const SubjectManager = () => {
+const SubjectManager = ({ onSubjectChange }: SubjectManagerProps) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -80,6 +84,11 @@ const SubjectManager = () => {
       
       message.success('Subject deleted successfully');
       fetchSubjects();
+      
+      // Notify parent component about the change
+      if (onSubjectChange) {
+        await onSubjectChange();
+      }
     } catch (error) {
       if (isDev) {
         console.error('Error deleting subject:', error);
@@ -146,6 +155,11 @@ const SubjectManager = () => {
       setEditingSubject(null);
       form.resetFields();
       fetchSubjects();
+      
+      // Notify parent component about the change
+      if (onSubjectChange) {
+        await onSubjectChange();
+      }
     } catch (error) {
       if (isDev) {
         console.error('Error saving subject:', error);
