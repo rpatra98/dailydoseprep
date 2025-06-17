@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Form, Input, Button, Card, Typography, Alert, Grid } from 'antd';
+import { Form, Input, Button, Card, Typography, Alert, Grid, Spin } from 'antd';
 import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import AspectRatioLayout from '@/components/AspectRatioLayout';
@@ -11,59 +10,135 @@ import AspectRatioLayout from '@/components/AspectRatioLayout';
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
+// Only log in development
+const isDev = process.env.NODE_ENV === 'development';
+
 export default function RegisterPage() {
   const [form] = Form.useForm();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
   
-  const { user, registerStudent } = useAuth();
   const router = useRouter();
   const screens = useBreakpoint();
+
+  // Add debug logging
+  const addDebug = (message: string) => {
+    if (isDev) {
+      console.log(message);
+      setDebugInfo(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${message}`]);
+    }
+  };
   
   useEffect(() => {
+    addDebug('🔄 Register page mounting...');
     setIsMounted(true);
+    addDebug('✅ Register page mounted');
   }, []);
   
   const isMobile = isMounted ? screens.xs : false;
 
-  // Redirect if already logged in
+  // Check if user is already logged in
   useEffect(() => {
-    if (user) {
-      router.push('/dashboard');
-    }
-  }, [user, router]);
+    if (!isMounted) return;
+
+    const checkAuth = async () => {
+      try {
+        addDebug('🔄 Checking if user is already logged in...');
+        
+        const response = await fetch('/api/auth/me', {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          addDebug(`✅ User already logged in: ${userData.email}, redirecting to dashboard`);
+          router.push('/dashboard');
+        } else {
+          addDebug('✅ No active session, user can register');
+        }
+      } catch (error) {
+        addDebug(`⚠️ Auth check error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // Ignore errors, user can proceed with registration
+      }
+    };
+
+    checkAuth();
+  }, [isMounted, router]);
 
   const handleSubmit = async (values: { email: string; password: string; confirmPassword: string }) => {
     const { email, password, confirmPassword } = values;
     setError('');
     setSuccess('');
     
+    addDebug(`🔄 Starting registration for: ${email}`);
+    
     // Validate passwords match
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      const errorMsg = 'Passwords do not match';
+      setError(errorMsg);
+      addDebug(`❌ Password validation failed: ${errorMsg}`);
       return;
     }
     
     try {
       setIsSubmitting(true);
-      await registerStudent(email, password);
-      setSuccess('Registration successful! You can now log in.');
-      // After successful registration, redirect to login page after a delay
+      addDebug('📡 Sending registration request...');
+      
+      // Create student account via API
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.toLowerCase().trim(),
+          password,
+          role: 'STUDENT'
+        }),
+      });
+
+      addDebug(`📡 Registration API response status: ${response.status}`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        addDebug(`❌ Registration failed: ${errorData.error}`);
+        throw new Error(errorData.error || 'Registration failed');
+      }
+
+      const result = await response.json();
+      addDebug('✅ Registration successful');
+      
+      setSuccess('Registration successful! You can now log in with your credentials.');
+      form.resetFields();
+      
+      // Redirect to login page after a delay
       setTimeout(() => {
+        addDebug('🔄 Redirecting to login page...');
         router.push('/login');
       }, 2000);
+      
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      const errorMessage = err instanceof Error ? err.message : 'Registration failed';
+      addDebug(`❌ Registration error: ${errorMessage}`);
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Don't render during SSR to avoid hydration issues
+  // Prevent hydration mismatch
   if (!isMounted) {
-    return <div className="center-content">Loading...</div>;
+    return (
+      <AspectRatioLayout>
+        <div className="center-content">
+          <Spin size="large" tip="Loading registration page..." />
+        </div>
+      </AspectRatioLayout>
+    );
   }
 
   return (
@@ -193,6 +268,29 @@ export default function RegisterPage() {
             </Text>
           </div>
         </Card>
+
+        {/* Debug Info Panel - Only show in development */}
+        {isDev && (
+          <Card 
+            title="Debug Information"
+            size="small"
+            style={{ 
+              marginTop: 24,
+              maxWidth: 600
+            }}
+          >
+            <div style={{ fontFamily: 'monospace', fontSize: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+              {debugInfo.map((info, index) => (
+                <div key={index} style={{ marginBottom: '4px' }}>
+                  {info}
+                </div>
+              ))}
+              {debugInfo.length === 0 && (
+                <div style={{ color: '#999' }}>No debug info yet...</div>
+              )}
+            </div>
+          </Card>
+        )}
       </div>
     </AspectRatioLayout>
   );
