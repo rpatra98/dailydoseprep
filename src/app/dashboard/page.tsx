@@ -344,15 +344,14 @@ export default function Dashboard() {
         }}>
           <div>
             <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-              <span className="hidden-mobile">Daily Dose Prep Dashboard</span>
-              <span className="visible-mobile">Dashboard</span>
+              <span className="hidden-mobile">Daily Dose Prep</span>
+              <span className="visible-mobile">DDP</span>
             </Title>
             {user && (
-              <Text type="secondary" style={{ fontSize: isMobile ? '12px' : '14px' }}>
-                <span className="hidden-mobile">Welcome, {user.email}</span>
-                <span className="visible-mobile">{user.email}</span>
+              <Text type="secondary" style={{ fontSize: isMobile ? '11px' : '13px' }}>
+                {user.email}
                 <Tag color={userRole === 'SUPERADMIN' ? 'red' : userRole === 'QAUTHOR' ? 'blue' : 'green'} 
-                     style={{ marginLeft: 8 }}>
+                     style={{ marginLeft: 6, fontSize: isMobile ? '10px' : '12px' }}>
                   {userRole}
                 </Tag>
               </Text>
@@ -363,7 +362,7 @@ export default function Dashboard() {
             danger
             icon={<LogoutOutlined />}
             onClick={handleSignOut}
-            size={isMobile ? "middle" : "large"}
+            size={isMobile ? "small" : "middle"}
           >
             <span className="hidden-mobile">Sign Out</span>
           </Button>
