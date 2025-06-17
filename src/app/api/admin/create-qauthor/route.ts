@@ -1,11 +1,36 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
-export async function POST(request: Request) {
-  // Only SUPERADMIN should be able to call this API
-  // In a real-world application, you would implement proper authorization here
-  
+export async function POST(request: NextRequest) {
   try {
+    // Check authentication first
+    const supabase = createRouteHandlerClient({ cookies });
+    
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
+    
+    // Get current user's role
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+    
+    if (userError || !currentUser || currentUser.role !== 'SUPERADMIN') {
+      return NextResponse.json(
+        { error: 'Access denied. SUPERADMIN role required.' },
+        { status: 403 }
+      );
+    }
+    
     const { email, password } = await request.json();
     
     if (!email || !password) {
