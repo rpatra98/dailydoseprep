@@ -45,33 +45,78 @@ async function testDatabaseConnectivity(supabase: any) {
     
     console.log('✅ Basic connection successful');
     
-    // Test 2: Authentication
+    // Test 2: Authentication - with better error handling
     console.log('🔐 Testing authentication...');
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
     
     if (authError) {
       logError('AUTH_TEST', authError);
       return {
         success: false,
         error: 'Authentication failed',
-        details: authError.message,
-        step: 'auth_test'
+        details: `Auth session missing! ${authError.message}`,
+        step: 'auth_test',
+        suggestion: 'User needs to log in again'
       };
     }
     
+    const user = authData?.user;
     if (!user) {
       console.log('❌ No authenticated user found');
       return {
         success: false,
-        error: 'No authenticated user',
-        details: 'User session not found',
-        step: 'auth_test'
+        error: 'Authentication failed',
+        details: 'Auth session missing!',
+        step: 'auth_test',
+        suggestion: 'User needs to log in again'
       };
     }
     
     console.log('✅ Authentication successful:', user.email);
     
-    // Test 3: Subjects table
+    // Test 3: Check if user exists in database
+    console.log('👤 Checking user in database...');
+    const { data: dbUser, error: dbUserError } = await supabase
+      .from('users')
+      .select('id, email, role')
+      .eq('id', user.id)
+      .single();
+    
+    if (dbUserError) {
+      logError('DB_USER_TEST', dbUserError);
+      return {
+        success: false,
+        error: 'User not found in database',
+        details: dbUserError.message,
+        step: 'db_user_test',
+        suggestion: 'User account may need to be created in the database'
+      };
+    }
+    
+    if (!dbUser) {
+      return {
+        success: false,
+        error: 'User not found in database',
+        details: 'User exists in auth but not in users table',
+        step: 'db_user_test',
+        suggestion: 'User account needs to be created in the database'
+      };
+    }
+    
+    console.log('✅ User found in database:', dbUser.email, 'Role:', dbUser.role);
+    
+    // Test 4: Check user role
+    if (dbUser.role !== 'QAUTHOR' && dbUser.role !== 'SUPERADMIN') {
+      return {
+        success: false,
+        error: 'Insufficient permissions',
+        details: `User role '${dbUser.role}' cannot create questions`,
+        step: 'permission_test',
+        suggestion: 'Only QAUTHOR and SUPERADMIN can create questions'
+      };
+    }
+    
+    // Test 5: Subjects table
     console.log('📋 Testing subjects table...');
     const { data: subjects, error: subjectsError } = await supabase
       .from('subjects')
@@ -100,7 +145,7 @@ async function testDatabaseConnectivity(supabase: any) {
     
     console.log('✅ Subjects table accessible:', subjects.length, 'subjects found');
     
-    // Test 4: Questions table structure
+    // Test 6: Questions table structure
     console.log('❓ Testing questions table structure...');
     const { data: questionsTest, error: questionsError } = await supabase
       .from('questions')
@@ -126,7 +171,7 @@ async function testDatabaseConnectivity(supabase: any) {
     
     return {
       success: true,
-      user: user,
+      user: dbUser,
       subjects: subjects,
       questionsColumns: questionsTest?.[0] ? Object.keys(questionsTest[0]) : null
     };
@@ -148,20 +193,18 @@ async function testQuestionInsertion(supabase: any, user: any, subjects: any[]) 
   
   // Test data matching actual database schema
   const testData = {
-    subject_id: testSubject.id,               // UUID from subjects table
-    title: 'Test Question',                  // TEXT
-    content: 'Test question - will be deleted immediately',  // TEXT
-    option_a: 'Test Option A',               // TEXT
-    option_b: 'Test Option B',               // TEXT
-    option_c: 'Test Option C',               // TEXT
-    option_d: 'Test Option D',               // TEXT
-    correct_option: 'A',                     // CHARACTER
+    subject: testSubject.id,                 // UUID from subjects table
+    question_text: 'Test question - will be deleted immediately',  // TEXT
+    options: {                               // JSONB field
+      A: 'Test Option A',
+      B: 'Test Option B',
+      C: 'Test Option C',
+      D: 'Test Option D'
+    },
+    correct_answer: 'A',                     // TEXT
     explanation: 'This is a test explanation',          // TEXT
-    difficulty: 'EASY',                      // USER-DEFINED
-    exam_category: 'OTHER',                  // USER-DEFINED (required)
-    year: 2024,                              // INTEGER
-    source: 'Test Source',                   // TEXT
-    questionhash: 'test-hash-' + Date.now() + '-' + Math.random(), // TEXT (unique)
+    difficulty: 'EASY',                      // TEXT
+    questionHash: 'test-hash-' + Date.now() + '-' + Math.random(), // TEXT (unique)
     created_by: user.id                      // UUID from auth
   };
   
@@ -501,7 +544,7 @@ export async function POST(req: NextRequest) {
         error: connectivityTest.error,
         details: connectivityTest.details,
         step: connectivityTest.step,
-        suggestion: 'Check database setup and authentication',
+        suggestion: connectivityTest.suggestion,
         setupUrl: '/api/setup'
       }, { status: 500 });
     }
@@ -522,20 +565,18 @@ export async function POST(req: NextRequest) {
     }
     
     const questionData = {
-      subject_id: subject,
-      title: title || 'Question',
-      content: content,
-      option_a: optionA,
-      option_b: optionB,
-      option_c: optionC,
-      option_d: optionD,
-      correct_option: correctAnswer,
+      subject: subject,                        // UUID field matching schema
+      question_text: content,                  // TEXT field matching schema
+      options: {                               // JSONB field matching schema
+        A: optionA,
+        B: optionB,
+        C: optionC,
+        D: optionD
+      },
+      correct_answer: correctAnswer,           // TEXT field matching schema
       explanation: explanation || '',
       difficulty: difficulty || 'MEDIUM',
-      exam_category: examCategory || 'OTHER',  // Required field with default
-      year: year || new Date().getFullYear(),  // Required field with default
-      source: source || '',                    // Optional field
-      questionhash: generateQuestionHash({
+      questionHash: generateQuestionHash({     // camelCase as per schema
         content,
         optionA,
         optionB,

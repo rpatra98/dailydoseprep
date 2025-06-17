@@ -76,6 +76,11 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         throw new Error('You must be logged in to create questions');
       }
       
+      // Debug authentication state
+      console.log('User object:', user);
+      console.log('User role:', user.role);
+      console.log('User email:', user.email);
+      
       console.log('Submitting question with values:', {
         ...values,
         optionA: values.optionA ? 'present' : 'missing',
@@ -118,7 +123,17 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('API error response:', errorData);
-        throw new Error(errorData.error || `Failed to create question (${response.status})`);
+        
+        // Provide more specific error messages
+        if (errorData.step === 'auth_test') {
+          throw new Error('Authentication failed - please log out and log back in');
+        } else if (errorData.step === 'db_user_test') {
+          throw new Error('User account not properly set up in database');
+        } else if (errorData.step === 'permission_test') {
+          throw new Error('You do not have permission to create questions. Only QAUTHORs can create questions.');
+        } else {
+          throw new Error(errorData.error || `Failed to create question (${response.status})`);
+        }
       }
       
       const createdQuestion = await response.json();
