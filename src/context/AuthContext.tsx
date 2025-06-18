@@ -6,7 +6,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { UserRole } from '@/types';
 
 // Enable logging for debugging
-const isDev = true; // Temporarily enable for debugging
+const isDev = process.env.NODE_ENV === 'development';
 
 interface AuthUser {
   id: string;
@@ -33,12 +33,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const supabase = createClientComponentClient();
   
-  console.log('✅ AuthProvider: Component mounted, Supabase client initialized');
+  if (isDev) {
+    console.log('✅ AuthProvider: Component mounted, Supabase client initialized');
+  }
 
   // Fetch user data from our users table
   const fetchUserData = async (authUser: User): Promise<AuthUser | null> => {
     try {
-      console.log('🔄 AuthProvider: Fetching user data for:', authUser.email);
+      if (isDev) {
+        console.log('🔄 AuthProvider: Fetching user data for:', authUser.email);
+      }
       
       const { data, error } = await supabase
         .from('users')
@@ -47,12 +51,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (error) {
-        console.error('❌ AuthProvider: Database error:', error);
+        if (isDev) {
+          console.error('❌ AuthProvider: Database error:', error);
+        }
         throw error;
       }
 
       if (!data) {
-        console.error('❌ AuthProvider: No user data found in database');
+        if (isDev) {
+          console.error('❌ AuthProvider: No user data found in database');
+        }
         throw new Error('User not found in database');
       }
 
@@ -62,10 +70,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: data.role as UserRole
       };
 
-      console.log('✅ AuthProvider: User data fetched successfully:', userData.email, 'Role:', userData.role);
+      if (isDev) {
+        console.log('✅ AuthProvider: User data fetched successfully:', userData.email, 'Role:', userData.role);
+      }
       return userData;
     } catch (error) {
-      console.error('❌ AuthProvider: Error fetching user data:', error);
+      if (isDev) {
+        console.error('❌ AuthProvider: Error fetching user data:', error);
+      }
       return null;
     }
   };
@@ -73,105 +85,153 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Handle auth state changes
   useEffect(() => {
     if (!initialized) {
-      console.log('🔄 AuthProvider: Skipping auth state listener setup - not initialized yet');
+      if (isDev) {
+        console.log('🔄 AuthProvider: Skipping auth state listener setup - not initialized yet');
+      }
       return;
     }
 
-    console.log('🔄 AuthProvider: Setting up auth state change listener...');
+    if (isDev) {
+      console.log('🔄 AuthProvider: Setting up auth state change listener...');
+    }
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 AuthProvider: Auth state change:', event, session ? 'with session' : 'no session');
+        if (isDev) {
+          console.log('🔄 AuthProvider: Auth state change:', event, session ? 'with session' : 'no session');
+        }
 
         // Skip INITIAL_SESSION event to avoid double processing
         if (event === 'INITIAL_SESSION') {
-          console.log('🔄 AuthProvider: Skipping INITIAL_SESSION event (already handled)');
+          if (isDev) {
+            console.log('🔄 AuthProvider: Skipping INITIAL_SESSION event (already handled)');
+          }
           return;
         }
 
         setSession(session);
 
         if (session?.user) {
-          console.log('🔄 AuthProvider: User session found, fetching user data...');
+          if (isDev) {
+            console.log('🔄 AuthProvider: User session found, fetching user data...');
+          }
           // User signed in
           const userData = await fetchUserData(session.user);
           if (userData) {
             setUser(userData);
-            console.log('✅ AuthProvider: User signed in successfully:', userData.email, 'Role:', userData.role);
+            if (isDev) {
+              console.log('✅ AuthProvider: User signed in successfully:', userData.email, 'Role:', userData.role);
+            }
           } else {
             setUser(null);
-            console.error('❌ AuthProvider: Failed to fetch user data after sign in');
+            if (isDev) {
+              console.error('❌ AuthProvider: Failed to fetch user data after sign in');
+            }
           }
         } else {
           // User signed out
           setUser(null);
-          console.log('✅ AuthProvider: User signed out');
+          if (isDev) {
+            console.log('✅ AuthProvider: User signed out');
+          }
         }
 
-        console.log('🔄 AuthProvider: Auth state change processing complete');
+        if (isDev) {
+          console.log('🔄 AuthProvider: Auth state change processing complete');
+        }
       }
     );
 
     return () => {
-      console.log('🔄 AuthProvider: Cleaning up auth state change listener...');
+      if (isDev) {
+        console.log('🔄 AuthProvider: Cleaning up auth state change listener...');
+      }
       subscription.unsubscribe();
     };
   }, [supabase.auth, initialized]);
 
   // Initialize auth state
   useEffect(() => {
-    console.log('🔄 AuthProvider: useEffect triggered for initialization');
+    if (isDev) {
+      console.log('🔄 AuthProvider: useEffect triggered for initialization');
+    }
     
     const initializeAuth = async () => {
       try {
-        console.log('🔄 AuthProvider: Starting auth initialization...');
+        if (isDev) {
+          console.log('🔄 AuthProvider: Starting auth initialization...');
+        }
         setLoading(true);
         
-        console.log('🔄 AuthProvider: Getting current session...');
+        if (isDev) {
+          console.log('🔄 AuthProvider: Getting current session...');
+        }
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('❌ AuthProvider: Error getting session:', error);
+          if (isDev) {
+            console.error('❌ AuthProvider: Error getting session:', error);
+          }
           throw error;
         }
 
-        console.log('🔄 AuthProvider: Session check result:', session ? 'Session found' : 'No session');
+        if (isDev) {
+          console.log('🔄 AuthProvider: Session check result:', session ? 'Session found' : 'No session');
+        }
 
         if (session?.user) {
-          console.log('🔄 AuthProvider: Session found, fetching user data for:', session.user.email);
+          if (isDev) {
+            console.log('🔄 AuthProvider: Session found, fetching user data for:', session.user.email);
+          }
           const userData = await fetchUserData(session.user);
           if (userData) {
             setUser(userData);
             setSession(session);
-            console.log('✅ AuthProvider: Auth initialized with user:', userData.email);
+            if (isDev) {
+              console.log('✅ AuthProvider: Auth initialized with user:', userData.email);
+            }
           } else {
-            console.error('❌ AuthProvider: Failed to fetch user data during initialization');
+            if (isDev) {
+              console.error('❌ AuthProvider: Failed to fetch user data during initialization');
+            }
             setUser(null);
             setSession(null);
           }
         } else {
-          console.log('🔄 AuthProvider: No session found during initialization');
+          if (isDev) {
+            console.log('🔄 AuthProvider: No session found during initialization');
+          }
           setUser(null);
           setSession(null);
         }
 
-        console.log('✅ AuthProvider: Authentication initialization complete');
+        if (isDev) {
+          console.log('✅ AuthProvider: Authentication initialization complete');
+        }
       } catch (error) {
-        console.error('❌ AuthProvider: Error initializing auth:', error);
+        if (isDev) {
+          console.error('❌ AuthProvider: Error initializing auth:', error);
+        }
         setUser(null);
         setSession(null);
       } finally {
-        console.log('🔄 AuthProvider: Setting loading to false after initialization...');
+        if (isDev) {
+          console.log('🔄 AuthProvider: Setting loading to false after initialization...');
+        }
         setLoading(false);
         setInitialized(true);
-        console.log('✅ AuthProvider: Initialization fully complete');
+        if (isDev) {
+          console.log('✅ AuthProvider: Initialization fully complete');
+        }
       }
     };
 
     // Add timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
       if (!initialized) {
-        console.log('⚠️ AuthProvider: Initialization timeout, forcing completion...');
+        if (isDev) {
+          console.log('⚠️ AuthProvider: Initialization timeout, forcing completion...');
+        }
         setLoading(false);
         setInitialized(true);
       }
@@ -180,7 +240,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializeAuth();
 
     return () => {
-      console.log('🔄 AuthProvider: Cleanup initialization timeout');
+      if (isDev) {
+        console.log('🔄 AuthProvider: Cleanup initialization timeout');
+      }
       clearTimeout(timeoutId);
     };
   }, [supabase.auth, initialized]);
