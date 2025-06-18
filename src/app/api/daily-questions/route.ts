@@ -13,10 +13,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
     
-    // Check if user is a STUDENT
+    // Check if user is a STUDENT and get their primary subject
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('role')
+      .select('role, primarysubject')
       .eq('id', authData.session.user.id)
       .single();
     
@@ -26,6 +26,15 @@ export async function GET(req: NextRequest) {
     
     if (userData?.role !== 'STUDENT') {
       return NextResponse.json({ error: 'Only students can access daily questions' }, { status: 403 });
+    }
+
+    // Check if student has selected a primary subject
+    if (!userData.primarysubject) {
+      return NextResponse.json({ 
+        error: 'No primary subject selected',
+        message: 'Please select a primary subject in your dashboard to receive daily questions.',
+        needsSubjectSelection: true
+      }, { status: 400 });
     }
     
     // Get today's date in YYYY-MM-DD format for consistency
@@ -90,8 +99,10 @@ export async function GET(req: NextRequest) {
     
     const attemptedIds = attemptedQuestionIds?.map(item => item.questionId) || [];
     
+    // Filter questions by primary subject and exclude attempted ones
     let query = supabase.from('questions')
       .select('id, title, content, option_a, option_b, option_c, option_d')
+      .eq('subject_id', userData.primarysubject)  // Filter by primary subject
       .order('created_at', { ascending: true });
       
     // Exclude previously attempted questions
@@ -226,7 +237,7 @@ export async function POST(req: NextRequest) {
     // Fetch correct answers for validation
     const { data: questionsData, error: questionsError } = await supabase
       .from('questions')
-      .select('id, correct_answer')
+      .select('id, correct_option')
       .in('id', questionIds);
       
     if (questionsError || !questionsData) {
@@ -235,7 +246,7 @@ export async function POST(req: NextRequest) {
     
     // Create a map for quick lookup of correct answers
     const correctAnswers = new Map();
-    questionsData.forEach(q => correctAnswers.set(q.id, q.correct_answer));
+    questionsData.forEach(q => correctAnswers.set(q.id, q.correct_option));
     
     // Process answers and record attempts
     let correctCount = 0;

@@ -162,6 +162,11 @@ CREATE POLICY "Students can view their own question sets"
     TO authenticated 
     USING (auth.uid() = studentId AND (SELECT role FROM public.users WHERE id = auth.uid()) = 'STUDENT');
 
+CREATE POLICY "Students can insert their own question sets" 
+    ON public.daily_question_sets FOR INSERT 
+    TO authenticated 
+    WITH CHECK (auth.uid() = studentId AND (SELECT role FROM public.users WHERE id = auth.uid()) = 'STUDENT');
+
 CREATE POLICY "Students can update their own question sets" 
     ON public.daily_question_sets FOR UPDATE 
     TO authenticated 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Select, Alert, Spin, Typography } from 'antd';
+import { Select, Alert, Spin, Typography, Button } from 'antd';
 import { getBrowserClient } from '@/lib/supabase-browser';
 import { Subject } from '@/types';
 
@@ -15,29 +15,49 @@ interface SubjectSelectionProps {
 export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: SubjectSelectionProps) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(initialSubjectId || null);
+  const [currentPrimarySubject, setCurrentPrimarySubject] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
 
-  // Fetch subjects on component mount
+  // Fetch subjects and current primary subject on component mount
   useEffect(() => {
-    const fetchSubjects = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
         
         const supabase = getBrowserClient();
-        const { data, error } = await supabase
+        
+        // Fetch subjects
+        const { data: subjectsData, error: subjectsError } = await supabase
           .from('subjects')
           .select('*')
           .order('name', { ascending: true });
           
-        if (error) {
+        if (subjectsError) {
           throw new Error('Failed to load subjects');
         }
         
-        setSubjects(data || []);
+        setSubjects(subjectsData || []);
+
+        // Fetch current user's primary subject
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('primarysubject')
+          .eq('id', userId)
+          .single();
+
+        if (userError && userError.code !== 'PGRST116') { // PGRST116 = no rows returned
+          throw new Error('Failed to load user data');
+        }
+
+        if (userData?.primarysubject) {
+          setCurrentPrimarySubject(userData.primarysubject);
+          setSelectedSubject(userData.primarysubject);
+        }
+        
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
@@ -45,8 +65,8 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
       }
     };
 
-    fetchSubjects();
-  }, []);
+    fetchData();
+  }, [userId]);
 
   const handleSubjectChange = async (subjectId: string) => {
     try {
@@ -55,13 +75,18 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
       setError(null);
       setSuccess(false);
       
-      // Since we don't have primarySubject in the database, just simulate success
-      // In the future, you could store this preference in a separate table
-      // Subject selected
+      // Save primary subject to database
+      const supabase = getBrowserClient();
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ primarysubject: subjectId })
+        .eq('id', userId);
+
+      if (updateError) {
+        throw new Error('Failed to save primary subject');
+      }
       
-      // Simulate a small delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      setCurrentPrimarySubject(subjectId);
       setSuccess(true);
       
       // Call the onComplete callback if provided
@@ -70,6 +95,8 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      // Reset selection on error
+      setSelectedSubject(currentPrimarySubject);
     } finally {
       setSaving(false);
     }
@@ -79,9 +106,42 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
     return <Spin tip="Loading subjects..." />;
   }
 
+  // If primary subject is already selected, show read-only view
+  if (currentPrimarySubject) {
+    const selectedSubjectName = subjects.find(s => s.id === currentPrimarySubject)?.name || 'Unknown Subject';
+    
+    return (
+      <div>
+        <Title level={4}>Your Primary Subject</Title>
+        <Alert
+          message="Primary Subject Selected"
+          description={
+            <div>
+              <Text strong>{selectedSubjectName}</Text>
+              <br />
+              <Text type="secondary">
+                Your primary subject cannot be changed once selected. You will receive daily questions from this subject.
+              </Text>
+            </div>
+          }
+          type="success"
+          showIcon
+          style={{ marginTop: 16 }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       <Title level={4}>Select Your Primary Subject</Title>
+      <Alert
+        message="Important"
+        description="Choose carefully! Once you select your primary subject, it cannot be changed. You will receive daily questions from this subject."
+        type="warning"
+        showIcon
+        style={{ marginBottom: 16 }}
+      />
       <Text>Choose the main subject you'd like to focus on. This will determine which questions you receive daily.</Text>
       
       {error && (
@@ -97,7 +157,7 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
       {success && (
         <Alert
           message="Success"
-          description="Primary subject updated successfully!"
+          description="Primary subject selected successfully! You can now access your daily questions."
           type="success"
           showIcon
           style={{ marginTop: 16, marginBottom: 16 }}

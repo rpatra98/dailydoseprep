@@ -610,7 +610,7 @@ export default function Dashboard() {
                 </div>
                 <Divider />
                 <Row gutter={[16, 16]}>
-                  <Col xs={24} sm={12} md={8}>
+                  <Col xs={24} sm={12} md={12}>
                     <Link href="/daily-questions">
                       <Button 
                         type="primary" 
@@ -622,22 +622,14 @@ export default function Dashboard() {
                       </Button>
                     </Link>
                   </Col>
-                  <Col xs={24} sm={12} md={8}>
-                    <Link href="/create-question">
-                      <Button 
-                        icon={<PlusOutlined />}
-                        size="large"
-                        block
-                      >
-                        Practice Mode
-                      </Button>
-                    </Link>
-                  </Col>
-                  <Col xs={24} sm={12} md={8}>
+                  <Col xs={24} sm={12} md={12}>
                     <Button 
                       icon={<DatabaseOutlined />}
                       size="large"
                       block
+                      onClick={() => {
+                        message.info('Progress tracking feature coming soon!');
+                      }}
                     >
                       Progress Tracking
                     </Button>

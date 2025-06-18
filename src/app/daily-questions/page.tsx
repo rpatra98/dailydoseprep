@@ -70,6 +70,13 @@ export default function DailyQuestions() {
         
         if (!response.ok) {
           const errorData = await response.json();
+          
+          // Handle special case where primary subject selection is needed
+          if (errorData.needsSubjectSelection) {
+            setError('Please select your primary subject in the dashboard first.');
+            return;
+          }
+          
           throw new Error(errorData.error || 'Failed to fetch daily questions');
         }
         
