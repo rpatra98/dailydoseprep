@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Select, Alert, Spin, Typography, Button } from 'antd';
+import { Select, Alert, Spin, Typography, Button, Modal } from 'antd';
 import { getBrowserClient } from '@/lib/supabase-browser';
 import { Subject } from '@/types';
 
