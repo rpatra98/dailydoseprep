@@ -26,14 +26,37 @@ const { Option: SelectOption } = Select;
 interface QuestionFormProps {
   onComplete?: (question: Question) => void;
   onCancel?: () => void;
+  initialData?: Question | null; // For edit mode
+  mode?: 'create' | 'edit'; // Form mode
 }
 
-export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
+export const QuestionForm = ({ onComplete, onCancel, initialData, mode = 'create' }: QuestionFormProps) => {
   const [form] = Form.useForm();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Set initial form values when editing
+  useEffect(() => {
+    if (mode === 'edit' && initialData) {
+      form.setFieldsValue({
+        title: initialData.title,
+        content: initialData.content,
+        optionA: initialData.optionA,
+        optionB: initialData.optionB,
+        optionC: initialData.optionC,
+        optionD: initialData.optionD,
+        correctOption: initialData.correctOption,
+        explanation: initialData.explanation,
+        difficulty: initialData.difficulty,
+        subject: initialData.subject,
+        examCategory: initialData.examCategory,
+        year: initialData.year,
+        source: initialData.source
+      });
+    }
+  }, [mode, initialData, form]);
   
   // Fetch subjects on component mount
   useEffect(() => {
@@ -70,7 +93,7 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
     const isDev = process.env.NODE_ENV === 'development';
     
     if (isDev) {
-      console.log('Submitting question with values:', {
+      console.log(`${mode === 'edit' ? 'Updating' : 'Creating'} question with values:`, {
         title: values.title,
         content: values.content,
         optionA: values.optionA ? 'present' : 'missing',
@@ -85,7 +108,7 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
       });
     }
 
-    setLoading(true);
+    setSubmitting(true);
     setError('');
 
     try {
@@ -106,11 +129,17 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
       };
 
       if (isDev) {
-        console.log('Sending question data to API:', questionData);
+        console.log(`Sending question data to API (${mode}):`, questionData);
       }
 
-      const response = await fetch('/api/questions', {
-        method: 'POST',
+      const apiUrl = mode === 'edit' && initialData 
+        ? `/api/qauthor/questions/${initialData.id}`
+        : '/api/questions';
+      
+      const method = mode === 'edit' ? 'PUT' : 'POST';
+
+      const response = await fetch(apiUrl, {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -124,28 +153,31 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create question');
+        throw new Error(errorData.error || `Failed to ${mode} question`);
       }
 
       const result = await response.json();
-      const createdQuestion = result.question || result;
+      const processedQuestion = result.question || result;
 
       if (isDev) {
-        console.log('Question created successfully:', createdQuestion.id);
+        console.log(`Question ${mode}d successfully:`, processedQuestion.id);
       }
 
-      message.success('Question created successfully!');
-      form.resetFields();
+      message.success(`Question ${mode}d successfully!`);
       
-      if (onComplete && createdQuestion) {
-        onComplete(createdQuestion);
+      if (mode === 'create') {
+        form.resetFields();
+      }
+      
+      if (onComplete && processedQuestion) {
+        onComplete(processedQuestion);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create question';
+      const errorMessage = error instanceof Error ? error.message : `Failed to ${mode} question`;
       setError(errorMessage);
       message.error(errorMessage);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
   
@@ -155,10 +187,12 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
   
   return (
     <div>
-      <Title level={3}>Create New Question</Title>
+      <Title level={3}>{mode === 'edit' ? 'Edit Question' : 'Create New Question'}</Title>
       <Text>
-        Fill out the required fields below to create a complete question. Each question must have four options
-        with one correct answer and belong to a specific subject.
+        {mode === 'edit' 
+          ? 'Update the fields below to modify this question.'
+          : 'Fill out the required fields below to create a complete question. Each question must have four options with one correct answer and belong to a specific subject.'
+        }
       </Text>
       
       {error && (
@@ -200,63 +234,63 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
           />
         </Form.Item>
         
-        <Divider>Answer Options</Divider>
+        <Divider>Options</Divider>
         
         <Form.Item
           name="optionA"
           label="Option A"
-          rules={[{ required: true, message: 'Please enter Option A' }]}
+          rules={[{ required: true, message: 'Please enter option A' }]}
         >
-          <Input placeholder="Enter Option A" />
+          <Input placeholder="Enter option A" />
         </Form.Item>
         
         <Form.Item
           name="optionB"
           label="Option B"
-          rules={[{ required: true, message: 'Please enter Option B' }]}
+          rules={[{ required: true, message: 'Please enter option B' }]}
         >
-          <Input placeholder="Enter Option B" />
+          <Input placeholder="Enter option B" />
         </Form.Item>
         
         <Form.Item
           name="optionC"
           label="Option C"
-          rules={[{ required: true, message: 'Please enter Option C' }]}
+          rules={[{ required: true, message: 'Please enter option C' }]}
         >
-          <Input placeholder="Enter Option C" />
+          <Input placeholder="Enter option C" />
         </Form.Item>
         
         <Form.Item
           name="optionD"
           label="Option D"
-          rules={[{ required: true, message: 'Please enter Option D' }]}
+          rules={[{ required: true, message: 'Please enter option D' }]}
         >
-          <Input placeholder="Enter Option D" />
+          <Input placeholder="Enter option D" />
         </Form.Item>
         
         <Form.Item
           name="correctOption"
-          label="Correct Option"
-          rules={[{ required: true, message: 'Please select the correct option' }]}
+          label="Correct Answer"
+          rules={[{ required: true, message: 'Please select the correct answer' }]}
         >
           <Radio.Group>
-            <Radio value="A">A</Radio>
-            <Radio value="B">B</Radio>
-            <Radio value="C">C</Radio>
-            <Radio value="D">D</Radio>
+            <Radio value="A">Option A</Radio>
+            <Radio value="B">Option B</Radio>
+            <Radio value="C">Option C</Radio>
+            <Radio value="D">Option D</Radio>
           </Radio.Group>
         </Form.Item>
         
         <Form.Item
           name="explanation"
-          label="Explanation for Correct Answer"
+          label="Explanation"
           rules={[{ required: true, message: 'Please provide an explanation for the correct answer' }]}
         >
           <TextArea 
             placeholder="Explain why this is the correct answer" 
-            rows={4} 
+            rows={3} 
             showCount 
-            maxLength={1000} 
+            maxLength={500}
           />
         </Form.Item>
         
@@ -267,8 +301,8 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
           label="Subject"
           rules={[{ required: true, message: 'Please select a subject' }]}
         >
-          <Select placeholder="Select the subject">
-            {subjects.map(subject => (
+          <Select placeholder="Select a subject">
+            {subjects.map((subject) => (
               <SelectOption key={subject.id} value={subject.id}>
                 {subject.name}
               </SelectOption>
@@ -277,37 +311,43 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
         </Form.Item>
         
         <Form.Item
-          name="examCategory"
-          label="Exam Category (Optional)"
-          help="If not selected, will default to 'OTHER'"
-        >
-          <Select placeholder="Select exam category" allowClear>
-            <SelectOption value="UPSC">UPSC</SelectOption>
-            <SelectOption value="JEE">JEE</SelectOption>
-            <SelectOption value="NEET">NEET</SelectOption>
-            <SelectOption value="SSC">SSC</SelectOption>
-            <SelectOption value="OTHER">OTHER</SelectOption>
-          </Select>
-        </Form.Item>
-        
-        <Form.Item
           name="difficulty"
-          label="Difficulty Level (Optional)"
-          help="If not selected, will default to 'MEDIUM'"
+          label="Difficulty Level"
+          rules={[{ required: true, message: 'Please select difficulty level' }]}
         >
-          <Select placeholder="Select difficulty" allowClear>
+          <Select placeholder="Select difficulty">
             <SelectOption value="EASY">Easy</SelectOption>
             <SelectOption value="MEDIUM">Medium</SelectOption>
             <SelectOption value="HARD">Hard</SelectOption>
           </Select>
         </Form.Item>
         
-        <Form.Item name="year" label="Year (Optional)">
-          <Input placeholder="Enter year (e.g., 2023)" type="number" />
+        <Form.Item
+          name="examCategory"
+          label="Exam Category"
+          rules={[{ required: true, message: 'Please select exam category' }]}
+        >
+          <Select placeholder="Select exam category">
+            <SelectOption value="UPSC">UPSC</SelectOption>
+            <SelectOption value="JEE">JEE</SelectOption>
+            <SelectOption value="NEET">NEET</SelectOption>
+            <SelectOption value="SSC">SSC</SelectOption>
+            <SelectOption value="OTHER">Other</SelectOption>
+          </Select>
         </Form.Item>
         
-        <Form.Item name="source" label="Source/Reference (Optional)">
-          <Input placeholder="Enter source or reference" />
+        <Form.Item
+          name="year"
+          label="Year (Optional)"
+        >
+          <Input type="number" placeholder="Enter year (e.g., 2023)" min={1900} max={2030} />
+        </Form.Item>
+        
+        <Form.Item
+          name="source"
+          label="Source (Optional)"
+        >
+          <Input placeholder="Enter source (e.g., Previous Year Paper, Mock Test)" />
         </Form.Item>
         
         <Form.Item>
@@ -315,15 +355,14 @@ export const QuestionForm = ({ onComplete, onCancel }: QuestionFormProps) => {
             <Button 
               type="primary" 
               htmlType="submit" 
-              loading={submitting}
               icon={<SaveOutlined />}
+              loading={submitting}
             >
-              Submit Question
+              {mode === 'edit' ? 'Update Question' : 'Create Question'}
             </Button>
-            
             {onCancel && (
               <Button 
-                onClick={onCancel} 
+                onClick={onCancel}
                 icon={<CloseOutlined />}
               >
                 Cancel

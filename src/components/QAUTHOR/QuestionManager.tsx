@@ -29,6 +29,7 @@ import {
   LockOutlined,
   UserOutlined
 } from '@ant-design/icons';
+import { QuestionForm } from '@/components/Question/QuestionForm';
 
 const { Title, Text } = Typography;
 
@@ -54,6 +55,7 @@ interface Question {
   source: string;
   created_at: string;
   subjects?: {
+    id: string;
     name: string;
   };
 }
@@ -76,6 +78,10 @@ export default function QuestionManager() {
   const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
   const [deleteForm] = Form.useForm();
+
+  // New state for edit functionality
+  const [editModalVisible, setEditModalVisible] = useState<boolean>(false);
+  const [questionToEdit, setQuestionToEdit] = useState<Question | null>(null);
 
   const addDebug = (message: string) => {
     if (isDev) {
@@ -257,6 +263,51 @@ export default function QuestionManager() {
     window.location.reload();
   };
 
+  // Convert database question format to form format
+  const convertQuestionForForm = (question: Question) => {
+    return {
+      id: question.id,
+      title: question.title,
+      content: question.content,
+      optionA: question.option_a,
+      optionB: question.option_b,
+      optionC: question.option_c,
+      optionD: question.option_d,
+      correctOption: question.correct_option as 'A' | 'B' | 'C' | 'D',
+      explanation: question.explanation,
+      difficulty: question.difficulty as 'EASY' | 'MEDIUM' | 'HARD',
+      examCategory: question.exam_category as 'UPSC' | 'JEE' | 'NEET' | 'SSC' | 'OTHER',
+      subject: question.subjects?.id || '',
+      year: question.year,
+      source: question.source,
+      createdBy: '',
+      createdAt: new Date(question.created_at),
+      updatedAt: new Date()
+    };
+  };
+
+  // Handle edit question
+  const handleEdit = (question: Question) => {
+    setQuestionToEdit(question);
+    setEditModalVisible(true);
+  };
+
+  const handleEditComplete = async (updatedQuestion: any) => {
+    addDebug('✅ Question updated successfully');
+    setEditModalVisible(false);
+    setQuestionToEdit(null);
+    
+    // Refresh questions list
+    if (user) {
+      await fetchQuestions(user.id);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditModalVisible(false);
+    setQuestionToEdit(null);
+  };
+
   // Prevent hydration mismatch
   if (!isMounted) {
     return (
@@ -374,7 +425,7 @@ export default function QuestionManager() {
     {
       title: 'Actions',
       key: 'actions',
-      width: 120,
+      width: 150,
       render: (_: any, record: Question) => (
         <Space>
           <Tooltip title="Preview Question">
@@ -382,6 +433,14 @@ export default function QuestionManager() {
               type="text" 
               icon={<EyeOutlined />} 
               onClick={() => handlePreview(record)}
+              size="small"
+            />
+          </Tooltip>
+          <Tooltip title="Edit Question">
+            <Button 
+              type="text" 
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
               size="small"
             />
           </Tooltip>
@@ -582,9 +641,33 @@ export default function QuestionManager() {
           </div>
         )}
       </Modal>
+
+      {/* Edit Question Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <EditOutlined style={{ color: '#1890ff', marginRight: 8 }} />
+            <span>Edit Question</span>
+          </div>
+        }
+        open={editModalVisible}
+        onCancel={handleEditCancel}
+        footer={null}
+        width={900}
+        destroyOnClose
+      >
+        {questionToEdit && (
+          <QuestionForm
+            mode="edit"
+            initialData={convertQuestionForForm(questionToEdit)}
+            onComplete={handleEditComplete}
+            onCancel={handleEditCancel}
+          />
+        )}
+      </Modal>
       
       {/* Debug Info Panel - Only show in development */}
-      {isDev && debugInfo.length > 0 && (
+      {debugInfo.length > 0 && (
         <Card 
           title="Debug Information"
           size="small"

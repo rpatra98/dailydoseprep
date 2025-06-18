@@ -112,36 +112,16 @@ async function simpleReset() {
       role: verifyUser.role
     });
     
-    // Step 6: Create some default subjects (if subjects table exists)
-    console.log('📚 Creating default subjects...');
-    const defaultSubjects = [
-      { name: 'General Studies', examCategory: 'UPSC', description: 'General Studies for UPSC preparation' },
-      { name: 'Mathematics', examCategory: 'JEE', description: 'Mathematics for JEE preparation' },
-      { name: 'Physics', examCategory: 'JEE', description: 'Physics for JEE preparation' },
-      { name: 'Biology', examCategory: 'NEET', description: 'Biology for NEET preparation' },
-      { name: 'General Knowledge', examCategory: 'SSC', description: 'General Knowledge for SSC preparation' }
-    ];
-    
-    const { error: subjectsError } = await supabase
-      .from('subjects')
-      .insert(defaultSubjects);
-    
-    if (subjectsError) {
-      console.warn('Warning creating default subjects:', subjectsError.message);
-      console.log('📝 Note: You may need to create the subjects table manually in Supabase');
-    } else {
-      console.log('✅ Default subjects created');
-    }
-    
     console.log('\n🎉 Simplified reset completed successfully!');
     console.log('\n📋 SUPERADMIN Credentials:');
     console.log(`   Email: ${adminEmail}`);
     console.log(`   Password: ${adminPassword}`);
     console.log('\n⚠️  Please change the password after first login for security!');
     console.log('\n📝 Next Steps:');
-    console.log('1. If tables don\'t exist, create them manually in Supabase dashboard');
+    console.log('1. Login as SUPERADMIN to create subjects dynamically');
     console.log('2. Test login at your application URL');
-    console.log('3. Change the SUPERADMIN password after first login');
+    console.log('3. Use Subject Management to add subjects as needed');
+    console.log('4. Change the SUPERADMIN password after first login');
     
   } catch (error) {
     console.error('❌ Simplified reset failed:', error);
