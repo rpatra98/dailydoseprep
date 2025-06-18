@@ -604,23 +604,6 @@ export default function Dashboard() {
                   Select your primary subject to start practicing.
                 </Text>
                 
-                {/* Debug Information - Always show for now */}
-                <Alert
-                  message="Debug Info (Production)"
-                  description={
-                    <div style={{ fontFamily: 'monospace', fontSize: '12px' }}>
-                      <div>User ID: {user?.id || 'Not loaded'}</div>
-                      <div>User Email: {user?.email || 'Not loaded'}</div>
-                      <div>User Role: {user?.role || 'Not loaded'}</div>
-                      <div>Environment: {process.env.NODE_ENV}</div>
-                      <div>User Object: {JSON.stringify(user, null, 2)}</div>
-                    </div>
-                  }
-                  type="info"
-                  style={{ margin: '16px 0' }}
-                  closable
-                />
-                
                 <div style={{ marginTop: 24 }}>
                   {user && user.id ? (
                     <SubjectSelection userId={user.id} />
@@ -663,27 +646,6 @@ export default function Dashboard() {
               </Card>
             </div>
           )}
-
-          {/* Debug Info Panel - Always show for now */}
-          <Card 
-            title="Debug Information (Production)"
-            size="small"
-            style={{ 
-              marginTop: 24,
-              maxWidth: 600
-            }}
-          >
-            <div style={{ fontFamily: 'monospace', fontSize: '12px', maxHeight: '200px', overflowY: 'auto' }}>
-              {debugInfo.map((info, index) => (
-                <div key={index} style={{ marginBottom: '4px' }}>
-                  {info}
-                </div>
-              ))}
-              {debugInfo.length === 0 && (
-                <div style={{ color: '#999' }}>No debug info yet...</div>
-              )}
-            </div>
-          </Card>
         </Content>
       </Layout>
     </AspectRatioLayout>

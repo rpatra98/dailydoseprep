@@ -6,25 +6,32 @@ import { Subject } from '@/types';
 // Only log in development
 const isDev = process.env.NODE_ENV === 'development';
 
+// Always log for debugging - will remove later
+const shouldLog = true;
+
 // GET all subjects
 export async function GET(req: NextRequest) {
   try {
+    console.log('🔄 GET /api/subjects: Request received');
     const supabase = createRouteHandlerClient({ cookies });
     
+    console.log('📋 GET /api/subjects: Fetching subjects from database...');
     const { data: subjects, error } = await supabase
       .from('subjects')
       .select('*')
       .order('name');
     
     if (error) {
+      console.error('❌ GET /api/subjects: Database error:', error);
       throw error;
     }
     
+    console.log('✅ GET /api/subjects: Subjects fetched:', subjects?.length || 0, 'subjects');
+    console.log('✅ GET /api/subjects: Subjects data:', subjects);
+    
     return NextResponse.json(subjects);
   } catch (error) {
-    if (isDev) {
-      console.error('Error fetching subjects:', error);
-    }
+    console.error('❌ GET /api/subjects: Error fetching subjects:', error);
     return NextResponse.json(
       { error: 'Failed to fetch subjects' },
       { status: 500 }
