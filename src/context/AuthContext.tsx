@@ -5,8 +5,8 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { User, Session } from '@supabase/supabase-js';
 import { UserRole } from '@/types';
 
-// Only log in development
-const isDev = process.env.NODE_ENV === 'development';
+// Enable logging for debugging
+const isDev = true; // Temporarily enable for debugging
 
 interface AuthUser {
   id: string;
@@ -32,13 +32,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const supabase = createClientComponentClient();
   
-  if (isDev) {
-    console.log('✅ Supabase client initialized');
-  }
+  console.log('✅ AuthProvider: Supabase client initialized');
 
   // Fetch user data from our users table
   const fetchUserData = async (authUser: User): Promise<AuthUser | null> => {
     try {
+      console.log('🔄 AuthProvider: Fetching user data for:', authUser.email);
+      
       const { data, error } = await supabase
         .from('users')
         .select('id, email, role')
@@ -46,10 +46,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (error) {
+        console.error('❌ AuthProvider: Database error:', error);
         throw error;
       }
 
       if (!data) {
+        console.error('❌ AuthProvider: No user data found in database');
         throw new Error('User not found in database');
       }
 
@@ -59,90 +61,86 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: data.role as UserRole
       };
 
-      if (isDev) {
-        console.log('✅ User data fetched:', userData.email, 'Role:', userData.role);
-      }
-
+      console.log('✅ AuthProvider: User data fetched successfully:', userData.email, 'Role:', userData.role);
       return userData;
     } catch (error) {
-      if (isDev) {
-        console.error('❌ Error fetching user data:', error);
-      }
+      console.error('❌ AuthProvider: Error fetching user data:', error);
       return null;
     }
   };
 
   // Handle auth state changes
   useEffect(() => {
+    console.log('🔄 AuthProvider: Setting up auth state change listener...');
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (isDev) {
-          console.log('🔄 Auth state change:', event, session ? 'with session' : 'no session');
-        }
+        console.log('🔄 AuthProvider: Auth state change:', event, session ? 'with session' : 'no session');
 
         setSession(session);
 
         if (session?.user) {
+          console.log('🔄 AuthProvider: User session found, fetching user data...');
           // User signed in
           const userData = await fetchUserData(session.user);
           if (userData) {
             setUser(userData);
-            if (isDev) {
-              console.log('✅ User signed in:', userData.email, 'Role:', userData.role);
-            }
+            console.log('✅ AuthProvider: User signed in successfully:', userData.email, 'Role:', userData.role);
           } else {
             setUser(null);
-            if (isDev) {
-              console.error('❌ Failed to fetch user data after sign in');
-            }
+            console.error('❌ AuthProvider: Failed to fetch user data after sign in');
           }
         } else {
           // User signed out
           setUser(null);
-          if (isDev) {
-            console.log('✅ User signed out');
-          }
+          console.log('✅ AuthProvider: User signed out');
         }
 
+        console.log('🔄 AuthProvider: Setting loading to false...');
         setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('🔄 AuthProvider: Cleaning up auth state change listener...');
+      subscription.unsubscribe();
+    };
   }, [supabase.auth]);
 
   // Initialize auth state
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        console.log('🔄 AuthProvider: Starting auth initialization...');
         setLoading(true);
         
-        if (isDev) {
-          console.log('🔄 Initializing authentication...');
-        }
-
+        console.log('🔄 AuthProvider: Getting current session...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
+          console.error('❌ AuthProvider: Error getting session:', error);
           throw error;
         }
 
         if (session?.user) {
+          console.log('🔄 AuthProvider: Session found, fetching user data...');
           const userData = await fetchUserData(session.user);
           if (userData) {
             setUser(userData);
             setSession(session);
+            console.log('✅ AuthProvider: Auth initialized with user:', userData.email);
+          } else {
+            console.error('❌ AuthProvider: Failed to fetch user data during initialization');
           }
+        } else {
+          console.log('🔄 AuthProvider: No session found during initialization');
         }
 
-        if (isDev) {
-          console.log('✅ Authentication initialized');
-        }
+        console.log('✅ AuthProvider: Authentication initialization complete');
       } catch (error) {
-        if (isDev) {
-          console.error('❌ Error initializing auth:', error);
-        }
+        console.error('❌ AuthProvider: Error initializing auth:', error);
       } finally {
+        console.log('🔄 AuthProvider: Setting loading to false after initialization...');
         setLoading(false);
       }
     };
