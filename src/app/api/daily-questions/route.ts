@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     const { data: existingSet, error: setError } = await supabase
       .from('daily_question_sets')
       .select('*')
-      .eq('studentId', authData.session.user.id)
+      .eq('student_id', authData.session.user.id)
       .eq('date', today)
       .single();
       
@@ -94,10 +94,10 @@ export async function GET(req: NextRequest) {
     // First, get all questions for the primary subject that the student hasn't answered yet
     const { data: attemptedQuestionIds } = await supabase
       .from('student_attempts')
-      .select('questionId')
-      .eq('studentId', authData.session.user.id);
+      .select('question_id')
+      .eq('student_id', authData.session.user.id);
     
-    const attemptedIds = attemptedQuestionIds?.map(item => item.questionId) || [];
+    const attemptedIds = attemptedQuestionIds?.map(item => item.question_id) || [];
     
     // Filter questions by primary subject and exclude attempted ones
     let query = supabase.from('questions')
@@ -128,8 +128,8 @@ export async function GET(req: NextRequest) {
     
     // Create a new daily question set
     const questionIds = availableQuestions.map(q => q.id);
-    const newSet: Partial<DailyQuestionSet> = {
-      studentId: authData.session.user.id,
+    const newSet = {
+      student_id: authData.session.user.id,
       date: today,
       questions: questionIds,
       completed: false,
@@ -213,7 +213,7 @@ export async function POST(req: NextRequest) {
     const { data: questionSet, error: setError } = await supabase
       .from('daily_question_sets')
       .select('*')
-      .eq('studentId', authData.session.user.id)
+      .eq('student_id', authData.session.user.id)
       .eq('date', date)
       .single();
       
@@ -257,11 +257,11 @@ export async function POST(req: NextRequest) {
       if (isCorrect) correctCount++;
       
       attempts.push({
-        studentId: authData.session.user.id,
-        questionId: answer.questionId,
-        selectedOption: answer.selectedOption,
-        isCorrect,
-        attemptedAt: new Date()
+        student_id: authData.session.user.id,
+        question_id: answer.questionId,
+        selected_option: answer.selectedOption,
+        is_correct: isCorrect,
+        attempted_at: new Date()
       });
     }
     
