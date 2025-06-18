@@ -39,6 +39,7 @@ import SubjectSelection from '@/components/Auth/SubjectSelection';
 import SubjectManager from '@/components/Admin/SubjectManager';
 import QuestionManager from '@/components/QAUTHOR/QuestionManager';
 import AspectRatioLayout from '@/components/AspectRatioLayout';
+import EnhancedStudentDashboard from '@/components/Student/EnhancedStudentDashboard';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -593,57 +594,9 @@ export default function Dashboard() {
           {userRole === 'STUDENT' && (
             <div>
               <Title level={2}>Student Dashboard</Title>
-              <Paragraph>
-                Welcome to your learning dashboard. Select subjects and start your daily dose preparation.
-              </Paragraph>
-
-              <Card>
-                <Title level={2}>Welcome to Daily Dose Prep!</Title>
-                <Text>
-                  As a student, you'll receive 10 new questions daily at 6am from your primary subject.
-                  Select your primary subject to start practicing.
-                </Text>
-                
-                <div style={{ marginTop: 24 }}>
-                  {user && user.id ? (
-                    <SubjectSelection userId={user.id} />
-                  ) : (
-                    <Alert
-                      message="User Not Loaded"
-                      description="User information is not available. Please refresh the page."
-                      type="error"
-                      showIcon
-                    />
-                  )}
-                </div>
-                <Divider />
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} sm={12} md={12}>
-                    <Link href="/daily-questions">
-                      <Button 
-                        type="primary" 
-                        icon={<BookOutlined />}
-                        size="large"
-                        block
-                      >
-                        View Today's Questions
-                      </Button>
-                    </Link>
-                  </Col>
-                  <Col xs={24} sm={12} md={12}>
-                    <Button 
-                      icon={<DatabaseOutlined />}
-                      size="large"
-                      block
-                      onClick={() => {
-                        message.info('Progress tracking feature coming soon!');
-                      }}
-                    >
-                      Progress Tracking
-                    </Button>
-                  </Col>
-                </Row>
-              </Card>
+              
+              {/* Enhanced Student Dashboard */}
+              <EnhancedStudentDashboard user={user} />
             </div>
           )}
         </Content>
