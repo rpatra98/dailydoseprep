@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   
   const supabase = createClientComponentClient();
   
@@ -71,11 +72,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Handle auth state changes
   useEffect(() => {
+    if (!initialized) {
+      console.log('🔄 AuthProvider: Skipping auth state listener setup - not initialized yet');
+      return;
+    }
+
     console.log('🔄 AuthProvider: Setting up auth state change listener...');
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔄 AuthProvider: Auth state change:', event, session ? 'with session' : 'no session');
+
+        // Skip INITIAL_SESSION event to avoid double processing
+        if (event === 'INITIAL_SESSION') {
+          console.log('🔄 AuthProvider: Skipping INITIAL_SESSION event (already handled)');
+          return;
+        }
 
         setSession(session);
 
@@ -96,8 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log('✅ AuthProvider: User signed out');
         }
 
-        console.log('🔄 AuthProvider: Setting loading to false...');
-        setLoading(false);
+        console.log('🔄 AuthProvider: Auth state change processing complete');
       }
     );
 
@@ -105,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🔄 AuthProvider: Cleaning up auth state change listener...');
       subscription.unsubscribe();
     };
-  }, [supabase.auth]);
+  }, [supabase.auth, initialized]);
 
   // Initialize auth state
   useEffect(() => {
@@ -131,22 +142,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('✅ AuthProvider: Auth initialized with user:', userData.email);
           } else {
             console.error('❌ AuthProvider: Failed to fetch user data during initialization');
+            setUser(null);
+            setSession(null);
           }
         } else {
           console.log('🔄 AuthProvider: No session found during initialization');
+          setUser(null);
+          setSession(null);
         }
 
         console.log('✅ AuthProvider: Authentication initialization complete');
       } catch (error) {
         console.error('❌ AuthProvider: Error initializing auth:', error);
+        setUser(null);
+        setSession(null);
       } finally {
         console.log('🔄 AuthProvider: Setting loading to false after initialization...');
         setLoading(false);
+        setInitialized(true);
       }
     };
 
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (!initialized) {
+        console.log('⚠️ AuthProvider: Initialization timeout, forcing completion...');
+        setLoading(false);
+        setInitialized(true);
+      }
+    }, 5000); // 5 second timeout
+
     initializeAuth();
-  }, [supabase.auth]);
+
+    return () => clearTimeout(timeoutId);
+  }, [supabase.auth, initialized]);
 
   const signIn = async (email: string, password: string) => {
     try {
