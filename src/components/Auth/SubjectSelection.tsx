@@ -20,6 +20,8 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [pendingSubjectId, setPendingSubjectId] = useState<string | null>(null);
 
   // Fetch subjects and current primary subject on component mount
   useEffect(() => {
@@ -92,19 +94,27 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
     fetchData();
   }, [userId]);
 
-  const handleSubjectChange = async (subjectId: string) => {
+  const handleSubjectChange = (subjectId: string) => {
+    console.log('🔄 SubjectSelection: User selected subject:', subjectId);
+    setPendingSubjectId(subjectId);
+    setShowConfirmModal(true);
+  };
+
+  const confirmSubjectSelection = async () => {
+    if (!pendingSubjectId) return;
+    
     try {
-      console.log('🔄 SubjectSelection: Saving subject:', subjectId);
-      setSelectedSubject(subjectId);
+      console.log('🔄 SubjectSelection: Confirming subject selection:', pendingSubjectId);
       setSaving(true);
       setError(null);
       setSuccess(false);
+      setShowConfirmModal(false);
       
       // Save primary subject to database
       const supabase = getBrowserClient();
       const { error: updateError } = await supabase
         .from('users')
-        .update({ primarysubject: subjectId })
+        .update({ primarysubject: pendingSubjectId })
         .eq('id', userId);
 
       if (updateError) {
@@ -113,7 +123,8 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
       }
       
       console.log('✅ SubjectSelection: Subject saved successfully');
-      setCurrentPrimarySubject(subjectId);
+      setCurrentPrimarySubject(pendingSubjectId);
+      setSelectedSubject(pendingSubjectId);
       setSuccess(true);
       
       // Call the onComplete callback if provided
@@ -123,11 +134,17 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
     } catch (err) {
       console.error('❌ SubjectSelection: Save failed:', err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      // Reset selection on error
-      setSelectedSubject(currentPrimarySubject);
     } finally {
       setSaving(false);
+      setPendingSubjectId(null);
     }
+  };
+
+  const cancelSubjectSelection = () => {
+    console.log('🔄 SubjectSelection: User cancelled subject selection');
+    setShowConfirmModal(false);
+    setPendingSubjectId(null);
+    setSelectedSubject(currentPrimarySubject);
   };
 
   // Show error state
