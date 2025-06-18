@@ -15,7 +15,9 @@ import {
   Alert,
   Spin,
   Result,
-  Empty
+  Empty,
+  Form,
+  Input
 } from 'antd';
 import { 
   EditOutlined, 
@@ -23,7 +25,9 @@ import {
   EyeOutlined,
   ReloadOutlined,
   BookOutlined,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined,
+  LockOutlined,
+  UserOutlined
 } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
@@ -58,21 +62,27 @@ interface Question {
 const isDev = process.env.NODE_ENV === 'development';
 
 export default function QuestionManager() {
-  const [user, setUser] = useState<User | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
-  const [previewVisible, setPreviewVisible] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState<boolean>(false);
+  const [isMounted, setIsMounted] = useState<boolean>(false);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  
+  // New state for secure delete functionality
+  const [deleteModalVisible, setDeleteModalVisible] = useState<boolean>(false);
+  const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
+  const [deleteForm] = Form.useForm();
 
   const addDebug = (message: string) => {
     if (isDev) {
       const timestamp = new Date().toLocaleTimeString();
-      const debugMessage = `[${timestamp}] ${message}`;
-      console.log(debugMessage);
-      setDebugInfo(prev => [...prev.slice(-4), debugMessage]);
+      const logMessage = `[${timestamp}] ${message}`;
+      console.log(logMessage);
+      setDebugInfo(prev => [...prev.slice(-9), logMessage]);
     }
   };
 
@@ -150,32 +160,82 @@ export default function QuestionManager() {
     }
   };
 
-  const handleDelete = async (questionId: string) => {
+  // Secure delete with second factor authentication
+  const handleSecureDelete = (question: Question) => {
+    setQuestionToDelete(question);
+    setDeleteModalVisible(true);
+    deleteForm.resetFields();
+  };
+
+  const handleDeleteConfirm = async (values: { email: string; password: string }) => {
+    if (!questionToDelete || !user) return;
+
     try {
-      addDebug(`🔄 Deleting question: ${questionId}`);
+      setDeleteLoading(true);
+      addDebug(`🔄 Attempting secure delete for question: ${questionToDelete.id}`);
+
+      // Verify credentials before deletion
+      const authResponse = await fetch('/api/auth/verify-credentials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: values.email,
+          password: values.password,
+        }),
+      });
+
+      if (!authResponse.ok) {
+        const authError = await authResponse.json();
+        throw new Error(authError.error || 'Invalid credentials');
+      }
+
+      const authData = await authResponse.json();
       
-      const response = await fetch(`/api/qauthor/questions/${questionId}`, {
+      // Verify the authenticated user matches the current user
+      if (authData.user.id !== user.id || authData.user.email !== user.email) {
+        throw new Error('Authentication failed: User mismatch');
+      }
+
+      addDebug('✅ Credentials verified, proceeding with deletion...');
+
+      // Proceed with deletion
+      const deleteResponse = await fetch(`/api/qauthor/questions/${questionToDelete.id}`, {
         method: 'DELETE',
         credentials: 'include',
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete question');
+      if (!deleteResponse.ok) {
+        const deleteError = await deleteResponse.json();
+        throw new Error(deleteError.error || 'Failed to delete question');
       }
 
       addDebug('✅ Question deleted successfully');
       message.success('Question deleted successfully');
       
-      // Refresh the questions list
+      // Close modal and refresh questions
+      setDeleteModalVisible(false);
+      setQuestionToDelete(null);
+      deleteForm.resetFields();
+      
       if (user) {
         await fetchQuestions(user.id);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete question';
-      addDebug(`❌ Delete failed: ${errorMessage}`);
+      addDebug(`❌ Secure delete failed: ${errorMessage}`);
       message.error(errorMessage);
+    } finally {
+      setDeleteLoading(false);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModalVisible(false);
+    setQuestionToDelete(null);
+    deleteForm.resetFields();
   };
 
   const handlePreview = (question: Question) => {
@@ -237,7 +297,7 @@ export default function QuestionManager() {
         </div>
         
         {/* Debug Info Panel - Only show in development */}
-        {isDev && (
+        {isDev && debugInfo.length > 0 && (
           <Card 
             title="Debug Information"
             size="small"
@@ -325,23 +385,15 @@ export default function QuestionManager() {
               size="small"
             />
           </Tooltip>
-          <Popconfirm
-            title="Delete Question"
-            description="Are you sure you want to delete this question?"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
-            icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
-          >
-            <Tooltip title="Delete Question">
-              <Button 
-                type="text" 
-                danger 
-                icon={<DeleteOutlined />}
-                size="small"
-              />
-            </Tooltip>
-          </Popconfirm>
+          <Tooltip title="Secure Delete Question">
+            <Button 
+              type="text" 
+              danger 
+              icon={<DeleteOutlined />}
+              onClick={() => handleSecureDelete(record)}
+              size="small"
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -389,6 +441,81 @@ export default function QuestionManager() {
         }}
       />
 
+      {/* Secure Delete Confirmation Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <LockOutlined style={{ color: '#ff4d4f', marginRight: 8 }} />
+            <span>Secure Delete Confirmation</span>
+          </div>
+        }
+        open={deleteModalVisible}
+        onCancel={handleDeleteCancel}
+        footer={null}
+        width={500}
+        destroyOnClose
+      >
+        <Alert
+          message="Security Verification Required"
+          description={`To delete the question "${questionToDelete?.title}", please verify your identity by entering your email and password.`}
+          type="warning"
+          showIcon
+          style={{ marginBottom: 24 }}
+        />
+        
+        <Form
+          form={deleteForm}
+          layout="vertical"
+          onFinish={handleDeleteConfirm}
+        >
+          <Form.Item
+            name="email"
+            label="Email Address"
+            rules={[
+              { required: true, message: 'Please enter your email address' },
+              { type: 'email', message: 'Please enter a valid email address' }
+            ]}
+          >
+            <Input 
+              prefix={<UserOutlined />}
+              placeholder="Enter your email address"
+              autoComplete="email"
+            />
+          </Form.Item>
+          
+          <Form.Item
+            name="password"
+            label="Password"
+            rules={[
+              { required: true, message: 'Please enter your password' }
+            ]}
+          >
+            <Input.Password 
+              prefix={<LockOutlined />}
+              placeholder="Enter your password"
+              autoComplete="current-password"
+            />
+          </Form.Item>
+          
+          <div style={{ textAlign: 'right', marginTop: 24 }}>
+            <Space>
+              <Button onClick={handleDeleteCancel}>
+                Cancel
+              </Button>
+              <Button 
+                type="primary" 
+                danger 
+                htmlType="submit"
+                loading={deleteLoading}
+                icon={<DeleteOutlined />}
+              >
+                Confirm Delete
+              </Button>
+            </Space>
+          </div>
+        </Form>
+      </Modal>
+
       {/* Question Preview Modal */}
       <Modal
         title="Question Preview"
@@ -403,17 +530,18 @@ export default function QuestionManager() {
       >
         {selectedQuestion && (
           <div>
-            <Title level={5}>{selectedQuestion.title}</Title>
-            <Text>{selectedQuestion.content}</Text>
-            
+            <Title level={4}>{selectedQuestion.title}</Title>
+            <Text strong>Question:</Text>
+            <p>{selectedQuestion.content}</p>
+
             <div style={{ marginTop: 16 }}>
               <Text strong>Options:</Text>
-              <ul style={{ marginTop: 8 }}>
-                <li>A. {selectedQuestion.option_a}</li>
-                <li>B. {selectedQuestion.option_b}</li>
-                <li>C. {selectedQuestion.option_c}</li>
-                <li>D. {selectedQuestion.option_d}</li>
-              </ul>
+              <div style={{ marginLeft: 16, marginTop: 8 }}>
+                <p><strong>A.</strong> {selectedQuestion.option_a}</p>
+                <p><strong>B.</strong> {selectedQuestion.option_b}</p>
+                <p><strong>C.</strong> {selectedQuestion.option_c}</p>
+                <p><strong>D.</strong> {selectedQuestion.option_d}</p>
+              </div>
             </div>
 
             <div style={{ marginTop: 16 }}>
@@ -421,14 +549,10 @@ export default function QuestionManager() {
               <Tag color="green">{selectedQuestion.correct_option}</Tag>
             </div>
 
-            {selectedQuestion.explanation && (
-              <div style={{ marginTop: 16 }}>
-                <Text strong>Explanation:</Text>
-                <div style={{ marginTop: 8, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
-                  <Text>{selectedQuestion.explanation}</Text>
-                </div>
-              </div>
-            )}
+            <div style={{ marginTop: 16 }}>
+              <Text strong>Explanation:</Text>
+              <p>{selectedQuestion.explanation}</p>
+            </div>
 
             <div style={{ marginTop: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               <div>
