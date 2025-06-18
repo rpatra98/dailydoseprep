@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/types';
 import { 
   Layout, 
@@ -45,13 +45,6 @@ const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 const { useBreakpoint } = Grid;
 
-interface User {
-  id: string;
-  email: string;
-  role: UserRole;
-  created_at?: string;
-}
-
 interface SystemStats {
   totalUsers: number;
   totalQAuthors: number;
@@ -63,8 +56,7 @@ interface SystemStats {
 
 export default function Dashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const { user, loading: authLoading, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -94,39 +86,22 @@ export default function Dashboard() {
 
   // Check authentication and fetch user data
   useEffect(() => {
-    if (!isMounted) return;
+    if (!isMounted || authLoading) return;
 
-    const checkAuth = async (retryCount = 0) => {
+    const loadDashboardData = async () => {
       try {
-        addDebug('🔄 Checking authentication...');
+        addDebug('🔄 Loading dashboard data...');
         
-        // Check if user is authenticated via session
-        const response = await fetch('/api/auth/me', {
-          method: 'GET',
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          // Retry once in case session is still being established
-          if (retryCount === 0) {
-            addDebug('⚠️ Auth check failed, retrying in 2 seconds...');
-            setTimeout(() => checkAuth(1), 2000);
-            return;
-          }
-          
+        if (!user) {
           addDebug('❌ Not authenticated, redirecting to login');
           router.push('/login');
           return;
         }
 
-        const userData = await response.json();
-        addDebug(`✅ User authenticated: ${userData.email} (${userData.role})`);
-        
-        setUser(userData);
-        setUserRole(userData.role);
+        addDebug(`✅ User authenticated: ${user.email} (${user.role})`);
         
         // If SUPERADMIN, fetch additional data
-        if (userData.role === 'SUPERADMIN') {
+        if (user.role === 'SUPERADMIN') {
           addDebug('🔄 Fetching admin data...');
           await Promise.all([
             fetchAllUsers(),
@@ -136,18 +111,16 @@ export default function Dashboard() {
         }
         
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
-        addDebug(`❌ Auth error: ${errorMessage}`);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load dashboard';
+        addDebug(`❌ Dashboard error: ${errorMessage}`);
         setLoadError(errorMessage);
-        // Redirect to login on auth failure
-        setTimeout(() => router.push('/login'), 1000);
       } finally {
         setIsLoading(false);
       }
     };
 
-    checkAuth();
-  }, [isMounted, router]);
+    loadDashboardData();
+  }, [isMounted, authLoading, user, router]);
 
   const fetchAllUsers = async () => {
     try {
@@ -187,21 +160,11 @@ export default function Dashboard() {
   const handleSignOut = async () => {
     try {
       addDebug('🔄 Signing out...');
-      
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      
-      if (response.ok) {
-        addDebug('✅ Signed out successfully');
-        router.push('/');
-      } else {
-        throw new Error('Logout failed');
-      }
+      await signOut();
+      addDebug('✅ Signed out successfully');
+      router.push('/');
     } catch (error) {
-      addDebug(`❌ Logout error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      message.error('Failed to sign out');
+      addDebug(`❌ Sign out error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -269,70 +232,64 @@ export default function Dashboard() {
   }
 
   // Show loading state
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
-      <AspectRatioLayout>
-        <div className="center-content">
-          <Spin size="large" tip="Loading your dashboard..." />
-          {isDev && (
-            <div style={{ 
-              marginTop: 20, 
-              fontFamily: 'monospace', 
-              fontSize: '12px',
-              textAlign: 'center',
-              maxWidth: '400px'
-            }}>
-              {debugInfo.slice(-3).map((info, index) => (
-                <div key={index} style={{ marginBottom: '4px', color: '#666' }}>
-                  {info}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </AspectRatioLayout>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
+        <Spin size="large" tip="Loading dashboard..." />
+        {debugInfo.length > 0 && (
+          <div style={{ maxWidth: '400px', textAlign: 'center' }}>
+            {debugInfo.map((info, index) => (
+              <Text key={index} type="secondary" style={{ display: 'block', fontSize: '12px' }}>
+                {info}
+              </Text>
+            ))}
+          </div>
+        )}
+      </div>
     );
   }
 
   // Show error state
   if (loadError) {
     return (
-      <AspectRatioLayout>
-        <Layout className="full-height">
-          <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={3} style={{ margin: 0 }}>
-              <span className="hidden-mobile">Dashboard</span>
-              <span className="visible-mobile">Dashboard</span>
-            </Title>
-          </Header>
-          <Content style={{ padding: '24px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Card style={{ textAlign: 'center', maxWidth: 500 }}>
-              <Alert
-                message="Dashboard Error"
-                description={loadError}
-                type="error"
-                showIcon
-                style={{ marginBottom: 24 }}
-              />
-              <Paragraph>
-                We encountered an issue while loading your dashboard.
-              </Paragraph>
-              <Button 
-                type="primary" 
-                icon={<ReloadOutlined />}
-                onClick={handleRetry}
-                style={{ marginTop: 16 }}
-              >
-                Retry
-              </Button>
-            </Card>
-          </Content>
-        </Layout>
-      </AspectRatioLayout>
+      <div style={{ padding: '24px' }}>
+        <Alert
+          message="Dashboard Error"
+          description={loadError}
+          type="error"
+          showIcon
+          action={
+            <Button size="small" onClick={handleRetry}>
+              Retry
+            </Button>
+          }
+        />
+      </div>
     );
   }
 
-  const isMobile = isMounted ? screens.xs : false;
+  // Check if user is authenticated
+  if (!user) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh'
+      }}>
+        <Spin size="large" tip="Redirecting to login..." />
+      </div>
+    );
+  }
+
+  const isMobile = !screens.md;
 
   // Show dashboard content
   return (
@@ -356,9 +313,9 @@ export default function Dashboard() {
                 <Text type="secondary" style={{ fontSize: isMobile ? '11px' : '13px' }}>
                   {user.email}
                 </Text>
-                <Tag color={userRole === 'SUPERADMIN' ? 'red' : userRole === 'QAUTHOR' ? 'blue' : 'green'} 
+                <Tag color={user.role === 'SUPERADMIN' ? 'red' : user.role === 'QAUTHOR' ? 'blue' : 'green'} 
                      style={{ fontSize: isMobile ? '10px' : '12px', margin: 0 }}>
-                  {userRole}
+                  {user.role}
                 </Tag>
               </div>
             )}
@@ -375,7 +332,7 @@ export default function Dashboard() {
         </Header>
 
         <Content style={{ padding: isMobile ? '16px' : '24px', flex: 1, overflowY: 'auto' }}>
-          {userRole === 'SUPERADMIN' && (
+          {user.role === 'SUPERADMIN' && (
             <div>
               <Title level={2}>System Administration</Title>
               <Paragraph>
@@ -559,7 +516,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {userRole === 'QAUTHOR' && (
+          {user.role === 'QAUTHOR' && (
             <div>
               <Title level={2}>Question Author Dashboard</Title>
               <Paragraph>
@@ -591,7 +548,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {userRole === 'STUDENT' && (
+          {user.role === 'STUDENT' && (
             <div>
               <Title level={2}>Student Dashboard</Title>
               

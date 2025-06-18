@@ -21,18 +21,7 @@ export async function GET(req: NextRequest) {
     // Get user data from our users table
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select(`
-        id,
-        email,
-        role,
-        primarysubject,
-        created_at,
-        updated_at,
-        subjects (
-          id,
-          name
-        )
-      `)
+      .select('id, email, role, primarysubject, created_at, updated_at')
       .eq('id', authData.user.id)
       .single();
 
@@ -43,13 +32,27 @@ export async function GET(req: NextRequest) {
 
     console.log('✅ /api/auth/me: User data fetched successfully');
     
+    // Get primary subject data if it exists
+    let primarySubjectData = null;
+    if (userData.primarysubject) {
+      const { data: subjectData, error: subjectError } = await supabase
+        .from('subjects')
+        .select('id, name')
+        .eq('id', userData.primarysubject)
+        .single();
+      
+      if (!subjectError && subjectData) {
+        primarySubjectData = subjectData;
+      }
+    }
+    
     // Return user data with primary subject information
     const response = {
       id: userData.id,
       email: userData.email,
       role: userData.role,
       primarysubject: userData.primarysubject,
-      primarySubjectData: userData.subjects,
+      primarySubjectData: primarySubjectData,
       created_at: userData.created_at,
       updated_at: userData.updated_at
     };
