@@ -34,22 +34,24 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
           throw new Error('User ID is required');
         }
         
-        const supabase = getBrowserClient();
+        // Fetch subjects from API instead of direct database access
+        console.log('📋 SubjectSelection: Fetching subjects from API...');
+        const subjectsResponse = await fetch('/api/subjects', {
+          method: 'GET',
+          credentials: 'include',
+        });
         
-        // Fetch subjects
-        console.log('📋 SubjectSelection: Fetching subjects...');
-        const { data: subjectsData, error: subjectsError } = await supabase
-          .from('subjects')
-          .select('*')
-          .order('name', { ascending: true });
-          
-        if (subjectsError) {
-          console.error('❌ SubjectSelection: Subjects fetch error:', subjectsError);
-          throw new Error('Failed to load subjects: ' + subjectsError.message);
+        if (!subjectsResponse.ok) {
+          throw new Error(`Failed to fetch subjects: ${subjectsResponse.status} ${subjectsResponse.statusText}`);
         }
         
-        console.log('✅ SubjectSelection: Subjects fetched:', subjectsData?.length || 0, 'subjects');
+        const subjectsData = await subjectsResponse.json();
+        console.log('✅ SubjectSelection: Subjects fetched from API:', subjectsData?.length || 0, 'subjects');
+        console.log('✅ SubjectSelection: Subjects data:', subjectsData);
         setSubjects(subjectsData || []);
+
+        // Get supabase client for user data fetch
+        const supabase = getBrowserClient();
 
         // Fetch current user's primary subject
         console.log('👤 SubjectSelection: Fetching user primary subject for userId:', userId);
