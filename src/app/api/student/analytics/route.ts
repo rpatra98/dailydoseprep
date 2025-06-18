@@ -59,7 +59,8 @@ export async function GET(req: NextRequest) {
           totalTimeSpent: 0,
           totalQuestionsAnswered: 0,
           overallScore: 0
-        }
+        },
+        message: 'No subjects selected. Please select subjects to view analytics.'
       });
     }
 
@@ -97,25 +98,53 @@ export async function GET(req: NextRequest) {
       console.error('Error fetching attempts:', attemptsError);
     }
 
+    // Get subject time logs for today
+    const { data: subjectTimeLogs, error: timeLogsError } = await supabase
+      .from('subject_time_logs')
+      .select('subject_id, duration_seconds')
+      .eq('user_id', authData.user.id)
+      .gte('start_time', today)
+      .lt('start_time', new Date(new Date(today).getTime() + 24 * 60 * 60 * 1000).toISOString());
+
+    if (timeLogsError) {
+      console.error('Error fetching subject time logs:', timeLogsError);
+    }
+
+    // Get total questions count per subject
+    const { data: questionCounts, error: questionCountsError } = await supabase
+      .from('questions')
+      .select('subject_id')
+      .in('subject_id', subjectIds);
+
+    if (questionCountsError) {
+      console.error('Error fetching question counts:', questionCountsError);
+    }
+
     // Calculate subject-wise performance
     const subjectPerformance = userSubjects.map(us => {
       const subject = us.subjects;
       if (!subject) return null;
+
+      // Handle both array and object cases for subjects
+      const subjectData = Array.isArray(subject) ? subject[0] : subject;
+      if (!subjectData) return null;
 
       // Get attempts for this subject
       const subjectAttempts = attempts?.filter(a => a.subject_id === us.subject_id) || [];
       const correctAttempts = subjectAttempts.filter(a => a.isCorrect).length;
       const score = subjectAttempts.length > 0 ? Math.round((correctAttempts / subjectAttempts.length) * 100) : 0;
 
-      // Get time spent on this subject (placeholder - would need subject_time_logs)
-      const timeSpent = Math.floor(Math.random() * 120) + 30; // Placeholder: 30-150 minutes
+      // Get time spent on this subject from database
+      const subjectTimeEntries = subjectTimeLogs?.filter(log => log.subject_id === us.subject_id) || [];
+      const timeSpentSeconds = subjectTimeEntries.reduce((sum, log) => sum + (log.duration_seconds || 0), 0);
+      const timeSpent = Math.floor(timeSpentSeconds / 60); // Convert to minutes
 
-      // Get total questions available for this subject
-      const totalQuestions = Math.floor(Math.random() * 100) + 50; // Placeholder
+      // Get total questions available for this subject from database
+      const totalQuestions = questionCounts?.filter(q => q.subject_id === us.subject_id).length || 0;
 
       return {
-        id: subject.id,
-        name: subject.name,
+        id: subjectData.id,
+        name: subjectData.name,
         score: score,
         timeSpent: timeSpent,
         questionsAttempted: subjectAttempts.length,

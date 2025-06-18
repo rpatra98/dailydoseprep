@@ -237,45 +237,80 @@ const EnhancedStudentDashboard = ({ user }: EnhancedStudentDashboardProps) => {
 
       {/* Subject Performance Grid */}
       <Card title="Subject Performance" style={{ marginBottom: '24px' }}>
-        <Row gutter={[16, 16]}>
-          {subjects.map((subject) => (
-            <Col xs={24} sm={12} md={8} lg={6} key={subject.id}>
-              <Card 
-                size="small"
-                actions={[
-                  <Link href={`/practice?subject=${subject.id}`} key="practice">
-                    <Button type="link" icon={<PlayCircleOutlined />}>
-                      Practice
-                    </Button>
-                  </Link>
-                ]}
-              >
-                <div style={{ textAlign: 'center' }}>
-                  <Title level={5} style={{ margin: '0 0 8px 0' }}>
-                    {subject.name}
-                  </Title>
-                  <Progress
-                    type="circle"
-                    size={60}
-                    percent={subject.score}
-                    format={(percent) => `${percent}%`}
-                    strokeColor={getScoreColor(subject.score)}
-                  />
-                  <div style={{ marginTop: '12px' }}>
-                    <Space direction="vertical" size="small">
-                      <Text type="secondary">
-                        Time: {formatTime(subject.timeSpent)}
-                      </Text>
-                      <Text type="secondary">
-                        {subject.questionsAttempted}/{subject.totalQuestions} questions
-                      </Text>
-                    </Space>
+        {subjects.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <BookOutlined style={{ fontSize: '32px', color: '#d9d9d9', marginBottom: '16px' }} />
+            <Title level={5} style={{ color: '#999', margin: 0 }}>
+              No Performance Data Yet
+            </Title>
+            <Text type="secondary">
+              Start practicing questions to see your performance metrics here.
+            </Text>
+          </div>
+        ) : (
+          <Row gutter={[16, 16]}>
+            {subjects.map((subject) => (
+              <Col xs={24} sm={12} md={8} lg={6} key={subject.id}>
+                <Card 
+                  size="small"
+                  actions={[
+                    <Link href={`/practice?subject=${subject.id}`} key="practice">
+                      <Button type="link" icon={<PlayCircleOutlined />}>
+                        Practice
+                      </Button>
+                    </Link>
+                  ]}
+                >
+                  <div style={{ textAlign: 'center' }}>
+                    <Title level={5} style={{ margin: '0 0 8px 0' }}>
+                      {subject.name}
+                    </Title>
+                    {subject.questionsAttempted > 0 ? (
+                      <Progress
+                        type="circle"
+                        size={60}
+                        percent={subject.score}
+                        format={(percent) => `${percent}%`}
+                        strokeColor={getScoreColor(subject.score)}
+                      />
+                    ) : (
+                      <div style={{ 
+                        width: '60px', 
+                        height: '60px', 
+                        border: '2px dashed #d9d9d9', 
+                        borderRadius: '50%', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        margin: '0 auto',
+                        color: '#999'
+                      }}>
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                          No data
+                        </Text>
+                      </div>
+                    )}
+                    <div style={{ marginTop: '12px' }}>
+                      <Space direction="vertical" size="small">
+                        <Text type="secondary">
+                          Time: {subject.timeSpent > 0 ? formatTime(subject.timeSpent) : 'No time logged'}
+                        </Text>
+                        <Text type="secondary">
+                          {subject.questionsAttempted}/{subject.totalQuestions || 'Unknown'} questions
+                        </Text>
+                        {subject.questionsAttempted === 0 && subject.totalQuestions === 0 && (
+                          <Text type="secondary" style={{ fontSize: '11px', fontStyle: 'italic' }}>
+                            No questions available
+                          </Text>
+                        )}
+                      </Space>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            </Col>
-          ))}
-        </Row>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        )}
       </Card>
 
       {/* Time Spent Analytics */}
@@ -289,19 +324,38 @@ const EnhancedStudentDashboard = ({ user }: EnhancedStudentDashboardProps) => {
               label: 'Today',
               children: (
                 <div>
-                  {subjects.map((subject) => (
-                    <div key={subject.id} style={{ marginBottom: '16px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <Text>{subject.name}</Text>
-                        <Text strong>{formatTime(subject.timeSpent)}</Text>
-                      </div>
-                      <Progress 
-                        percent={(subject.timeSpent / Math.max(...subjects.map(s => s.timeSpent))) * 100} 
-                        showInfo={false}
-                        strokeColor="#1890ff"
-                      />
+                  {subjects.length === 0 || subjects.every(s => s.timeSpent === 0) ? (
+                    <div style={{ textAlign: 'center', padding: '40px' }}>
+                      <ClockCircleOutlined style={{ fontSize: '32px', color: '#d9d9d9', marginBottom: '16px' }} />
+                      <Text type="secondary">No time logged today. Start practicing to track your progress!</Text>
                     </div>
-                  ))}
+                  ) : (
+                    subjects.map((subject) => (
+                      <div key={subject.id} style={{ marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <Text>{subject.name}</Text>
+                          <Text strong>
+                            {subject.timeSpent > 0 ? formatTime(subject.timeSpent) : 'No time logged'}
+                          </Text>
+                        </div>
+                        {subject.timeSpent > 0 && (
+                          <Progress 
+                            percent={(subject.timeSpent / Math.max(...subjects.map(s => s.timeSpent), 1)) * 100} 
+                            showInfo={false}
+                            strokeColor="#1890ff"
+                          />
+                        )}
+                        {subject.timeSpent === 0 && (
+                          <Progress 
+                            percent={0} 
+                            showInfo={false}
+                            strokeColor="#f0f0f0"
+                            trailColor="#f0f0f0"
+                          />
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               )
             },
@@ -310,7 +364,8 @@ const EnhancedStudentDashboard = ({ user }: EnhancedStudentDashboardProps) => {
               label: 'This Week',
               children: (
                 <div style={{ textAlign: 'center', padding: '40px' }}>
-                  <Text type="secondary">Weekly analytics coming soon!</Text>
+                  <BarChartOutlined style={{ fontSize: '32px', color: '#d9d9d9', marginBottom: '16px' }} />
+                  <Text type="secondary">Weekly analytics will be available once you have more practice data.</Text>
                 </div>
               )
             },
@@ -319,7 +374,8 @@ const EnhancedStudentDashboard = ({ user }: EnhancedStudentDashboardProps) => {
               label: 'This Month',
               children: (
                 <div style={{ textAlign: 'center', padding: '40px' }}>
-                  <Text type="secondary">Monthly analytics coming soon!</Text>
+                  <BarChartOutlined style={{ fontSize: '32px', color: '#d9d9d9', marginBottom: '16px' }} />
+                  <Text type="secondary">Monthly analytics will be available once you have more practice data.</Text>
                 </div>
               )
             },
@@ -328,7 +384,8 @@ const EnhancedStudentDashboard = ({ user }: EnhancedStudentDashboardProps) => {
               label: 'All Time',
               children: (
                 <div style={{ textAlign: 'center', padding: '40px' }}>
-                  <Text type="secondary">All-time analytics coming soon!</Text>
+                  <BarChartOutlined style={{ fontSize: '32px', color: '#d9d9d9', marginBottom: '16px' }} />
+                  <Text type="secondary">All-time analytics will be available once you have more practice data.</Text>
                 </div>
               )
             }
