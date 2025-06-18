@@ -86,7 +86,17 @@ export default function Dashboard() {
 
   // Check authentication and fetch user data
   useEffect(() => {
-    if (!isMounted || authLoading) return;
+    if (!isMounted) {
+      addDebug('⏳ Dashboard: Not mounted yet, skipping auth check');
+      return;
+    }
+
+    addDebug(`🔄 Dashboard: Auth state - loading: ${authLoading}, user: ${user ? user.email : 'null'}`);
+
+    if (authLoading) {
+      addDebug('⏳ Dashboard: Auth still loading, waiting...');
+      return;
+    }
 
     const loadDashboardData = async () => {
       try {

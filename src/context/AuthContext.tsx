@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const supabase = createClientComponentClient();
   
-  console.log('✅ AuthProvider: Supabase client initialized');
+  console.log('✅ AuthProvider: Component mounted, Supabase client initialized');
 
   // Fetch user data from our users table
   const fetchUserData = async (authUser: User): Promise<AuthUser | null> => {
@@ -120,6 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialize auth state
   useEffect(() => {
+    console.log('🔄 AuthProvider: useEffect triggered for initialization');
+    
     const initializeAuth = async () => {
       try {
         console.log('🔄 AuthProvider: Starting auth initialization...');
@@ -133,8 +135,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw error;
         }
 
+        console.log('🔄 AuthProvider: Session check result:', session ? 'Session found' : 'No session');
+
         if (session?.user) {
-          console.log('🔄 AuthProvider: Session found, fetching user data...');
+          console.log('🔄 AuthProvider: Session found, fetching user data for:', session.user.email);
           const userData = await fetchUserData(session.user);
           if (userData) {
             setUser(userData);
@@ -160,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('🔄 AuthProvider: Setting loading to false after initialization...');
         setLoading(false);
         setInitialized(true);
+        console.log('✅ AuthProvider: Initialization fully complete');
       }
     };
 
@@ -174,7 +179,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initializeAuth();
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      console.log('🔄 AuthProvider: Cleanup initialization timeout');
+      clearTimeout(timeoutId);
+    };
   }, [supabase.auth, initialized]);
 
   const signIn = async (email: string, password: string) => {
