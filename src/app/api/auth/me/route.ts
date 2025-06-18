@@ -2,46 +2,62 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
+  console.log('🔄 /api/auth/me: Starting authentication check...');
+  
   try {
     const supabase = createRouteHandlerClient({ cookies });
     
-    // Get the current session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // Check if user is authenticated
+    const { data: authData, error: authError } = await supabase.auth.getUser();
     
-    if (sessionError || !session) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
+    if (authError || !authData.user) {
+      console.log('❌ /api/auth/me: User not authenticated');
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
-    
-    // Get user data from database
+
+    console.log('✅ /api/auth/me: User authenticated:', authData.user.email);
+
+    // Get user data from our users table
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, email, role, created_at')
-      .eq('id', session.user.id)
+      .select(`
+        id,
+        email,
+        role,
+        primarysubject,
+        created_at,
+        updated_at,
+        subjects (
+          id,
+          name
+        )
+      `)
+      .eq('id', authData.user.id)
       .single();
-    
+
     if (userError) {
-      console.error('❌ Error fetching user data:', userError.message);
-      return NextResponse.json(
-        { error: 'User data not found' },
-        { status: 404 }
-      );
+      console.log('❌ /api/auth/me: User data fetch error:', userError);
+      return NextResponse.json({ error: 'User data not found' }, { status: 404 });
     }
+
+    console.log('✅ /api/auth/me: User data fetched successfully');
     
-    if (!userData) {
-      return NextResponse.json(
-        { error: 'User not found in database' },
-        { status: 404 }
-      );
-    }
-    
-    return NextResponse.json(userData);
-    
+    // Return user data with primary subject information
+    const response = {
+      id: userData.id,
+      email: userData.email,
+      role: userData.role,
+      primarysubject: userData.primarysubject,
+      primarySubjectData: userData.subjects,
+      created_at: userData.created_at,
+      updated_at: userData.updated_at
+    };
+
+    return NextResponse.json(response);
+
   } catch (error) {
-    console.error('❌ /api/auth/me error:', error);
+    console.error('❌ /api/auth/me: Server error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
