@@ -4,13 +4,16 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 let browserClientInstance: SupabaseClient | null = null;
 let isInitializing = false;
 
-// Only log in development
-const isDev = process.env.NODE_ENV === 'development';
+// Always log for debugging - will remove later
+const shouldLog = true;
 
 export function getBrowserClient(): SupabaseClient {
   if (typeof window === 'undefined') {
     // We're on the server, return a dummy client that won't be used
     // This prevents errors during SSR/SSG
+    if (shouldLog) {
+      console.log('🔄 getBrowserClient: Server-side rendering, returning dummy client');
+    }
     return {
       auth: {
         getSession: () => Promise.resolve({ data: { session: null }, error: null }),
@@ -32,33 +35,45 @@ export function getBrowserClient(): SupabaseClient {
   
   // If we already have an instance, return it
   if (browserClientInstance) {
+    if (shouldLog) {
+      console.log('✅ getBrowserClient: Returning existing client instance');
+    }
     return browserClientInstance;
   }
   
   // If we're already initializing, wait and return the instance
   if (isInitializing) {
+    if (shouldLog) {
+      console.log('⏳ getBrowserClient: Client is initializing, returning temporary client');
+    }
     // Return a temporary client while initializing
     return browserClientInstance || createDummyClient();
   }
   
   try {
     isInitializing = true;
+    console.log('🔄 getBrowserClient: Initializing new Supabase client...');
     
     // Check for environment variables
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     
+    console.log('🔄 getBrowserClient: Environment check:', {
+      NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ? 'Set' : 'Missing',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseKey ? 'Set' : 'Missing',
+      NODE_ENV: process.env.NODE_ENV
+    });
+    
     if (!supabaseUrl || !supabaseKey) {
-      if (isDev) {
-        console.error('Supabase environment variables missing:', {
-          NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ? 'Set' : 'Missing',
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseKey ? 'Set' : 'Missing'
-        });
-      }
+      console.error('❌ getBrowserClient: Supabase environment variables missing:', {
+        NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ? 'Set' : 'Missing',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseKey ? 'Set' : 'Missing'
+      });
       throw new Error('Supabase configuration error');
     }
     
     // Create the client with default auth configuration to match auth helpers
+    console.log('🔄 getBrowserClient: Creating Supabase client with URL:', supabaseUrl);
     browserClientInstance = createClient(supabaseUrl, supabaseKey, {
       auth: {
         storage: typeof window !== 'undefined' ? window.localStorage : undefined,
@@ -86,11 +101,10 @@ export function getBrowserClient(): SupabaseClient {
       throw new Error('Failed to initialize Supabase client');
     }
     
+    console.log('✅ getBrowserClient: Supabase client created successfully');
     return browserClientInstance;
   } catch (error) {
-    if (isDev) {
-      console.error('Error initializing Supabase client:', error);
-    }
+    console.error('❌ getBrowserClient: Error initializing Supabase client:', error);
     throw error;
   } finally {
     isInitializing = false;
@@ -137,12 +151,12 @@ export function clearBrowserClient(): void {
       }
       keysToRemove.forEach(key => window.localStorage.removeItem(key));
       
-      if (isDev) {
+      if (shouldLog) {
         console.log('Cleared auth storage keys:', keysToRemove);
       }
     } catch (error) {
       // Silent fail if localStorage is not available
-      if (isDev) {
+      if (shouldLog) {
         console.error('Error clearing auth storage:', error);
       }
     }
@@ -151,7 +165,7 @@ export function clearBrowserClient(): void {
 
 // Force clear all authentication data and refresh client
 export function forceRefreshAuth(): void {
-  if (isDev) {
+  if (shouldLog) {
     console.log('Force refreshing authentication...');
   }
   
@@ -181,11 +195,11 @@ export function forceRefreshAuth(): void {
       }
       sessionKeysToRemove.forEach(key => window.sessionStorage.removeItem(key));
       
-      if (isDev) {
+      if (shouldLog) {
         console.log('Force cleared storage keys:', [...keysToRemove, ...sessionKeysToRemove]);
       }
     } catch (error) {
-      if (isDev) {
+      if (shouldLog) {
         console.error('Error force clearing storage:', error);
       }
     }

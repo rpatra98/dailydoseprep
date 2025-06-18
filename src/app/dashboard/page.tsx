@@ -78,12 +78,10 @@ export default function Dashboard() {
   // Only log in development
   const isDev = process.env.NODE_ENV === 'development';
 
-  // Add debug logging
+  // Add debug logging - Always log for now
   const addDebug = (message: string) => {
-    if (isDev) {
-      console.log(message);
-      setDebugInfo(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${message}`]);
-    }
+    console.log(message);
+    setDebugInfo(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${message}`]);
   };
 
   // Handle mounting
@@ -605,8 +603,35 @@ export default function Dashboard() {
                   As a student, you'll receive 10 new questions daily at 6am from your primary subject.
                   Select your primary subject to start practicing.
                 </Text>
+                
+                {/* Debug Information - Always show for now */}
+                <Alert
+                  message="Debug Info (Production)"
+                  description={
+                    <div style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+                      <div>User ID: {user?.id || 'Not loaded'}</div>
+                      <div>User Email: {user?.email || 'Not loaded'}</div>
+                      <div>User Role: {user?.role || 'Not loaded'}</div>
+                      <div>Environment: {process.env.NODE_ENV}</div>
+                      <div>User Object: {JSON.stringify(user, null, 2)}</div>
+                    </div>
+                  }
+                  type="info"
+                  style={{ margin: '16px 0' }}
+                  closable
+                />
+                
                 <div style={{ marginTop: 24 }}>
-                  {user && <SubjectSelection userId={user.id} />}
+                  {user && user.id ? (
+                    <SubjectSelection userId={user.id} />
+                  ) : (
+                    <Alert
+                      message="User Not Loaded"
+                      description="User information is not available. Please refresh the page."
+                      type="error"
+                      showIcon
+                    />
+                  )}
                 </div>
                 <Divider />
                 <Row gutter={[16, 16]}>
@@ -639,28 +664,26 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Debug Info Panel - Only show in development */}
-          {isDev && (
-            <Card 
-              title="Debug Information"
-              size="small"
-              style={{ 
-                marginTop: 24,
-                maxWidth: 600
-              }}
-            >
-              <div style={{ fontFamily: 'monospace', fontSize: '12px', maxHeight: '200px', overflowY: 'auto' }}>
-                {debugInfo.map((info, index) => (
-                  <div key={index} style={{ marginBottom: '4px' }}>
-                    {info}
-                  </div>
-                ))}
-                {debugInfo.length === 0 && (
-                  <div style={{ color: '#999' }}>No debug info yet...</div>
-                )}
-              </div>
-            </Card>
-          )}
+          {/* Debug Info Panel - Always show for now */}
+          <Card 
+            title="Debug Information (Production)"
+            size="small"
+            style={{ 
+              marginTop: 24,
+              maxWidth: 600
+            }}
+          >
+            <div style={{ fontFamily: 'monospace', fontSize: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+              {debugInfo.map((info, index) => (
+                <div key={index} style={{ marginBottom: '4px' }}>
+                  {info}
+                </div>
+              ))}
+              {debugInfo.length === 0 && (
+                <div style={{ color: '#999' }}>No debug info yet...</div>
+              )}
+            </div>
+          </Card>
         </Content>
       </Layout>
     </AspectRatioLayout>

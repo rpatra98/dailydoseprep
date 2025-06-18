@@ -25,42 +25,64 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log('🔄 SubjectSelection: Starting data fetch for userId:', userId);
         setLoading(true);
         setError(null);
+        
+        // Validate userId
+        if (!userId) {
+          throw new Error('User ID is required');
+        }
         
         const supabase = getBrowserClient();
         
         // Fetch subjects
+        console.log('📋 SubjectSelection: Fetching subjects...');
         const { data: subjectsData, error: subjectsError } = await supabase
           .from('subjects')
           .select('*')
           .order('name', { ascending: true });
           
         if (subjectsError) {
-          throw new Error('Failed to load subjects');
+          console.error('❌ SubjectSelection: Subjects fetch error:', subjectsError);
+          throw new Error('Failed to load subjects: ' + subjectsError.message);
         }
         
+        console.log('✅ SubjectSelection: Subjects fetched:', subjectsData?.length || 0, 'subjects');
         setSubjects(subjectsData || []);
 
         // Fetch current user's primary subject
+        console.log('👤 SubjectSelection: Fetching user primary subject for userId:', userId);
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('primarysubject')
           .eq('id', userId)
           .single();
 
-        if (userError && userError.code !== 'PGRST116') { // PGRST116 = no rows returned
-          throw new Error('Failed to load user data');
+        if (userError) {
+          console.error('❌ SubjectSelection: User fetch error:', userError);
+          // Don't throw error if user not found - they might be new
+          if (userError.code !== 'PGRST116') {
+            throw new Error('Failed to load user data: ' + userError.message);
+          }
         }
 
+        console.log('✅ SubjectSelection: User data fetched:', userData);
+
         if (userData?.primarysubject) {
+          console.log('📌 SubjectSelection: Primary subject found:', userData.primarysubject);
           setCurrentPrimarySubject(userData.primarysubject);
           setSelectedSubject(userData.primarysubject);
+        } else {
+          console.log('📌 SubjectSelection: No primary subject selected yet');
+          setCurrentPrimarySubject(null);
         }
         
       } catch (err) {
+        console.error('❌ SubjectSelection: Fatal error:', err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
+        console.log('✅ SubjectSelection: Data fetch completed, setting loading to false');
         setLoading(false);
       }
     };
@@ -70,6 +92,7 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
 
   const handleSubjectChange = async (subjectId: string) => {
     try {
+      console.log('🔄 SubjectSelection: Saving subject:', subjectId);
       setSelectedSubject(subjectId);
       setSaving(true);
       setError(null);
@@ -83,17 +106,20 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
         .eq('id', userId);
 
       if (updateError) {
-        throw new Error('Failed to save primary subject');
+        console.error('❌ SubjectSelection: Save error:', updateError);
+        throw new Error('Failed to save primary subject: ' + updateError.message);
       }
       
+      console.log('✅ SubjectSelection: Subject saved successfully');
       setCurrentPrimarySubject(subjectId);
       setSuccess(true);
       
       // Call the onComplete callback if provided
       if (onComplete) {
-        onComplete();
+        setTimeout(() => onComplete(), 1000);
       }
     } catch (err) {
+      console.error('❌ SubjectSelection: Save failed:', err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
       // Reset selection on error
       setSelectedSubject(currentPrimarySubject);
@@ -102,8 +128,36 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
     }
   };
 
+  // Show error state
+  if (error && !loading) {
+    return (
+      <div>
+        <Title level={4}>Subject Selection</Title>
+        <Alert
+          message="Error Loading Subjects"
+          description={error}
+          type="error"
+          showIcon
+          action={
+            <Button size="small" onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  // Show loading state
   if (loading) {
-    return <Spin tip="Loading subjects..." />;
+    return (
+      <div style={{ textAlign: 'center', padding: '20px' }}>
+        <Spin size="large" tip="Loading subjects..." />
+        <div style={{ marginTop: '10px' }}>
+          <Text type="secondary">Please wait while we load available subjects...</Text>
+        </div>
+      </div>
+    );
   }
 
   // If primary subject is already selected, show read-only view
@@ -171,6 +225,7 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
         value={selectedSubject}
         loading={saving}
         disabled={saving}
+        size="large"
       >
         {subjects.map(subject => (
           <Option key={subject.id} value={subject.id}>
@@ -181,9 +236,9 @@ export const SubjectSelection = ({ userId, initialSubjectId, onComplete }: Subje
       
       {subjects.length === 0 && !loading && (
         <Alert
-          message="No subjects available"
-          description="Please contact an administrator to add subjects."
-          type="info"
+          message="No Subjects Available"
+          description="No subjects are currently available. Please contact an administrator."
+          type="warning"
           showIcon
           style={{ marginTop: 16 }}
         />

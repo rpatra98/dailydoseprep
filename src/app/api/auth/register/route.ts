@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
-// Only log in development
-const isDev = process.env.NODE_ENV === 'development';
+// Always log for debugging - will remove later
+const shouldLog = true;
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,9 +56,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
     
-    if (isDev) {
-      console.log('🔄 Creating STUDENT account for:', email);
-    }
+    console.log('🔄 Creating STUDENT account for:', email);
     
     // Check if user already exists in our users table
     const { data: existingUser, error: checkError } = await supabase
@@ -68,9 +66,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
-      if (isDev) {
-        console.error('❌ Error checking existing user:', checkError);
-      }
+      console.error('❌ Error checking existing user:', checkError);
       return NextResponse.json({
         error: 'Database error',
         details: 'Failed to check existing user'
@@ -94,9 +90,7 @@ export async function POST(req: NextRequest) {
     });
     
     if (authError) {
-      if (isDev) {
-        console.error('❌ Auth signup error:', authError);
-      }
+      console.error('❌ Auth signup error:', authError);
       
       // Handle specific auth errors
       if (authError.message?.includes('already registered')) {
@@ -119,9 +113,7 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
     
-    if (isDev) {
-      console.log('✅ Auth user created with ID:', authData.user.id);
-    }
+    console.log('✅ Auth user created with ID:', authData.user.id);
     
     // Create the user record in our users table
     const { data: userData, error: userError } = await supabase
@@ -135,17 +127,13 @@ export async function POST(req: NextRequest) {
       .single();
     
     if (userError) {
-      if (isDev) {
-        console.error('❌ User table insert error:', userError);
-      }
+      console.error('❌ User table insert error:', userError);
       
       // Clean up the auth user if user creation failed
       try {
         await supabase.auth.admin.deleteUser(authData.user.id);
       } catch (cleanupError) {
-        if (isDev) {
-          console.error('❌ Failed to cleanup auth user:', cleanupError);
-        }
+        console.error('❌ Failed to cleanup auth user:', cleanupError);
       }
       
       return NextResponse.json({
@@ -161,9 +149,7 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
     
-    if (isDev) {
-      console.log('✅ STUDENT user created successfully:', userData.email);
-    }
+    console.log('✅ STUDENT user created successfully:', userData.email);
     
     return NextResponse.json({
       success: true,
@@ -177,9 +163,7 @@ export async function POST(req: NextRequest) {
     }, { status: 201 });
     
   } catch (error) {
-    if (isDev) {
-      console.error('❌ Unexpected error in student registration:', error);
-    }
+    console.error('❌ Unexpected error in student registration:', error);
     return NextResponse.json({
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'
