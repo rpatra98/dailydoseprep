@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 
 // Only log in development
 const isDev = process.env.NODE_ENV === 'development';
@@ -10,6 +11,7 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
   const router = useRouter();
+  const { signIn } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,56 +23,26 @@ export default function LoginForm() {
     }
 
     try {
-      // Call the login API
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          email: email.toLowerCase().trim(),
-          password,
-        }),
-      });
+      // Use AuthContext signIn method
+      const result = await signIn(email.toLowerCase().trim(), password);
 
-      if (isDev) {
-        console.log('📡 Login API response status:', response.status);
+      if (!result.success) {
+        throw new Error(result.error || 'Login failed');
       }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (isDev) {
-          console.error('❌ Login failed:', errorData.error);
-        }
-        throw new Error(errorData.error || 'Login failed');
-      }
-
-      const result = await response.json();
       if (isDev) {
-        console.log('✅ Login successful for user:', result.user?.email);
+        console.log('✅ Login successful via AuthContext');
       }
 
       setMessage({ type: 'success', text: 'Logged in successfully!' });
       
-      // Redirect based on user role
+      // The AuthContext will handle user data, just redirect to dashboard
+      // The middleware and dashboard will handle role-based redirects
       setTimeout(() => {
-        if (result.user?.role === 'ADMIN') {
-          if (isDev) {
-            console.log('🔄 Redirecting ADMIN to admin dashboard...');
-          }
-          router.push('/admin/questions');
-        } else if (result.user?.role === 'QAUTHOR') {
-          if (isDev) {
-            console.log('🔄 Redirecting QAUTHOR to question creation...');
-          }
-          router.push('/create-question');
-        } else {
-          if (isDev) {
-            console.log('🔄 Redirecting STUDENT to dashboard...');
-          }
-          router.push('/dashboard');
+        if (isDev) {
+          console.log('🔄 Redirecting to dashboard...');
         }
+        router.push('/dashboard');
       }, 1000);
 
     } catch (error) {

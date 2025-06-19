@@ -18,9 +18,10 @@ interface AuthContextType {
   user: AuthUser | null;
   session: Session | null;
   loading: boolean;
+  initialized: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -335,23 +336,120 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const refreshUser = async () => {
-    if (session?.user) {
-      const userData = await fetchUserData(session.user);
-      setUser(userData);
+  const refresh = async () => {
+    if (isDev) {
+      console.log('🔄 AuthProvider: Manual refresh requested...');
+    }
+    setLoading(true);
+    
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        if (isDev) {
+          console.error('❌ AuthProvider: Refresh session error:', error);
+        }
+        setUser(null);
+        setSession(null);
+        return;
+      }
+
+      if (session?.user) {
+        const userData = await fetchUserData(session.user);
+        if (userData) {
+          setUser(userData);
+          setSession(session);
+          if (isDev) {
+            console.log('✅ AuthProvider: Refresh successful for:', userData.email);
+          }
+        } else {
+          setUser(null);
+          setSession(null);
+        }
+      } else {
+        setUser(null);
+        setSession(null);
+      }
+    } catch (error) {
+      if (isDev) {
+        console.error('❌ AuthProvider: Refresh error:', error);
+      }
+      setUser(null);
+      setSession(null);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const value = {
+  const contextValue = {
     user,
     session,
     loading,
-    signIn,
-    signOut,
-    refreshUser,
+    initialized,
+    signOut: async () => {
+      if (isDev) {
+        console.log('🔄 AuthProvider: Signing out...');
+      }
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        if (isDev) {
+          console.error('❌ AuthProvider: Sign out error:', error);
+        }
+      } else {
+        setUser(null);
+        setSession(null);
+        if (isDev) {
+          console.log('✅ AuthProvider: Signed out successfully');
+        }
+      }
+    },
+    refresh: async () => {
+      if (isDev) {
+        console.log('🔄 AuthProvider: Manual refresh requested...');
+      }
+      setLoading(true);
+      
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          if (isDev) {
+            console.error('❌ AuthProvider: Refresh session error:', error);
+          }
+          setUser(null);
+          setSession(null);
+          return;
+        }
+
+        if (session?.user) {
+          const userData = await fetchUserData(session.user);
+          if (userData) {
+            setUser(userData);
+            setSession(session);
+            if (isDev) {
+              console.log('✅ AuthProvider: Refresh successful for:', userData.email);
+            }
+          } else {
+            setUser(null);
+            setSession(null);
+          }
+        } else {
+          setUser(null);
+          setSession(null);
+        }
+      } catch (error) {
+        if (isDev) {
+          console.error('❌ AuthProvider: Refresh error:', error);
+        }
+        setUser(null);
+        setSession(null);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

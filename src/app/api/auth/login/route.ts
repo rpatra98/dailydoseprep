@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     
     // Attempt to sign in
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.toLowerCase().trim(),
       password,
     });
     
@@ -39,14 +39,70 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log('✅ Login successful for:', data.user.email);
+    console.log('✅ Auth login successful for:', data.user.email);
     
+    // Fetch user data from our users table
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, email, role, primarysubject, current_streak, longest_streak, last_login_date')
+      .eq('id', data.user.id)
+      .single();
+
+    if (userError || !userData) {
+      console.error('❌ User data fetch error:', userError);
+      
+      // If user doesn't exist in our database, sign them out
+      await supabase.auth.signOut();
+      
+      return NextResponse.json(
+        { error: 'User account not found in database. Please contact administrator.' },
+        { status: 404 }
+      );
+    }
+
+    console.log('✅ User data fetched successfully:', userData.email, 'Role:', userData.role);
+
+    // Create or update user session for streak tracking
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Check if user already has an active session today
+    const { data: existingSession } = await supabase
+      .from('user_sessions')
+      .select('id')
+      .eq('user_id', data.user.id)
+      .eq('date', today)
+      .eq('is_active', true)
+      .single();
+
+    if (!existingSession) {
+      // Create new session for today
+      const { error: sessionError } = await supabase
+        .from('user_sessions')
+        .insert({
+          user_id: data.user.id,
+          date: today,
+          login_time: new Date().toISOString(),
+          is_active: true
+        });
+
+      if (sessionError) {
+        console.error('❌ Session creation error:', sessionError);
+        // Don't fail login for session creation error
+      } else {
+        console.log('✅ New session created for today');
+      }
+    }
+
     return NextResponse.json({
       success: true,
       user: {
-        id: data.user.id,
-        email: data.user.email,
-        role: data.user.user_metadata?.role || 'USER'
+        id: userData.id,
+        email: userData.email,
+        role: userData.role,
+        primarysubject: userData.primarysubject,
+        current_streak: userData.current_streak,
+        longest_streak: userData.longest_streak,
+        last_login_date: userData.last_login_date
       }
     });
     
