@@ -54,6 +54,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isDev) {
           console.error('❌ AuthProvider: Database error:', error);
         }
+        
+        // If user doesn't exist in database but exists in auth, clear the session
+        if (error.code === 'PGRST116') { // No rows returned
+          if (isDev) {
+            console.log('🔄 AuthProvider: User exists in auth but not in database, clearing session...');
+          }
+          await supabase.auth.signOut();
+          return null;
+        }
+        
         throw error;
       }
 
@@ -61,6 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isDev) {
           console.error('❌ AuthProvider: No user data found in database');
         }
+        // Clear session if user doesn't exist in database
+        await supabase.auth.signOut();
         throw new Error('User not found in database');
       }
 
