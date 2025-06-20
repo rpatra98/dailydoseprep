@@ -54,6 +54,21 @@ export async function POST(request: NextRequest) {
     
     console.log(`Creating QAUTHOR account for ${email}`);
     
+    // First check if user already exists in our users table
+    const { data: existingUser, error: checkError } = await supabaseAdmin
+      .from('users')
+      .select('email')
+      .eq('email', email.toLowerCase())
+      .single();
+    
+    if (existingUser) {
+      console.log(`User ${email} already exists in users table`);
+      return NextResponse.json(
+        { error: 'A user with this email address has already been registered' },
+        { status: 409 }
+      );
+    }
+    
     // Create user without email confirmation
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -64,6 +79,17 @@ export async function POST(request: NextRequest) {
     
     if (error || !data.user) {
       console.error('Error creating QAUTHOR:', error);
+      
+      // Handle specific error cases
+      if (error?.message?.includes('already been registered') || 
+          error?.message?.includes('already exists') ||
+          error?.message?.includes('User already registered')) {
+        return NextResponse.json(
+          { error: 'A user with this email address has already been registered' },
+          { status: 409 }
+        );
+      }
+      
       return NextResponse.json(
         { error: error?.message || 'Failed to create QAUTHOR account' },
         { status: 500 }
@@ -94,6 +120,28 @@ export async function POST(request: NextRequest) {
     
     if (roleError) {
       console.error('Error setting QAUTHOR role:', roleError);
+      
+      // Check if it's a duplicate key error (user already exists in users table)
+      if (roleError.code === '23505' || roleError.message?.includes('duplicate key')) {
+        console.log(`User ${email} already exists in users table, checking role...`);
+        
+        // Check if existing user has correct role
+        const { data: existingUserRole, error: roleCheckError } = await supabaseAdmin
+          .from('users')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+        
+        if (!roleCheckError && existingUserRole?.role === 'QAUTHOR') {
+          console.log(`User ${email} already exists with QAUTHOR role`);
+          return NextResponse.json({ 
+            success: true, 
+            userId: data.user.id,
+            message: 'User already exists with correct role'
+          });
+        }
+      }
+      
       // Try to delete the created user if we can't set their role
       await supabaseAdmin.auth.admin.deleteUser(data.user.id);
       

@@ -212,6 +212,20 @@ export default function Dashboard() {
         addDebug('✅ Statistics refreshed after QAUTHOR creation');
       } else {
         const errorData = await response.json();
+        
+        // Handle conflict errors (user already exists) differently
+        if (response.status === 409) {
+          addDebug(`⚠️ QAUTHOR already exists: ${values.email}`);
+          message.warning(`A QAUTHOR with email ${values.email} already exists. Please check the Users list below.`);
+          // Still refresh data to show existing user
+          await Promise.all([
+            fetchAllUsers(),
+            fetchSystemStats()
+          ]);
+          addDebug('✅ Statistics refreshed to show existing user');
+          return; // Don't throw error for conflicts
+        }
+        
         throw new Error(errorData.error || 'Failed to create QAUTHOR');
       }
     } catch (error) {
