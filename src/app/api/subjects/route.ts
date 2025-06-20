@@ -9,6 +9,11 @@ const isDev = process.env.NODE_ENV === 'development';
 // Always log for debugging - will remove later
 const shouldLog = true;
 
+// Helper function for consistent logging
+const log = (message: string, data?: any) => {
+  console.log(message, data ? JSON.stringify(data, null, 2) : '');
+};
+
 // GET all subjects
 export async function GET(req: NextRequest) {
   try {
@@ -55,9 +60,7 @@ export async function OPTIONS() {
 // POST a new subject - SUPERADMIN only (Session-based authentication)
 export async function POST(req: NextRequest) {
   try {
-    if (isDev) {
-      console.log('🔄 POST /api/subjects: Starting subject creation request');
-    }
+    log('🔄 POST /api/subjects: Starting subject creation request');
     
     const supabase = createRouteHandlerClient({ cookies });
     
@@ -92,9 +95,7 @@ export async function POST(req: NextRequest) {
       }, { status: 401 });
     }
     
-    if (isDev) {
-      console.log('✅ User authenticated:', user.email, 'ID:', user.id);
-    }
+    log('✅ User authenticated:', { email: user.email, id: user.id });
     
     // Verify user exists in database and has proper role
     const { data: userData, error: userError } = await supabase
@@ -104,9 +105,10 @@ export async function POST(req: NextRequest) {
       .single();
     
     if (userError) {
+      log('❌ User verification error:', userError);
       return NextResponse.json({
         error: 'User verification failed',
-        details: 'User account not found in database'
+        details: userError.message || 'User account not found in database'
       }, { status: 403 });
     }
     
@@ -117,9 +119,7 @@ export async function POST(req: NextRequest) {
       }, { status: 403 });
     }
     
-    if (isDev) {
-      console.log('✅ User found in database:', userData.email, 'Role:', userData.role);
-    }
+    log('✅ User found in database:', { email: userData.email, role: userData.role });
     
     // Only SUPERADMIN can create subjects
     if (userData.role !== 'SUPERADMIN') {
@@ -129,9 +129,7 @@ export async function POST(req: NextRequest) {
       }, { status: 403 });
     }
     
-    if (isDev) {
-      console.log('✅ SUPERADMIN role verified');
-    }
+    log('✅ SUPERADMIN role verified');
     
     // Validate and sanitize input
     const trimmedName = name.trim();
@@ -150,9 +148,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
     
-    if (isDev) {
-      console.log('✅ Subject name validated:', trimmedName);
-    }
+    log('✅ Subject name validated:', { name: trimmedName });
     
     // Check for duplicate subjects (case-insensitive)
     const { data: existingSubjects, error: duplicateError } = await supabase
@@ -174,9 +170,7 @@ export async function POST(req: NextRequest) {
       }, { status: 409 });
     }
     
-    if (isDev) {
-      console.log('✅ No duplicate found, proceeding with creation');
-    }
+    log('✅ No duplicate found, proceeding with creation');
     
     // Create the subject
     const subjectData = {
@@ -191,6 +185,7 @@ export async function POST(req: NextRequest) {
       .single();
     
     if (createError) {
+      log('❌ Database error creating subject:', createError);
       return NextResponse.json({
         error: 'Failed to create subject',
         details: createError.message
@@ -204,9 +199,7 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
     
-    if (isDev) {
-      console.log('✅ Subject created successfully:', newSubject.id, newSubject.name);
-    }
+    log('✅ Subject created successfully:', { id: newSubject.id, name: newSubject.name });
     
     return NextResponse.json({
       success: true,
@@ -215,9 +208,7 @@ export async function POST(req: NextRequest) {
     }, { status: 201 });
     
   } catch (error) {
-    if (isDev) {
-      console.error('❌ Unexpected error in POST /api/subjects:', error);
-    }
+    log('❌ Unexpected error in POST /api/subjects:', error);
     return NextResponse.json({
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'
