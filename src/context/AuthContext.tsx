@@ -386,6 +386,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     loading,
     initialized,
+    signIn,
     signOut: async () => {
       if (isDev) {
         console.log('🔄 AuthProvider: Signing out...');
