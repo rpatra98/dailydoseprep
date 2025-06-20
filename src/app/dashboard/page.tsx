@@ -32,7 +32,8 @@ import {
   LockOutlined,
   DatabaseOutlined,
   TeamOutlined,
-  FileTextOutlined
+  FileTextOutlined,
+  WarningOutlined
 } from '@ant-design/icons';
 import Link from 'next/link';
 import SubjectSelection from '@/components/Auth/SubjectSelection';
@@ -45,6 +46,9 @@ const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 const { useBreakpoint } = Grid;
 
+// Only log in development
+const isDev = process.env.NODE_ENV === 'development';
+
 interface SystemStats {
   totalUsers: number;
   totalQAuthors: number;
@@ -54,88 +58,53 @@ interface SystemStats {
   questionsPerSubject: { [key: string]: number };
 }
 
+interface DashboardUser {
+  id: string;
+  email: string;
+  role: UserRole;
+  created_at: string;
+}
+
 export default function Dashboard() {
   const router = useRouter();
-  const { user, loading: authLoading, signOut } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const { user, loading: authLoading, signOut, initialized } = useAuth();
+  const [dashboardState, setDashboardState] = useState<'loading' | 'ready' | 'error' | 'unauthorized'>('loading');
+  const [error, setError] = useState<string | null>(null);
+  const [allUsers, setAllUsers] = useState<DashboardUser[]>([]);
   const [createLoading, setCreateLoading] = useState(false);
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string[]>([]);
-  const [form] = Form.useForm();
   const [statsLoading, setStatsLoading] = useState(false);
+  const [form] = Form.useForm();
   const screens = useBreakpoint();
 
-  // Only log in development
-  const isDev = process.env.NODE_ENV === 'development';
-
-  // Add debug logging - Always log for now
-  const addDebug = (message: string) => {
-    console.log(message);
-    setDebugInfo(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${message}`]);
-  };
-
-  // Handle mounting
-  useEffect(() => {
-    addDebug('🔄 Dashboard mounting...');
-    setIsMounted(true);
-    addDebug('✅ Dashboard mounted');
-  }, []);
-
-  // Check authentication and fetch user data
-  useEffect(() => {
-    if (!isMounted) {
-      addDebug('⏳ Dashboard: Not mounted yet, skipping auth check');
-      return;
-    }
-
-    addDebug(`🔄 Dashboard: Auth state - loading: ${authLoading}, user: ${user ? user.email : 'null'}`);
-
-    if (authLoading) {
-      addDebug('⏳ Dashboard: Auth still loading, waiting...');
-      return;
-    }
-
-    const loadDashboardData = async () => {
-      try {
-        addDebug('🔄 Loading dashboard data...');
-        
-        if (!user) {
-          addDebug('❌ Not authenticated, redirecting to login');
-          router.push('/login');
-        return;
-      }
-      
-        addDebug(`✅ User authenticated: ${user.email} (${user.role})`);
-        
-        // If SUPERADMIN, fetch additional data
-        if (user.role === 'SUPERADMIN') {
-          addDebug('🔄 Fetching admin data...');
-          await Promise.all([
-            fetchAllUsers(),
-            fetchSystemStats()
-          ]);
-          addDebug('✅ Admin data loaded');
-      }
-        
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to load dashboard';
-        addDebug(`❌ Dashboard error: ${errorMessage}`);
-        setLoadError(errorMessage);
-    } finally {
-      setIsLoading(false);
+  // Helper function for debug logging
+  const log = (message: string, data?: any) => {
+    if (isDev) {
+      console.log(`[Dashboard] ${message}`, data || '');
     }
   };
 
-    loadDashboardData();
-  }, [isMounted, authLoading, user, router]);
+  // Validate user role and permissions
+  const validateUserAccess = (user: any): boolean => {
+    if (!user || !user.role || !user.email || !user.id) {
+      log('❌ Invalid user object:', user);
+      return false;
+    }
 
-  const fetchAllUsers = async () => {
+    const validRoles: UserRole[] = ['SUPERADMIN', 'QAUTHOR', 'STUDENT'];
+    if (!validRoles.includes(user.role)) {
+      log('❌ Invalid user role:', user.role);
+      return false;
+    }
+
+    log('✅ User validation passed:', { email: user.email, role: user.role });
+    return true;
+  };
+
+  // Fetch all users for SUPERADMIN
+  const fetchAllUsers = async (): Promise<void> => {
     try {
-      addDebug('🔄 Fetching all users...');
-      // Add cache-busting parameter to ensure fresh data
+      log('🔄 Fetching all users...');
       const response = await fetch(`/api/admin/users?t=${Date.now()}`, {
         method: 'GET',
         credentials: 'include',
@@ -145,39 +114,30 @@ export default function Dashboard() {
         }
       });
 
-      if (response.ok) {
-        const usersData = await response.json();
-        setAllUsers(usersData || []);
-        addDebug(`✅ Fetched ${usersData?.length || 0} users`);
-        if (usersData && usersData.length > 0) {
-          addDebug(`Users fetched: ${usersData.map((u: any) => `${u.email}(${u.role})`).join(', ')}`);
-        }
+      if (!response.ok) {
+        throw new Error(`Failed to fetch users: ${response.status} ${response.statusText}`);
+      }
+
+      const usersData = await response.json();
+      if (Array.isArray(usersData)) {
+        setAllUsers(usersData);
+        log('✅ Users fetched successfully:', usersData.length);
       } else {
-        addDebug(`❌ Failed to fetch users: ${response.status}`);
-        if (response.status === 401) {
-          addDebug('❌ Authentication error - session may have expired');
-        } else if (response.status === 403) {
-          addDebug('❌ Access denied - insufficient permissions');
-        }
-        
-        // Try to get error details
-        try {
-          const error = await response.json();
-          addDebug(`❌ API Error details: ${JSON.stringify(error)}`);
-        } catch (e) {
-          addDebug('❌ Could not parse error response');
-        }
+        throw new Error('Invalid users data format');
       }
     } catch (error) {
-      addDebug(`⚠️ Failed to fetch users: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch users';
+      log('❌ Error fetching users:', errorMessage);
+      throw error;
     }
   };
 
-  const fetchSystemStats = async () => {
+  // Fetch system statistics for SUPERADMIN
+  const fetchSystemStats = async (): Promise<void> => {
     try {
       setStatsLoading(true);
-      addDebug('🔄 Fetching system stats...');
-      // Add cache-busting parameter to ensure fresh data
+      log('🔄 Fetching system stats...');
+      
       const response = await fetch(`/api/admin/stats?t=${Date.now()}`, {
         method: 'GET',
         credentials: 'include',
@@ -186,118 +146,170 @@ export default function Dashboard() {
           'Pragma': 'no-cache'
         }
       });
-      
-      if (response.ok) {
-        const stats = await response.json();
-        setSystemStats(stats);
-        addDebug(`✅ Stats fetched: ${stats.totalUsers} users, ${stats.totalQAuthors} QAuthors`);
-      } else {
-        addDebug(`❌ Failed to fetch stats: ${response.status}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stats: ${response.status} ${response.statusText}`);
       }
+
+      const stats = await response.json();
+      setSystemStats(stats);
+      log('✅ Stats fetched successfully:', stats);
     } catch (error) {
-      addDebug(`⚠️ Failed to fetch stats: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch stats';
+      log('❌ Error fetching stats:', errorMessage);
+      throw error;
     } finally {
       setStatsLoading(false);
     }
   };
 
-  const handleSignOut = async () => {
+  // Initialize dashboard data based on user role
+  const initializeDashboard = async (user: any): Promise<void> => {
     try {
-      addDebug('🔄 Signing out...');
-      await signOut();
-      addDebug('✅ Signed out successfully');
-      router.push('/');
+      log('🔄 Initializing dashboard for user:', { email: user.email, role: user.role });
+
+      if (user.role === 'SUPERADMIN') {
+        log('🔄 Loading SUPERADMIN dashboard data...');
+        await Promise.all([fetchAllUsers(), fetchSystemStats()]);
+        log('✅ SUPERADMIN dashboard data loaded');
+      } else if (user.role === 'QAUTHOR') {
+        log('✅ QAUTHOR dashboard initialized');
+      } else if (user.role === 'STUDENT') {
+        log('✅ STUDENT dashboard initialized');
+      }
+
+      setDashboardState('ready');
+      log('✅ Dashboard initialization complete');
     } catch (error) {
-      addDebug(`❌ Sign out error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to initialize dashboard';
+      log('❌ Dashboard initialization error:', errorMessage);
+      setError(errorMessage);
+      setDashboardState('error');
     }
   };
 
-  const handleRetry = () => {
-    setIsLoading(true);
-    setLoadError(null);
-    window.location.reload();
+  // Main effect to handle authentication and dashboard loading
+  useEffect(() => {
+    const handleDashboardLoad = async () => {
+      try {
+        log('🔄 Dashboard effect triggered:', { 
+          initialized, 
+          authLoading, 
+          hasUser: !!user,
+          userEmail: user?.email,
+          userRole: user?.role
+        });
+
+        // Wait for auth to initialize
+        if (!initialized) {
+          log('⏳ Waiting for auth initialization...');
+          setDashboardState('loading');
+          return;
+        }
+
+        // If still loading auth, wait
+        if (authLoading) {
+          log('⏳ Auth still loading...');
+          setDashboardState('loading');
+          return;
+        }
+
+        // If no user, redirect to login
+        if (!user) {
+          log('❌ No authenticated user, redirecting to login');
+          setDashboardState('unauthorized');
+          router.push('/login');
+          return;
+        }
+
+        // Validate user data
+        if (!validateUserAccess(user)) {
+          log('❌ User validation failed');
+          setError('Invalid user data. Please sign in again.');
+          setDashboardState('error');
+          return;
+        }
+
+        // Initialize dashboard based on role
+        await initializeDashboard(user);
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Dashboard loading failed';
+        log('❌ Dashboard loading error:', errorMessage);
+        setError(errorMessage);
+        setDashboardState('error');
+      }
+    };
+
+    handleDashboardLoad();
+  }, [initialized, authLoading, user, router]);
+
+  // Handle sign out
+  const handleSignOut = async (): Promise<void> => {
+    try {
+      log('🔄 Signing out...');
+      await signOut();
+      log('✅ Sign out successful');
+      router.push('/login');
+    } catch (error) {
+      log('❌ Sign out error:', error);
+      message.error('Failed to sign out');
+    }
   };
 
-  const handleCreateQAUTHOR = async (values: { email: string; password: string }) => {
+  // Handle retry
+  const handleRetry = (): void => {
+    log('🔄 Retrying dashboard load...');
+    setError(null);
+    setDashboardState('loading');
+    if (user) {
+      initializeDashboard(user);
+    }
+  };
+
+  // Handle QAUTHOR creation
+  const handleCreateQAUTHOR = async (values: { email: string; password: string }): Promise<void> => {
     try {
       setCreateLoading(true);
-      addDebug(`🔄 Creating QAUTHOR: ${values.email}`);
-      
+      log('🔄 Creating QAUTHOR:', values.email);
+
       const response = await fetch('/api/admin/create-qauthor', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       });
-      
+
+      const result = await response.json();
+
       if (response.ok) {
-        const result = await response.json();
-        addDebug('✅ QAUTHOR created successfully');
         message.success(`QAUTHOR account created successfully for ${values.email}`);
         form.resetFields();
-
-        // Refresh both users list and system statistics
-        addDebug('🔄 Refreshing data after QAUTHOR creation...');
-        await Promise.all([
-          fetchAllUsers(),
-          fetchSystemStats()
-        ]);
-        addDebug('✅ Statistics refreshed after QAUTHOR creation');
-        
-        // Force component re-render to ensure UI updates
-        setTimeout(() => {
-          addDebug('🔄 Forcing component refresh...');
-        }, 100);
+        await Promise.all([fetchAllUsers(), fetchSystemStats()]);
+        log('✅ QAUTHOR created successfully');
+      } else if (response.status === 409) {
+        message.warning(result.message || 'User already exists with this email');
+        log('⚠️ QAUTHOR creation conflict:', result.message);
       } else {
-        const errorData = await response.json();
-        
-        // Handle conflict errors (user already exists) differently
-        if (response.status === 409) {
-          addDebug(`⚠️ QAUTHOR already exists: ${values.email}`);
-          message.warning(`A QAUTHOR with email ${values.email} already exists. Please check the Users list below.`);
-          // Still refresh data to show existing user
-          addDebug('🔄 Refreshing data to show existing QAUTHOR...');
-          await Promise.all([
-            fetchAllUsers(),
-            fetchSystemStats()
-          ]);
-          addDebug('✅ Statistics refreshed to show existing user');
-          return; // Don't throw error for conflicts
-        }
-        
-        throw new Error(errorData.error || 'Failed to create QAUTHOR');
+        throw new Error(result.message || 'Failed to create QAUTHOR');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create QAUTHOR';
-      addDebug(`❌ QAUTHOR creation failed: ${errorMessage}`);
+      log('❌ QAUTHOR creation error:', errorMessage);
       message.error(errorMessage);
     } finally {
       setCreateLoading(false);
     }
   };
 
-  // Callback function to refresh statistics when subjects are modified
-  const handleSubjectChange = async () => {
-    addDebug('🔄 Refreshing statistics after subject change...');
-    await fetchSystemStats();
-    addDebug('✅ Statistics refreshed after subject change');
+  // Handle subject changes
+  const handleSubjectChange = async (): Promise<void> => {
+    if (user?.role === 'SUPERADMIN') {
+      await fetchSystemStats();
+    }
   };
 
-  // Prevent hydration mismatch
-  if (!isMounted) {
-    return (
-      <AspectRatioLayout>
-        <div className="center-content">
-          <Spin size="large" tip="Loading dashboard..." />
-        </div>
-      </AspectRatioLayout>
-    );
-  }
-
-  // Show loading state
-  if (authLoading || isLoading) {
+  // Loading state
+  if (dashboardState === 'loading') {
     return (
       <div style={{ 
         display: 'flex', 
@@ -308,30 +320,27 @@ export default function Dashboard() {
         gap: '16px'
       }}>
         <Spin size="large" tip="Loading dashboard..." />
-        {debugInfo.length > 0 && (
-          <div style={{ maxWidth: '400px', textAlign: 'center' }}>
-            {debugInfo.map((info, index) => (
-              <Text key={index} type="secondary" style={{ display: 'block', fontSize: '12px' }}>
-                {info}
-              </Text>
-            ))}
-          </div>
-        )}
+        <Text type="secondary">
+          {!initialized ? 'Initializing authentication...' : 
+           authLoading ? 'Loading user data...' : 
+           'Setting up dashboard...'}
+        </Text>
       </div>
     );
   }
 
-  // Show error state
-  if (loadError) {
+  // Error state
+  if (dashboardState === 'error') {
     return (
-      <div style={{ padding: '24px' }}>
-            <Alert
+      <div style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
+        <Alert
           message="Dashboard Error"
-          description={loadError}
-              type="error"
-              showIcon
+          description={error}
+          type="error"
+          showIcon
+          icon={<WarningOutlined />}
           action={
-            <Button size="small" onClick={handleRetry}>
+            <Button type="primary" onClick={handleRetry}>
               Retry
             </Button>
           }
@@ -340,8 +349,8 @@ export default function Dashboard() {
     );
   }
 
-  // Check if user is authenticated
-  if (!user) {
+  // Unauthorized state
+  if (dashboardState === 'unauthorized') {
     return (
       <div style={{ 
         display: 'flex', 
@@ -354,10 +363,29 @@ export default function Dashboard() {
     );
   }
 
+  // Ensure user is available before rendering
+  if (!user || !validateUserAccess(user)) {
+    return (
+      <div style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
+        <Alert
+          message="Access Error"
+          description="Invalid user session. Please sign in again."
+          type="error"
+          showIcon
+          action={
+            <Button type="primary" onClick={() => router.push('/login')}>
+              Go to Login
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
   const isMobile = !screens.md;
 
-  // Show dashboard content
-    return (
+  // Main dashboard content
+  return (
     <AspectRatioLayout>
       <Layout className="full-height">
         <Header style={{ 
@@ -373,17 +401,15 @@ export default function Dashboard() {
               <span className="hidden-mobile">Daily Dose Prep</span>
               <span className="visible-mobile">DDP</span>
             </Title>
-            {user && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Text type="secondary" style={{ fontSize: isMobile ? '11px' : '13px' }}>
-                  {user.email}
-                </Text>
-                <Tag color={user.role === 'SUPERADMIN' ? 'red' : user.role === 'QAUTHOR' ? 'blue' : 'green'} 
-                     style={{ fontSize: isMobile ? '10px' : '12px', margin: 0 }}>
-                  {user.role}
-                </Tag>
-              </div>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Text type="secondary" style={{ fontSize: isMobile ? '11px' : '13px' }}>
+                {user.email}
+              </Text>
+              <Tag color={user.role === 'SUPERADMIN' ? 'red' : user.role === 'QAUTHOR' ? 'blue' : 'green'} 
+                   style={{ fontSize: isMobile ? '10px' : '12px', margin: 0 }}>
+                {user.role}
+              </Tag>
+            </div>
           </div>
           <Button 
             type="primary" 
@@ -397,6 +423,7 @@ export default function Dashboard() {
         </Header>
 
         <Content style={{ padding: isMobile ? '16px' : '24px', flex: 1, overflowY: 'auto' }}>
+          {/* SUPERADMIN Dashboard */}
           {user.role === 'SUPERADMIN' && (
             <div>
               <Title level={2}>System Administration</Title>
@@ -410,17 +437,17 @@ export default function Dashboard() {
                   title={
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>System Statistics</span>
-                  <Button 
+                      <Button 
                         icon={<ReloadOutlined />}
                         onClick={fetchSystemStats}
                         size="small"
                         type="text"
                         title="Refresh Statistics"
                         loading={statsLoading}
-                  >
+                      >
                         <span className="hidden-mobile">Refresh</span>
-                  </Button>
-                </div>
+                      </Button>
+                    </div>
                   }
                   style={{ marginBottom: 16 }}
                 >
@@ -477,53 +504,53 @@ export default function Dashboard() {
                           </Col>
                         ))}
                       </Row>
-              </>
-            )}
-          </Card>
+                    </>
+                  )}
+                </Card>
               )}
 
-        <Row gutter={[16, 16]}>
-          <Col xs={24} lg={16}>
-            <Card title="User Management">
-              <Title level={4}>Create QAUTHOR Account</Title>
-              <Form
-                form={form}
-                layout="vertical"
-                onFinish={handleCreateQAUTHOR}
-              >
-                <Form.Item
-                  name="email"
-                  label="Email"
-                  rules={[
-                    { required: true, message: 'Please enter an email address' },
-                    { type: 'email', message: 'Please enter a valid email address' }
-                  ]}
-                >
-                  <Input prefix={<MailOutlined />} placeholder="Enter email address" />
-                </Form.Item>
-                
-                <Form.Item
-                  name="password"
-                  label="Password"
-                  rules={[
-                    { required: true, message: 'Please enter a password' },
-                    { min: 6, message: 'Password must be at least 6 characters' }
-                  ]}
-                >
-                  <Input.Password prefix={<LockOutlined />} placeholder="Enter password" />
-                </Form.Item>
-                
-                <Form.Item>
-                  <Button 
-                    type="primary" 
-                    htmlType="submit" 
+              <Row gutter={[16, 16]}>
+                <Col xs={24} lg={16}>
+                  <Card title="User Management">
+                    <Title level={4}>Create QAUTHOR Account</Title>
+                    <Form
+                      form={form}
+                      layout="vertical"
+                      onFinish={handleCreateQAUTHOR}
+                    >
+                      <Form.Item
+                        name="email"
+                        label="Email"
+                        rules={[
+                          { required: true, message: 'Please enter an email address' },
+                          { type: 'email', message: 'Please enter a valid email address' }
+                        ]}
+                      >
+                        <Input prefix={<MailOutlined />} placeholder="Enter email address" />
+                      </Form.Item>
+                      
+                      <Form.Item
+                        name="password"
+                        label="Password"
+                        rules={[
+                          { required: true, message: 'Please enter a password' },
+                          { min: 6, message: 'Password must be at least 6 characters' }
+                        ]}
+                      >
+                        <Input.Password prefix={<LockOutlined />} placeholder="Enter password" />
+                      </Form.Item>
+                      
+                      <Form.Item>
+                        <Button 
+                          type="primary" 
+                          htmlType="submit" 
                           icon={<UserAddOutlined />}
                           loading={createLoading}
-                  >
-                    Create QAUTHOR
-                  </Button>
-                </Form.Item>
-              </Form>
+                        >
+                          Create QAUTHOR
+                        </Button>
+                      </Form.Item>
+                    </Form>
                   </Card>
                 </Col>
                 
@@ -553,7 +580,7 @@ export default function Dashboard() {
                   <Button 
                     icon={<ReloadOutlined />}
                     onClick={() => {
-                      addDebug('🔄 Manual refresh of users data...');
+                      log('🔄 Manual refresh of users data...');
                       fetchAllUsers();
                     }}
                     size="small"
@@ -565,72 +592,75 @@ export default function Dashboard() {
                 </div>
               } style={{ marginTop: 16 }}>
 
-              {/* Debug Information */}
-              <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  Debug: allUsers state contains {allUsers.length} users
-                </Text>
-                {allUsers.length > 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    <Text type="secondary" style={{ fontSize: '11px' }}>
-                      Users: {allUsers.map(u => `${u.email} (${u.role})`).join(', ')}
+                {/* Debug Information */}
+                {isDev && (
+                  <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
+                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                      Debug: allUsers state contains {allUsers.length} users
                     </Text>
+                    {allUsers.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <Text type="secondary" style={{ fontSize: '11px' }}>
+                          Users: {allUsers.map(u => `${u.email} (${u.role})`).join(', ')}
+                        </Text>
+                      </div>
+                    )}
+                    {allUsers.length === 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <Text type="secondary" style={{ fontSize: '11px', color: 'red' }}>
+                          ⚠️ No users in state - this indicates a data loading issue
+                        </Text>
+                        <Button 
+                          size="small" 
+                          type="primary" 
+                          onClick={async () => {
+                            log('🔧 Manual debug refresh triggered');
+                            await fetchAllUsers();
+                            await fetchSystemStats();
+                          }}
+                          style={{ marginLeft: 8 }}
+                        >
+                          Force Refresh
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
-                {allUsers.length === 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    <Text type="secondary" style={{ fontSize: '11px', color: 'red' }}>
-                      ⚠️ No users in state - this indicates a data loading issue
-                    </Text>
-                    <Button 
-                      size="small" 
-                      type="primary" 
-                      onClick={async () => {
-                        addDebug('🔧 Manual debug refresh triggered');
-                        await fetchAllUsers();
-                        await fetchSystemStats();
-                      }}
-                      style={{ marginLeft: 8 }}
-                    >
-                      Force Refresh
-                    </Button>
-                  </div>
-                )}
-              </div>
 
-              <Table
+                <Table
                   dataSource={allUsers}
-                rowKey="id"
-                columns={[
-                  {
-                    title: 'Email',
-                    dataIndex: 'email',
-                    key: 'email',
-                  },
-                  {
-                    title: 'Role',
-                    dataIndex: 'role',
-                    key: 'role',
+                  rowKey="id"
+                  columns={[
+                    {
+                      title: 'Email',
+                      dataIndex: 'email',
+                      key: 'email',
+                    },
+                    {
+                      title: 'Role',
+                      dataIndex: 'role',
+                      key: 'role',
                       render: (role: UserRole) => (
                         <Tag color={role === 'SUPERADMIN' ? 'red' : role === 'QAUTHOR' ? 'blue' : 'green'}>
-                        {role}
-                      </Tag>
-                    )
-                  },
-                  {
-                    title: 'Created At',
-                    dataIndex: 'created_at',
-                    key: 'created_at',
+                          {role}
+                        </Tag>
+                      )
+                    },
+                    {
+                      title: 'Created At',
+                      dataIndex: 'created_at',
+                      key: 'created_at',
                       render: (date: string) => new Date(date).toLocaleDateString()
-                  }
-                ]}
+                    }
+                  ]}
                   pagination={{ pageSize: 10 }}
                   scroll={{ x: 'max-content' }}
-              />
-            </Card>
+                />
+              </Card>
             </div>
           )}
           
+          {/* QAUTHOR Dashboard */}
           {user.role === 'QAUTHOR' && (
             <div>
               <Title level={2}>Question Author Dashboard</Title>
@@ -642,9 +672,9 @@ export default function Dashboard() {
                 <Col span={24}>
                   <Card>
                     <Title level={2}>Welcome, Question Author!</Title>
-              <Paragraph>
+                    <Paragraph>
                       As a Question Author, you can create questions for students. Your questions will be reviewed and made available to students in their daily question practice.
-              </Paragraph>
+                    </Paragraph>
                     <Divider />
                     <Button 
                       type="primary" 
@@ -654,15 +684,16 @@ export default function Dashboard() {
                     >
                       Create New Question
                     </Button>
-            </Card>
-          </Col>
+                  </Card>
+                </Col>
                 <Col span={24}>
                   <QuestionManager />
-          </Col>
-        </Row>
+                </Col>
+              </Row>
             </div>
           )}
 
+          {/* STUDENT Dashboard */}
           {user.role === 'STUDENT' && (
             <div>
               <Title level={2}>Student Dashboard</Title>
@@ -671,8 +702,8 @@ export default function Dashboard() {
               <EnhancedStudentDashboard user={user} />
             </div>
           )}
-      </Content>
-    </Layout>
+        </Content>
+      </Layout>
     </AspectRatioLayout>
   );
 } 
