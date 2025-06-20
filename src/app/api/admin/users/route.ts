@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Fetch all users
+    console.log('🔄 Fetching all users from database...');
     const { data: usersData, error: usersError } = await supabase
       .from('users')
       .select('id, email, role, created_at')
@@ -43,6 +44,9 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
+    
+    console.log(`✅ Successfully fetched ${usersData?.length || 0} users`);
+    console.log('Users data:', usersData?.map(u => ({ email: u.email, role: u.role })));
     
     return NextResponse.json(usersData || []);
     

@@ -53,11 +53,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log('🔄 Calculating system statistics...');
     const totalUsers = usersData?.length || 0;
     const totalQAuthors = usersData?.filter(u => u.role === 'QAUTHOR').length || 0;
     const totalStudents = usersData?.filter(u => u.role === 'STUDENT').length || 0;
     const totalSubjects = subjectsData?.length || 0;
     const totalQuestions = questionsData?.length || 0;
+    
+    console.log(`✅ Stats calculated: ${totalUsers} users (${totalQAuthors} QAuthors, ${totalStudents} Students), ${totalSubjects} subjects, ${totalQuestions} questions`);
 
     // Calculate questions per subject
     const questionsPerSubject: { [key: string]: number } = {};

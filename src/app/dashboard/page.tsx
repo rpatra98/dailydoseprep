@@ -134,14 +134,23 @@ export default function Dashboard() {
 
   const fetchAllUsers = async () => {
     try {
-      const response = await fetch('/api/admin/users', {
+      addDebug('🔄 Fetching all users...');
+      // Add cache-busting parameter to ensure fresh data
+      const response = await fetch(`/api/admin/users?t=${Date.now()}`, {
         method: 'GET',
         credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
       });
 
       if (response.ok) {
         const usersData = await response.json();
         setAllUsers(usersData || []);
+        addDebug(`✅ Fetched ${usersData?.length || 0} users`);
+      } else {
+        addDebug(`❌ Failed to fetch users: ${response.status}`);
       }
     } catch (error) {
       addDebug(`⚠️ Failed to fetch users: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -151,14 +160,23 @@ export default function Dashboard() {
   const fetchSystemStats = async () => {
     try {
       setStatsLoading(true);
-      const response = await fetch('/api/admin/stats', {
+      addDebug('🔄 Fetching system stats...');
+      // Add cache-busting parameter to ensure fresh data
+      const response = await fetch(`/api/admin/stats?t=${Date.now()}`, {
         method: 'GET',
         credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
       });
       
       if (response.ok) {
         const stats = await response.json();
         setSystemStats(stats);
+        addDebug(`✅ Stats fetched: ${stats.totalUsers} users, ${stats.totalQAuthors} QAuthors`);
+      } else {
+        addDebug(`❌ Failed to fetch stats: ${response.status}`);
       }
     } catch (error) {
       addDebug(`⚠️ Failed to fetch stats: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -205,11 +223,17 @@ export default function Dashboard() {
         form.resetFields();
 
         // Refresh both users list and system statistics
+        addDebug('🔄 Refreshing data after QAUTHOR creation...');
         await Promise.all([
           fetchAllUsers(),
           fetchSystemStats()
         ]);
         addDebug('✅ Statistics refreshed after QAUTHOR creation');
+        
+        // Force component re-render to ensure UI updates
+        setTimeout(() => {
+          addDebug('🔄 Forcing component refresh...');
+        }, 100);
       } else {
         const errorData = await response.json();
         
@@ -218,6 +242,7 @@ export default function Dashboard() {
           addDebug(`⚠️ QAUTHOR already exists: ${values.email}`);
           message.warning(`A QAUTHOR with email ${values.email} already exists. Please check the Users list below.`);
           // Still refresh data to show existing user
+          addDebug('🔄 Refreshing data to show existing QAUTHOR...');
           await Promise.all([
             fetchAllUsers(),
             fetchSystemStats()
