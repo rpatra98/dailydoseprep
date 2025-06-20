@@ -41,7 +41,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Helper function for debug logging
   const log = (message: string, data?: any) => {
     if (isDev) {
-      console.log(message, data ? JSON.stringify(data, null, 2) : '');
+      console.log(`[AuthContext] ${message}`, data || '');
+    }
+  };
+
+  // Enhanced error logging for auth issues
+  const logAuthError = (context: string, error: any, additionalData?: any) => {
+    console.error(`[AuthContext] ${context}:`, error);
+    if (additionalData) {
+      console.error(`[AuthContext] Additional context:`, additionalData);
     }
   };
 
@@ -57,7 +65,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (error) {
-        log('❌ Database error fetching user:', error);
+        logAuthError('Database error fetching user', error, { 
+          userId: authUser.id, 
+          userEmail: authUser.email,
+          errorCode: error.code,
+          errorMessage: error.message
+        });
         
         // If user doesn't exist in database, sign them out
         if (error.code === 'PGRST116') {
@@ -70,7 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!data) {
-        log('❌ No user data found in database');
+        logAuthError('No user data returned from database', null, { 
+          userId: authUser.id, 
+          userEmail: authUser.email 
+        });
         await supabase.auth.signOut();
         return null;
       }
@@ -84,7 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       log('✅ User data fetched successfully:', userData);
       return userData;
     } catch (error) {
-      log('❌ Error fetching user data:', error);
+      logAuthError('Error fetching user data', error, { 
+        userId: authUser.id, 
+        userEmail: authUser.email 
+      });
       return null;
     }
   };
@@ -98,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
-        log('❌ Error getting session:', error);
+        logAuthError('Error getting session during initialization', error);
         setSession(null);
         setUser(null);
         return;
@@ -123,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         log('ℹ️ No session found during initialization');
       }
     } catch (error) {
-      log('❌ Error initializing auth:', error);
+      logAuthError('Error initializing auth', error);
       setUser(null);
       setSession(null);
     } finally {
@@ -161,7 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         log('ℹ️ User signed out');
       }
     } catch (error) {
-      log('❌ Error handling auth change:', error);
+      logAuthError('Error handling auth change', error, { event, hasSession: !!session });
       setUser(null);
       setSession(null);
     }
@@ -179,41 +198,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       log('🔄 Starting login for:', email);
 
+      // Clear any existing session first
+      await supabase.auth.signOut();
+      log('🔄 Cleared existing session');
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
         password,
       });
 
       if (error) {
-        log('❌ Auth error:', error.message);
+        logAuthError('Auth sign-in error', error, { email });
         return { success: false, error: error.message };
       }
 
       if (!data.user) {
-        log('❌ No user data returned from auth');
+        logAuthError('No user data returned from auth', null, { email });
         return { success: false, error: 'Authentication failed' };
       }
 
-      log('✅ Authentication successful, processing user data...');
+      log('✅ Supabase auth successful, fetching user profile...');
 
-      // The auth state change handler will handle setting the user
-      // But we also need to manually fetch to ensure we have the data immediately
+      // Fetch user data from our database
       const userData = await fetchUserData(data.user);
       if (!userData) {
-        log('❌ Failed to fetch user profile');
-        return { success: false, error: 'Failed to fetch user profile' };
+        logAuthError('Failed to fetch user profile after successful auth', null, { 
+          email,
+          authUserId: data.user.id 
+        });
+        // Sign out since we can't get user data
+        await supabase.auth.signOut();
+        return { success: false, error: 'User profile not found. Please contact administrator.' };
       }
 
-      // Set user data immediately (auth state change will also set it, but this ensures immediate availability)
+      // Set user data immediately
       setUser(userData);
       setSession(data.session);
       
-             log('✅ Login complete:', { email: userData.email, role: userData.role });
+      log('✅ Login complete:', { email: userData.email, role: userData.role });
       return { success: true };
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
-      log('❌ Login error:', errorMessage);
+      logAuthError('Sign-in process error', error, { email });
       return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
@@ -228,7 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       const { error } = await supabase.auth.signOut();
       if (error) {
-        log('❌ Sign out error:', error);
+        logAuthError('Sign out error', error);
         throw error;
       }
       
@@ -236,7 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(null);
       log('✅ Signed out successfully');
     } catch (error) {
-      log('❌ Sign out error:', error);
+      logAuthError('Sign out process error', error);
       throw error;
     } finally {
       setLoading(false);
@@ -252,7 +279,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
-        log('❌ Refresh error:', error);
+        logAuthError('Refresh error', error);
         setUser(null);
         setSession(null);
         return;
@@ -275,7 +302,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         log('ℹ️ No session found during refresh');
       }
     } catch (error) {
-      log('❌ Refresh error:', error);
+      logAuthError('Refresh process error', error);
       setUser(null);
       setSession(null);
     } finally {
