@@ -13,7 +13,7 @@ import {
   Alert, 
   Divider, 
   Row, 
-  Col, 
+  Col,
   Tag,
   Form,
   Input,
@@ -22,8 +22,8 @@ import {
   Statistic,
   Grid
 } from 'antd';
-import { 
-  LogoutOutlined, 
+import {
+  LogoutOutlined,
   UserAddOutlined, 
   BookOutlined, 
   PlusOutlined,
@@ -105,9 +105,9 @@ export default function Dashboard() {
         if (!user) {
           addDebug('❌ Not authenticated, redirecting to login');
           router.push('/login');
-          return;
-        }
-
+        return;
+      }
+      
         addDebug(`✅ User authenticated: ${user.email} (${user.role})`);
         
         // If SUPERADMIN, fetch additional data
@@ -118,16 +118,16 @@ export default function Dashboard() {
             fetchSystemStats()
           ]);
           addDebug('✅ Admin data loaded');
-        }
+      }
         
-      } catch (error) {
+    } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to load dashboard';
         addDebug(`❌ Dashboard error: ${errorMessage}`);
         setLoadError(errorMessage);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
     loadDashboardData();
   }, [isMounted, authLoading, user, router]);
@@ -138,7 +138,7 @@ export default function Dashboard() {
         method: 'GET',
         credentials: 'include',
       });
-      
+
       if (response.ok) {
         const usersData = await response.json();
         setAllUsers(usersData || []);
@@ -203,7 +203,7 @@ export default function Dashboard() {
         addDebug('✅ QAUTHOR created successfully');
         message.success(`QAUTHOR account created successfully for ${values.email}`);
         form.resetFields();
-        
+
         // Refresh both users list and system statistics
         await Promise.all([
           fetchAllUsers(),
@@ -270,11 +270,11 @@ export default function Dashboard() {
   if (loadError) {
     return (
       <div style={{ padding: '24px' }}>
-        <Alert
+            <Alert
           message="Dashboard Error"
           description={loadError}
-          type="error"
-          showIcon
+              type="error"
+              showIcon
           action={
             <Button size="small" onClick={handleRetry}>
               Retry
@@ -302,7 +302,7 @@ export default function Dashboard() {
   const isMobile = !screens.md;
 
   // Show dashboard content
-  return (
+    return (
     <AspectRatioLayout>
       <Layout className="full-height">
         <Header style={{ 
@@ -355,17 +355,17 @@ export default function Dashboard() {
                   title={
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>System Statistics</span>
-                      <Button 
+                  <Button 
                         icon={<ReloadOutlined />}
                         onClick={fetchSystemStats}
                         size="small"
                         type="text"
                         title="Refresh Statistics"
                         loading={statsLoading}
-                      >
+                  >
                         <span className="hidden-mobile">Refresh</span>
-                      </Button>
-                    </div>
+                  </Button>
+                </div>
                   }
                   style={{ marginBottom: 16 }}
                 >
@@ -422,53 +422,53 @@ export default function Dashboard() {
                           </Col>
                         ))}
                       </Row>
-                    </>
-                  )}
-                </Card>
+              </>
+            )}
+          </Card>
               )}
 
-              <Row gutter={[16, 16]}>
-                <Col xs={24} lg={16}>
-                  <Card title="User Management">
-                    <Title level={4}>Create QAUTHOR Account</Title>
-                    <Form
-                      form={form}
-                      layout="vertical"
-                      onFinish={handleCreateQAUTHOR}
-                    >
-                      <Form.Item
-                        name="email"
-                        label="Email"
-                        rules={[
-                          { required: true, message: 'Please enter an email address' },
-                          { type: 'email', message: 'Please enter a valid email address' }
-                        ]}
-                      >
-                        <Input prefix={<MailOutlined />} placeholder="Enter email address" />
-                      </Form.Item>
-                      
-                      <Form.Item
-                        name="password"
-                        label="Password"
-                        rules={[
-                          { required: true, message: 'Please enter a password' },
-                          { min: 6, message: 'Password must be at least 6 characters' }
-                        ]}
-                      >
-                        <Input.Password prefix={<LockOutlined />} placeholder="Enter password" />
-                      </Form.Item>
-                      
-                      <Form.Item>
-                        <Button 
-                          type="primary" 
-                          htmlType="submit" 
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={16}>
+            <Card title="User Management">
+              <Title level={4}>Create QAUTHOR Account</Title>
+              <Form
+                form={form}
+                layout="vertical"
+                onFinish={handleCreateQAUTHOR}
+              >
+                <Form.Item
+                  name="email"
+                  label="Email"
+                  rules={[
+                    { required: true, message: 'Please enter an email address' },
+                    { type: 'email', message: 'Please enter a valid email address' }
+                  ]}
+                >
+                  <Input prefix={<MailOutlined />} placeholder="Enter email address" />
+                </Form.Item>
+                
+                <Form.Item
+                  name="password"
+                  label="Password"
+                  rules={[
+                    { required: true, message: 'Please enter a password' },
+                    { min: 6, message: 'Password must be at least 6 characters' }
+                  ]}
+                >
+                  <Input.Password prefix={<LockOutlined />} placeholder="Enter password" />
+                </Form.Item>
+                
+                <Form.Item>
+                  <Button 
+                    type="primary" 
+                    htmlType="submit" 
                           icon={<UserAddOutlined />}
                           loading={createLoading}
-                        >
-                          Create QAUTHOR
-                        </Button>
-                      </Form.Item>
-                    </Form>
+                  >
+                    Create QAUTHOR
+                  </Button>
+                </Form.Item>
+              </Form>
                   </Card>
                 </Col>
                 
@@ -493,39 +493,39 @@ export default function Dashboard() {
 
               {/* All Users Table */}
               <Card title="All Users" style={{ marginTop: 16 }}>
-                <Table
+              <Table
                   dataSource={allUsers}
-                  rowKey="id"
-                  columns={[
-                    {
-                      title: 'Email',
-                      dataIndex: 'email',
-                      key: 'email',
-                    },
-                    {
-                      title: 'Role',
-                      dataIndex: 'role',
-                      key: 'role',
+                rowKey="id"
+                columns={[
+                  {
+                    title: 'Email',
+                    dataIndex: 'email',
+                    key: 'email',
+                  },
+                  {
+                    title: 'Role',
+                    dataIndex: 'role',
+                    key: 'role',
                       render: (role: UserRole) => (
                         <Tag color={role === 'SUPERADMIN' ? 'red' : role === 'QAUTHOR' ? 'blue' : 'green'}>
-                          {role}
-                        </Tag>
-                      )
-                    },
-                    {
-                      title: 'Created At',
-                      dataIndex: 'created_at',
-                      key: 'created_at',
+                        {role}
+                      </Tag>
+                    )
+                  },
+                  {
+                    title: 'Created At',
+                    dataIndex: 'created_at',
+                    key: 'created_at',
                       render: (date: string) => new Date(date).toLocaleDateString()
-                    }
-                  ]}
+                  }
+                ]}
                   pagination={{ pageSize: 10 }}
                   scroll={{ x: 'max-content' }}
-                />
-              </Card>
+              />
+            </Card>
             </div>
           )}
-
+          
           {user.role === 'QAUTHOR' && (
             <div>
               <Title level={2}>Question Author Dashboard</Title>
@@ -537,9 +537,9 @@ export default function Dashboard() {
                 <Col span={24}>
                   <Card>
                     <Title level={2}>Welcome, Question Author!</Title>
-                    <Paragraph>
+              <Paragraph>
                       As a Question Author, you can create questions for students. Your questions will be reviewed and made available to students in their daily question practice.
-                    </Paragraph>
+              </Paragraph>
                     <Divider />
                     <Button 
                       type="primary" 
@@ -549,12 +549,12 @@ export default function Dashboard() {
                     >
                       Create New Question
                     </Button>
-                  </Card>
-                </Col>
+            </Card>
+          </Col>
                 <Col span={24}>
                   <QuestionManager />
-                </Col>
-              </Row>
+          </Col>
+        </Row>
             </div>
           )}
 
@@ -566,8 +566,8 @@ export default function Dashboard() {
               <EnhancedStudentDashboard user={user} />
             </div>
           )}
-        </Content>
-      </Layout>
+      </Content>
+    </Layout>
     </AspectRatioLayout>
   );
 } 

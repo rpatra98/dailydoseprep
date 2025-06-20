@@ -21,8 +21,8 @@ export async function GET(req: NextRequest) {
       },
       database: {
         userExists: false,
-        userData: null,
-        error: null
+        userData: null as { id: any; email: any; role: any; } | null,
+        error: null as string | null
       }
     };
     
