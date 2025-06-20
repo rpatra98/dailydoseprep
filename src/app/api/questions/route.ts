@@ -693,8 +693,8 @@ export async function POST(req: NextRequest) {
     
     if (isDev) {
       console.log('📝 Question data received:', {
-        title: title ? 'present' : 'missing',
-        content: content ? 'present' : 'missing',
+        title: title ? `"${title.substring(0, 30)}${title.length > 30 ? '...' : ''}"` : 'missing',
+        content: content ? `"${content.substring(0, 50)}${content.length > 50 ? '...' : ''}"` : 'missing',
         optionA: optionA ? 'present' : 'missing',
         optionB: optionB ? 'present' : 'missing',
         optionC: optionC ? 'present' : 'missing',
@@ -702,18 +702,87 @@ export async function POST(req: NextRequest) {
         correctAnswer,
         subject,
         difficulty: difficulty || 'MEDIUM',
-        examCategory: examCategory || 'OTHER'
+        examCategory: examCategory || 'OTHER',
+        year: year || 'not provided',
+        source: source || 'not provided'
       });
     }
     
-    // Validate required fields
-    if (!content || !optionA || !optionB || !optionC || !optionD || !correctAnswer || !subject) {
+    // Enhanced validation per APPLICATION_SPECIFICATION.md
+    const validationErrors = [];
+    
+    // Required field validation
+    if (!title || title.trim().length === 0) {
+      validationErrors.push('Title is required');
+    } else if (title.length > 200) {
+      validationErrors.push('Title cannot exceed 200 characters');
+    }
+    
+    if (!content || content.trim().length === 0) {
+      validationErrors.push('Question content is required');
+    } else if (content.length > 2000) {
+      validationErrors.push('Question content cannot exceed 2000 characters');
+    }
+    
+    if (!optionA || optionA.trim().length === 0) {
+      validationErrors.push('Option A is required');
+    } else if (optionA.length > 500) {
+      validationErrors.push('Option A cannot exceed 500 characters');
+    }
+    
+    if (!optionB || optionB.trim().length === 0) {
+      validationErrors.push('Option B is required');
+    } else if (optionB.length > 500) {
+      validationErrors.push('Option B cannot exceed 500 characters');
+    }
+    
+    if (!optionC || optionC.trim().length === 0) {
+      validationErrors.push('Option C is required');
+    } else if (optionC.length > 500) {
+      validationErrors.push('Option C cannot exceed 500 characters');
+    }
+    
+    if (!optionD || optionD.trim().length === 0) {
+      validationErrors.push('Option D is required');
+    } else if (optionD.length > 500) {
+      validationErrors.push('Option D cannot exceed 500 characters');
+    }
+    
+    if (!correctAnswer || !['A', 'B', 'C', 'D'].includes(correctAnswer)) {
+      validationErrors.push('Correct answer must be exactly A, B, C, or D');
+    }
+    
+    if (!explanation || explanation.trim().length === 0) {
+      validationErrors.push('Explanation is required');
+    } else if (explanation.length > 1000) {
+      validationErrors.push('Explanation cannot exceed 1000 characters');
+    }
+    
+    if (!difficulty || !['EASY', 'MEDIUM', 'HARD'].includes(difficulty)) {
+      validationErrors.push('Difficulty must be EASY, MEDIUM, or HARD');
+    }
+    
+    if (!examCategory || !['UPSC', 'JEE', 'NEET', 'SSC', 'OTHER'].includes(examCategory)) {
+      validationErrors.push('Exam category must be UPSC, JEE, NEET, SSC, or OTHER');
+    }
+    
+    if (!subject || subject.trim().length === 0) {
+      validationErrors.push('Subject is required');
+    }
+    
+    // Year validation (if provided)
+    if (year && (isNaN(year) || year < 1900 || year > 2030)) {
+      validationErrors.push('Year must be between 1900 and 2030');
+    }
+    
+    if (validationErrors.length > 0) {
       if (isDev) {
-        console.log('❌ Missing required fields');
+        console.log('❌ Validation errors:', validationErrors);
       }
       return NextResponse.json({ 
-        error: 'Missing required fields',
-        details: 'content, optionA, optionB, optionC, optionD, correctAnswer, and subject are required'
+        error: 'Validation failed',
+        details: validationErrors.join(', '),
+        validationErrors
       }, { status: 400 });
     }
 
@@ -742,7 +811,7 @@ export async function POST(req: NextRequest) {
 
     if (userError || !userData) {
       if (isDev) {
-        console.log('❌ User not found in database');
+        console.log('❌ User not found in database:', userError);
       }
       return NextResponse.json({
         error: 'User not found',
@@ -774,7 +843,7 @@ export async function POST(req: NextRequest) {
 
     if (subjectError || !subjectCheck) {
       if (isDev) {
-        console.log('❌ Subject not found:', subject);
+        console.log('❌ Subject not found:', subject, subjectError);
       }
       return NextResponse.json({
         error: 'Invalid subject',
@@ -786,34 +855,52 @@ export async function POST(req: NextRequest) {
       console.log('✅ Subject verified:', subjectCheck.name);
     }
     
-    // Prepare question data
+    // Prepare question data per APPLICATION_SPECIFICATION.md schema
     const questionData = {
-      title: title || 'Question',             // TEXT NOT NULL - Brief question title/heading
-      content: content,                        // TEXT NOT NULL - Full detailed question text  
-      option_a: optionA,                       // TEXT NOT NULL - Answer option A text
-      option_b: optionB,                       // TEXT NOT NULL - Answer option B text
-      option_c: optionC,                       // TEXT NOT NULL - Answer option C text
-      option_d: optionD,                       // TEXT NOT NULL - Answer option D text
+      title: title.trim(),                     // TEXT NOT NULL - Brief question title/heading
+      content: content.trim(),                 // TEXT NOT NULL - Full detailed question text  
+      option_a: optionA.trim(),               // TEXT NOT NULL - Answer option A text
+      option_b: optionB.trim(),               // TEXT NOT NULL - Answer option B text
+      option_c: optionC.trim(),               // TEXT NOT NULL - Answer option C text
+      option_d: optionD.trim(),               // TEXT NOT NULL - Answer option D text
       correct_option: correctAnswer,           // CHARACTER NOT NULL - Single character: 'A', 'B', 'C', or 'D'
-      explanation: explanation || '',          // TEXT NOT NULL - Detailed explanation
-      difficulty: difficulty || 'MEDIUM',     // TEXT NOT NULL - 'EASY', 'MEDIUM', 'HARD'
-      exam_category: examCategory || 'OTHER', // TEXT NOT NULL - 'UPSC', 'JEE', 'NEET', 'SSC', 'OTHER'
-      year: year || null,                      // INTEGER (nullable) - Year the question was from
-      source: source || null,                  // TEXT (nullable) - Source/reference information
-      questionhash: generateQuestionHash({     // TEXT (nullable) - Unique hash to prevent duplicates
-        content,
-        optionA,
-        optionB,
-        optionC,
-        optionD,
+      correct_answer: null,                    // TEXT (nullable) - Legacy field, not used
+      explanation: explanation.trim(),         // TEXT NOT NULL - Detailed explanation
+      difficulty: difficulty,                  // TEXT NOT NULL - 'EASY', 'MEDIUM', 'HARD'
+      exam_category: examCategory,            // TEXT NOT NULL - 'UPSC', 'JEE', 'NEET', 'SSC', 'OTHER'
+      year: year || null,                     // INTEGER (nullable) - Year the question was from
+      source: source?.trim() || null,         // TEXT (nullable) - Source/reference information
+      questionhash: generateQuestionHash({    // TEXT (nullable) - Unique hash to prevent duplicates
+        content: content.trim(),
+        optionA: optionA.trim(),
+        optionB: optionB.trim(),
+        optionC: optionC.trim(),
+        optionD: optionD.trim(),
         subject
       }),
-      subject_id: subject,                     // UUID (nullable) - Foreign key to subjects.id
-      created_by: userData.id                  // UUID NOT NULL - Foreign key to users.id (QAUTHOR)
+      options: {                              // JSONB (nullable) - Alternative JSON storage
+        A: optionA.trim(),
+        B: optionB.trim(),
+        C: optionC.trim(),
+        D: optionD.trim()
+      },
+      subject_id: subject,                    // UUID (nullable) - Foreign key to subjects.id
+      created_by: userData.id,                // UUID NOT NULL - Foreign key to users.id (QAUTHOR)
+      created_at: new Date().toISOString(),   // TIMESTAMP WITH TIME ZONE
+      updated_at: new Date().toISOString()    // TIMESTAMP WITH TIME ZONE
     };
 
     if (isDev) {
-      console.log('💾 Inserting question into database...');
+      console.log('💾 Inserting question into database with schema-compliant data...');
+      console.log('📊 Question data summary:', {
+        title: questionData.title,
+        content_length: questionData.content.length,
+        subject_name: subjectCheck.name,
+        difficulty: questionData.difficulty,
+        exam_category: questionData.exam_category,
+        has_hash: !!questionData.questionhash,
+        created_by_email: userData.email
+      });
     }
     
     // Insert the question
@@ -825,11 +912,17 @@ export async function POST(req: NextRequest) {
     if (finalError) {
       if (isDev) {
         console.error('❌ Database insert error:', finalError);
+        console.error('❌ Error details:', {
+          message: finalError.message,
+          details: finalError.details,
+          hint: finalError.hint,
+          code: finalError.code
+        });
       }
       return NextResponse.json({
         error: 'Failed to create question',
         details: finalError.message,
-        suggestion: 'Check database configuration'
+        suggestion: 'Check database configuration and RLS policies'
       }, { status: 500 });
     }
     
@@ -844,13 +937,36 @@ export async function POST(req: NextRequest) {
     }
 
     if (isDev) {
-      console.log('✅ Question created successfully:', finalResult[0].id);
+      console.log('✅ Question created successfully:', {
+        id: finalResult[0].id,
+        title: finalResult[0].title,
+        subject: subjectCheck.name,
+        difficulty: finalResult[0].difficulty,
+        created_by: userData.email
+      });
     }
     
     return NextResponse.json({
       success: true,
       message: 'Question created successfully',
-      question: finalResult[0]
+      question: {
+        id: finalResult[0].id,
+        title: finalResult[0].title,
+        content: finalResult[0].content,
+        optionA: finalResult[0].option_a,
+        optionB: finalResult[0].option_b,
+        optionC: finalResult[0].option_c,
+        optionD: finalResult[0].option_d,
+        correctAnswer: finalResult[0].correct_option,
+        explanation: finalResult[0].explanation,
+        difficulty: finalResult[0].difficulty,
+        examCategory: finalResult[0].exam_category,
+        subject: finalResult[0].subject_id,
+        year: finalResult[0].year,
+        source: finalResult[0].source,
+        createdBy: finalResult[0].created_by,
+        createdAt: finalResult[0].created_at
+      }
     }, { status: 201 });
     
   } catch (error) {
