@@ -149,8 +149,24 @@ export default function Dashboard() {
         const usersData = await response.json();
         setAllUsers(usersData || []);
         addDebug(`✅ Fetched ${usersData?.length || 0} users`);
+        if (usersData && usersData.length > 0) {
+          addDebug(`Users fetched: ${usersData.map((u: any) => `${u.email}(${u.role})`).join(', ')}`);
+        }
       } else {
         addDebug(`❌ Failed to fetch users: ${response.status}`);
+        if (response.status === 401) {
+          addDebug('❌ Authentication error - session may have expired');
+        } else if (response.status === 403) {
+          addDebug('❌ Access denied - insufficient permissions');
+        }
+        
+        // Try to get error details
+        try {
+          const error = await response.json();
+          addDebug(`❌ API Error details: ${JSON.stringify(error)}`);
+        } catch (e) {
+          addDebug('❌ Could not parse error response');
+        }
       }
     } catch (error) {
       addDebug(`⚠️ Failed to fetch users: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -531,7 +547,57 @@ export default function Dashboard() {
               </Card>
 
               {/* All Users Table */}
-              <Card title="All Users" style={{ marginTop: 16 }}>
+              <Card title={
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>All Users ({allUsers.length})</span>
+                  <Button 
+                    icon={<ReloadOutlined />}
+                    onClick={() => {
+                      addDebug('🔄 Manual refresh of users data...');
+                      fetchAllUsers();
+                    }}
+                    size="small"
+                    type="text"
+                    title="Refresh Users"
+                  >
+                    Refresh
+                  </Button>
+                </div>
+              } style={{ marginTop: 16 }}>
+
+              {/* Debug Information */}
+              <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  Debug: allUsers state contains {allUsers.length} users
+                </Text>
+                {allUsers.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <Text type="secondary" style={{ fontSize: '11px' }}>
+                      Users: {allUsers.map(u => `${u.email} (${u.role})`).join(', ')}
+                    </Text>
+                  </div>
+                )}
+                {allUsers.length === 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <Text type="secondary" style={{ fontSize: '11px', color: 'red' }}>
+                      ⚠️ No users in state - this indicates a data loading issue
+                    </Text>
+                    <Button 
+                      size="small" 
+                      type="primary" 
+                      onClick={async () => {
+                        addDebug('🔧 Manual debug refresh triggered');
+                        await fetchAllUsers();
+                        await fetchSystemStats();
+                      }}
+                      style={{ marginLeft: 8 }}
+                    >
+                      Force Refresh
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               <Table
                   dataSource={allUsers}
                 rowKey="id"
