@@ -562,6 +562,16 @@ export async function GET(req: NextRequest) {
     }
     const supabase = createRouteHandlerClient({ cookies });
     
+    // Simple health check for debugging
+    const url = new URL(req.url);
+    if (url.searchParams.get('health') === 'true') {
+      return NextResponse.json({ 
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        message: 'Questions API is working'
+      });
+    }
+    
     // Check authentication first
     const { data: authData, error: authError } = await supabase.auth.getUser();
     
@@ -661,11 +671,18 @@ export async function POST(req: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
     
+    if (isDev) {
+      console.log('🔄 Starting question creation...');
+    }
+    
     // Parse request body
     let body;
     try {
       body = await req.json();
     } catch (parseError) {
+      if (isDev) {
+        console.log('❌ Invalid JSON in request body');
+      }
       return NextResponse.json({
         error: 'Invalid request body',
         details: 'Could not parse JSON request'
@@ -674,42 +691,102 @@ export async function POST(req: NextRequest) {
     
     const { title, content, optionA, optionB, optionC, optionD, correctAnswer, explanation, subject, examCategory, difficulty, year, source } = body;
     
+    if (isDev) {
+      console.log('📝 Question data received:', {
+        title: title ? 'present' : 'missing',
+        content: content ? 'present' : 'missing',
+        optionA: optionA ? 'present' : 'missing',
+        optionB: optionB ? 'present' : 'missing',
+        optionC: optionC ? 'present' : 'missing',
+        optionD: optionD ? 'present' : 'missing',
+        correctAnswer,
+        subject,
+        difficulty: difficulty || 'MEDIUM',
+        examCategory: examCategory || 'OTHER'
+      });
+    }
+    
     // Validate required fields
     if (!content || !optionA || !optionB || !optionC || !optionD || !correctAnswer || !subject) {
+      if (isDev) {
+        console.log('❌ Missing required fields');
+      }
       return NextResponse.json({ 
         error: 'Missing required fields',
         details: 'content, optionA, optionB, optionC, optionD, correctAnswer, and subject are required'
       }, { status: 400 });
     }
-    
-    // Test database connectivity
-    const connectivityTest = await testDatabaseConnectivity(supabase);
-    
-    if (!connectivityTest.success) {
+
+    // Check authentication
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
+      if (isDev) {
+        console.log('❌ Authentication failed');
+      }
       return NextResponse.json({
-        error: connectivityTest.error,
-        details: connectivityTest.details,
-        step: connectivityTest.step,
-        suggestion: connectivityTest.suggestion,
-        setupUrl: '/api/setup'
-      }, { status: 500 });
+        error: 'Authentication required',
+        details: 'Please log in to create questions'
+      }, { status: 401 });
+    }
+
+    if (isDev) {
+      console.log('✅ User authenticated:', authData.user.email);
+    }
+
+    // Get user data from database
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, email, role')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (userError || !userData) {
+      if (isDev) {
+        console.log('❌ User not found in database');
+      }
+      return NextResponse.json({
+        error: 'User not found',
+        details: 'User account not properly configured'
+      }, { status: 403 });
+    }
+
+    // Check if user is QAUTHOR
+    if (userData.role !== 'QAUTHOR') {
+      if (isDev) {
+        console.log('❌ Access denied - user role:', userData.role);
+      }
+      return NextResponse.json({
+        error: 'Access denied',
+        details: 'Only QAUTHORs can create questions'
+      }, { status: 403 });
+    }
+
+    if (isDev) {
+      console.log('✅ QAUTHOR access confirmed');
+    }
+
+    // Verify subject exists
+    const { data: subjectCheck, error: subjectError } = await supabase
+      .from('subjects')
+      .select('id, name')
+      .eq('id', subject)
+      .single();
+
+    if (subjectError || !subjectCheck) {
+      if (isDev) {
+        console.log('❌ Subject not found:', subject);
+      }
+      return NextResponse.json({
+        error: 'Invalid subject',
+        details: 'Selected subject does not exist'
+      }, { status: 400 });
+    }
+
+    if (isDev) {
+      console.log('✅ Subject verified:', subjectCheck.name);
     }
     
-    // Test question insertion
-    const insertionTest = await testQuestionInsertion(supabase, connectivityTest.user, connectivityTest.subjects);
-    
-    if (!insertionTest.success) {
-      return NextResponse.json({
-        error: insertionTest.error,
-        details: insertionTest.details,
-        recommendation: insertionTest.recommendation,
-        testData: insertionTest.testData,
-        fullError: insertionTest.fullError,
-        suggestion: 'Run the complete supabase-manual-setup.sql script',
-        setupUrl: '/api/setup'
-      }, { status: 500 });
-    }
-    
+    // Prepare question data
     const questionData = {
       title: title || 'Question',             // TEXT NOT NULL - Brief question title/heading
       content: content,                        // TEXT NOT NULL - Full detailed question text  
@@ -724,35 +801,50 @@ export async function POST(req: NextRequest) {
       year: year || null,                      // INTEGER (nullable) - Year the question was from
       source: source || null,                  // TEXT (nullable) - Source/reference information
       questionhash: generateQuestionHash({     // TEXT (nullable) - Unique hash to prevent duplicates
-      content,
-      optionA,
-      optionB,
-      optionC,
-      optionD,
+        content,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
         subject
       }),
       subject_id: subject,                     // UUID (nullable) - Foreign key to subjects.id
-      created_by: connectivityTest.user.id    // UUID NOT NULL - Foreign key to users.id (QAUTHOR)
+      created_by: userData.id                  // UUID NOT NULL - Foreign key to users.id (QAUTHOR)
     };
+
+    if (isDev) {
+      console.log('💾 Inserting question into database...');
+    }
     
+    // Insert the question
     const { data: finalResult, error: finalError } = await supabase
       .from('questions')
       .insert(questionData)
       .select('*');
     
     if (finalError) {
+      if (isDev) {
+        console.error('❌ Database insert error:', finalError);
+      }
       return NextResponse.json({
         error: 'Failed to create question',
         details: finalError.message,
-        suggestion: 'Check the error details above'
+        suggestion: 'Check database configuration'
       }, { status: 500 });
     }
     
     if (!finalResult || finalResult.length === 0) {
+      if (isDev) {
+        console.log('❌ No data returned after insert');
+      }
       return NextResponse.json({
         error: 'Question creation succeeded but no data returned',
         details: 'This might indicate a database configuration issue'
       }, { status: 500 });
+    }
+
+    if (isDev) {
+      console.log('✅ Question created successfully:', finalResult[0].id);
     }
     
     return NextResponse.json({
@@ -762,6 +854,9 @@ export async function POST(req: NextRequest) {
     }, { status: 201 });
     
   } catch (error) {
+    if (isDev) {
+      console.error('❌ Unexpected error in question creation:', error);
+    }
     return NextResponse.json({
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'
