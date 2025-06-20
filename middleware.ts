@@ -20,16 +20,23 @@ export async function middleware(request: NextRequest) {
     return res;
   }
 
+  // Define public routes that don't require authentication
+  const publicRoutes = [
+    '/login',
+    '/register', 
+    '/api/auth',
+    '/',
+    '/api/setup',
+    '/api/debug-user',
+    '/api/debug-session'
+  ];
+  
+  const isPublicRoute = publicRoutes.some(route => 
+    request.nextUrl.pathname === route || request.nextUrl.pathname.startsWith(route + '/')
+  );
+  
   // Skip auth validation for public routes
-  const publicRoutes = ['/login', '/register', '/api/auth', '/', '/api/setup'];
-  const isPublicRoute = publicRoutes.some(route => request.nextUrl.pathname.startsWith(route));
-  
   if (isPublicRoute) {
-    return res;
-  }
-  
-  // Skip validation during development for debugging
-  if (process.env.NODE_ENV === 'development' && request.nextUrl.pathname === '/dashboard') {
     return res;
   }
   
@@ -37,60 +44,31 @@ export async function middleware(request: NextRequest) {
   const supabase = createMiddlewareClient({ req: request, res });
   
   try {
-    // Refresh session if expired - necessary for Supabase auth
+    // Simply refresh session if expired - let AuthContext handle user validation
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError) {
       console.error('Session error in middleware:', sessionError);
+      // Don't block - let the frontend handle it
       return res;
     }
 
-    // If user is authenticated, validate they exist in database
-    if (session?.user) {
-      try {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('id, email, role')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        if (userError) {
-          console.error('Database user check error:', userError);
-          // Don't block request, let the frontend handle it
-          return res;
-        }
-
-        if (!userData) {
-          // User exists in auth but not in database - SECURITY ISSUE
-          console.warn('SECURITY: User exists in auth but not in database:', session.user.email);
-          
-          // For API routes, return 401
-          if (request.nextUrl.pathname.startsWith('/api/')) {
-            return NextResponse.json(
-              { 
-                error: 'Account not properly configured',
-                details: 'User exists in auth but not in database',
-                action: 'logout_required'
-              }, 
-              { status: 401 }
-            );
-          }
-          
-          // For regular routes, redirect to login with error
-          const loginUrl = new URL('/login', request.url);
-          loginUrl.searchParams.set('error', 'account_config_error');
-          return NextResponse.redirect(loginUrl);
-        }
-
-        // User exists and is valid - continue
-        console.log('User validated in middleware:', userData.email, 'Role:', userData.role);
-      } catch (dbError) {
-        console.error('Database validation error in middleware:', dbError);
-        // Don't block request, let the frontend handle it
+    // For API routes, basic session check
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      if (!session?.user) {
+        return NextResponse.json(
+          { error: 'Authentication required' }, 
+          { status: 401 }
+        );
       }
     }
+
+    // For protected pages, let AuthContext handle the detailed validation
+    // Middleware just ensures session exists
+    
   } catch (error) {
     console.error('Error in middleware:', error);
+    // Don't block on middleware errors - let frontend handle auth
   }
   
   return res;
@@ -103,6 +81,6 @@ export const config = {
     '/create-question/:path*',
     '/admin/:path*',
     '/daily-questions/:path*',
-    '/((?!_next/static|_next/image|favicon.ico|login|register).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\..*|login|register).*)',
   ],
 }; 

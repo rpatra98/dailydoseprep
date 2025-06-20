@@ -7,7 +7,6 @@ import { ConfigProvider } from 'antd';
 import { AntdRegistry } from '@ant-design/nextjs-registry';
 import theme from '@/theme/themeConfig';
 import { useState, useEffect } from "react";
-import { clearBrowserClient } from "@/lib/supabase-browser";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -87,72 +86,124 @@ export default function RootLayout({
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
+    const isDev = process.env.NODE_ENV === 'development';
+    
     // Check if environment variables are available (only in development)
-    if (process.env.NODE_ENV === 'development') {
+    if (isDev) {
       if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
         console.error("Missing Supabase environment variables");
       }
     }
     
-    // Clean up any invalid tokens on app startup
-    const cleanupTokens = () => {
+    // Comprehensive session cleanup to prevent conflicts
+    const cleanupSessions = () => {
       try {
         if (typeof window !== 'undefined') {
-          // Clear the old custom storage key if it exists
-          const oldAuthToken = window.localStorage.getItem('ddp-supabase-auth-token');
-          if (oldAuthToken) {
-            window.localStorage.removeItem('ddp-supabase-auth-token');
-            if (process.env.NODE_ENV === 'development') {
-              console.log('Removed old custom auth token');
-            }
-          }
+          const isLoginPage = window.location.pathname === '/login';
           
-          // Check for invalid tokens in default Supabase storage
-          const keysToCheck = [];
+          // Clear any orphaned or conflicting auth tokens
+          const keysToClean = [];
           for (let i = 0; i < window.localStorage.length; i++) {
             const key = window.localStorage.key(i);
-            if (key && (key.includes('supabase') || key.includes('sb-'))) {
-              keysToCheck.push(key);
+            if (key && (
+              key.includes('supabase') || 
+              key.includes('sb-') || 
+              key.includes('ddp-') ||
+              key.includes('auth-token')
+            )) {
+              keysToClean.push(key);
             }
           }
           
-          // Validate each auth token
-          for (const key of keysToCheck) {
+          // Validate and clean up tokens
+          for (const key of keysToClean) {
             try {
               const tokenValue = window.localStorage.getItem(key);
               if (tokenValue) {
+                // Try to parse the token
                 const parsed = JSON.parse(tokenValue);
-                // If token is malformed or expired, clear it
-                if (!parsed.access_token || !parsed.refresh_token) {
-                  window.localStorage.removeItem(key);
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log('Removed invalid token:', key);
+                
+                // Check if token structure is valid
+                if (typeof parsed === 'object' && parsed !== null) {
+                  // If it has auth-like structure, validate it
+                  if (parsed.access_token || parsed.refresh_token) {
+                    // Check if tokens are expired or malformed
+                    if (!parsed.access_token || !parsed.refresh_token || 
+                        typeof parsed.access_token !== 'string' ||
+                        typeof parsed.refresh_token !== 'string') {
+                      window.localStorage.removeItem(key);
+                      if (isDev) console.log('Removed invalid token:', key);
+                    }
                   }
+                } else {
+                  // Invalid structure
+                  window.localStorage.removeItem(key);
+                  if (isDev) console.log('Removed malformed token:', key);
                 }
               }
             } catch (e) {
-              // If we can't parse the token, it's invalid
+              // Can't parse - remove it
               window.localStorage.removeItem(key);
-              if (process.env.NODE_ENV === 'development') {
-                console.log('Removed unparseable token:', key);
+              if (isDev) console.log('Removed unparseable token:', key);
+            }
+          }
+
+          // Clear session storage as well
+          try {
+            const sessionKeys = [];
+            for (let i = 0; i < window.sessionStorage.length; i++) {
+              const key = window.sessionStorage.key(i);
+              if (key && (
+                key.includes('supabase') || 
+                key.includes('sb-') || 
+                key.includes('ddp-')
+              )) {
+                sessionKeys.push(key);
               }
             }
+            
+            for (const key of sessionKeys) {
+              window.sessionStorage.removeItem(key);
+              if (isDev) console.log('Cleared session storage:', key);
+            }
+          } catch (e) {
+            if (isDev) console.error('Session storage cleanup error:', e);
+          }
+
+          // Clear any cookies that might be conflicting (only auth-related ones)
+          try {
+            const cookies = document.cookie.split(';');
+            for (const cookie of cookies) {
+              const [name] = cookie.trim().split('=');
+              if (name && (
+                name.includes('supabase') || 
+                name.includes('sb-') || 
+                name.includes('ddp-')
+              )) {
+                // Clear the cookie
+                document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+                if (isDev) console.log('Cleared cookie:', name);
+              }
+            }
+          } catch (e) {
+            if (isDev) console.error('Cookie cleanup error:', e);
           }
         }
       } catch (error) {
         // Silent cleanup failure
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Token cleanup error:', error);
+        if (isDev) {
+          console.error('Session cleanup error:', error);
         }
       }
     };
     
-    cleanupTokens();
+    // Run cleanup
+    cleanupSessions();
     
-    // Shorter timeout to improve user experience
+    // Set a shorter timeout for better UX
     const timer = setTimeout(() => {
       setLoading(false);
-    }, 500);
+    }, 300);
     
     return () => clearTimeout(timer);
   }, []);
@@ -169,7 +220,7 @@ export default function RootLayout({
             fontSize: '18px',
             color: '#666'
           }}>
-            Loading...
+            Initializing...
           </div>
         </body>
       </html>

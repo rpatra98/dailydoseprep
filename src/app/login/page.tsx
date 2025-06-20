@@ -6,6 +6,7 @@ import { Form, Input, Button, Card, Typography, Alert, Spin, Grid } from 'antd';
 import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import AspectRatioLayout from '@/components/AspectRatioLayout';
+import { useAuth } from '@/context/AuthContext';
 
 const { Title } = Typography;
 const { useBreakpoint } = Grid;
@@ -13,11 +14,13 @@ const { useBreakpoint } = Grid;
 export default function LoginPage() {
   const [form] = Form.useForm();
   const [localError, setLocalError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const router = useRouter();
   const screens = useBreakpoint();
+  
+  // Use AuthContext for proper session management
+  const { signIn, user, loading: authLoading, initialized } = useAuth();
   
   // Only log in development
   const isDev = process.env.NODE_ENV === 'development';
@@ -25,7 +28,7 @@ export default function LoginPage() {
   // Add debug logging
   const addDebug = (message: string) => {
     if (isDev) {
-      console.log(message);
+      console.log(`[LoginPage] ${message}`);
       setDebugInfo(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${message}`]);
     }
   };
@@ -48,57 +51,61 @@ export default function LoginPage() {
     }
   }, []);
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (initialized && !authLoading && user) {
+      addDebug(`✅ User already authenticated: ${(user as any).email} (${(user as any).role}), redirecting...`);
+      router.push('/dashboard');
+    }
+  }, [initialized, authLoading, user, router]);
+
   const handleSubmit = async (values: { email: string; password: string }) => {
     const { email, password } = values;
     setLocalError('');
-    setIsSubmitting(true);
     addDebug(`🔄 Starting login for: ${email}`);
     
     try {
-      // Direct login bypassing AuthContext for now
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-      
-      addDebug(`📡 Login API response status: ${response.status}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        addDebug('✅ Login successful, redirecting...');
-        // Small delay to ensure session is established
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 1000);
+      // Use AuthContext signIn method for proper session management
+      const result = await signIn(email.trim().toLowerCase(), password);
+
+      if (result.success) {
+        addDebug('✅ Login successful via AuthContext');
+        // AuthContext will handle state updates, just redirect
+        router.push('/dashboard');
       } else {
-        const errorData = await response.json();
-        addDebug(`❌ Login failed: ${errorData.error}`);
-        setLocalError(errorData.error || 'Login failed');
+        addDebug(`❌ Login failed: ${result.error}`);
+        setLocalError(result.error || 'Login failed');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed';
       addDebug(`💥 Login exception: ${errorMessage}`);
       setLocalError(errorMessage);
-    } finally {
-      setIsSubmitting(false);
     }
   };
   
-  // Prevent hydration mismatch by not rendering until mounted
-  if (!isMounted) {
+  // Show loading while auth is initializing
+  if (!isMounted || !initialized) {
     return (
       <AspectRatioLayout>
         <div className="center-content">
-          <Spin size="large" tip="Loading login page..." />
+          <Spin size="large" tip="Initializing authentication..." />
         </div>
       </AspectRatioLayout>
     );
   }
 
-  const isMobile = isMounted ? screens.xs : false;
+  // Show loading if already authenticated and redirecting
+  if (user) {
+    return (
+      <AspectRatioLayout>
+        <div className="center-content">
+          <Spin size="large" tip="Already signed in, redirecting..." />
+        </div>
+      </AspectRatioLayout>
+    );
+  }
+
+  const isMobile = screens.xs;
 
   return (
     <AspectRatioLayout>
@@ -161,7 +168,7 @@ export default function LoginPage() {
               onFinish={handleSubmit}
               size={isMobile ? "middle" : "large"}
               initialValues={{
-                email: 'superadmin@ddp.com', // Pre-fill for testing
+                email: isDev ? 'superadmin@ddp.com' : '', // Pre-fill only in development
               }}
             >
               <Form.Item
@@ -177,6 +184,7 @@ export default function LoginPage() {
                   placeholder="Enter your email"
                   autoComplete="email"
                   style={{ borderRadius: '6px' }}
+                  disabled={authLoading}
                 />
               </Form.Item>
               
@@ -192,6 +200,7 @@ export default function LoginPage() {
                   placeholder="Enter your password"
                   autoComplete="current-password"
                   style={{ borderRadius: '6px' }}
+                  disabled={authLoading}
                 />
               </Form.Item>
               
@@ -199,7 +208,8 @@ export default function LoginPage() {
                 <Button
                   type="primary"
                   htmlType="submit"
-                  loading={isSubmitting}
+                  loading={authLoading}
+                  disabled={authLoading}
                   style={{ 
                     width: '100%',
                     height: '40px',
@@ -208,7 +218,7 @@ export default function LoginPage() {
                   }}
                   size={isMobile ? "middle" : "large"}
                 >
-                  {isSubmitting ? 'Signing in...' : 'Sign In'}
+                  {authLoading ? 'Signing in...' : 'Sign In'}
                 </Button>
               </Form.Item>
             </Form>
@@ -238,15 +248,24 @@ export default function LoginPage() {
                 borderRadius: '8px'
               }}
             >
-              <div style={{ fontFamily: 'monospace', fontSize: '12px', maxHeight: '200px', overflowY: 'auto' }}>
-                {debugInfo.map((info, index) => (
-                  <div key={index} style={{ marginBottom: '4px' }}>
-                    {info}
-                  </div>
-                ))}
-                {debugInfo.length === 0 && (
-                  <div style={{ color: '#999' }}>No debug info yet...</div>
-                )}
+              <div style={{ fontFamily: 'monospace', fontSize: '11px', maxHeight: '200px', overflowY: 'auto' }}>
+                <div style={{ marginBottom: '8px', color: '#666' }}>
+                  <strong>Auth State:</strong><br />
+                  Initialized: {initialized ? 'Yes' : 'No'}<br />
+                  Loading: {authLoading ? 'Yes' : 'No'}<br />
+                                     User: {user ? `${(user as any).email} (${(user as any).role})` : 'None'}
+                </div>
+                <div style={{ borderTop: '1px solid #eee', paddingTop: '8px' }}>
+                  <strong>Debug Log:</strong><br />
+                  {debugInfo.map((info, index) => (
+                    <div key={index} style={{ marginBottom: '2px' }}>
+                      {info}
+                    </div>
+                  ))}
+                  {debugInfo.length === 0 && (
+                    <div style={{ color: '#999' }}>No debug info yet...</div>
+                  )}
+                </div>
               </div>
             </Card>
           )}
