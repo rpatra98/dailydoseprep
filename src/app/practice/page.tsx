@@ -27,8 +27,8 @@ import {
   QuestionCircleOutlined,
   PlayCircleOutlined,
   PauseCircleOutlined,
-  SkipNextOutlined,
-  SkipPreviousOutlined,
+  RightOutlined,
+  LeftOutlined,
   BookOutlined
 } from '@ant-design/icons';
 import AspectRatioLayout from '@/components/AspectRatioLayout';
@@ -144,10 +144,14 @@ export default function PracticePage() {
         credentials: 'include',
       });
 
-      let subjectInfo = { id: subjectId, name: 'Unknown Subject' };
+      let subjectInfo: Subject = { id: subjectId || '', name: 'Unknown Subject' };
       if (subjectResponse.ok) {
         const subjectData = await subjectResponse.json();
-        subjectInfo = subjectData;
+        subjectInfo = {
+          id: subjectData.id || subjectId || '',
+          name: subjectData.name || 'Unknown Subject',
+          examcategory: subjectData.examcategory
+        };
       }
 
       // Shuffle questions for variety
@@ -470,15 +474,15 @@ export default function PracticePage() {
           {/* Navigation */}
           <Card>
             <Row gutter={16} align="middle">
-              <Col>
-                <Button
-                  icon={<SkipPreviousOutlined />}
-                  onClick={handlePreviousQuestion}
-                  disabled={session.currentQuestionIndex === 0}
-                >
-                  Previous
-                </Button>
-              </Col>
+                             <Col>
+                 <Button
+                   icon={<LeftOutlined />}
+                   onClick={handlePreviousQuestion}
+                   disabled={session.currentQuestionIndex === 0}
+                 >
+                   Previous
+                 </Button>
+               </Col>
               
               <Col flex="auto" style={{ textAlign: 'center' }}>
                 {!isAnswered ? (
@@ -506,15 +510,15 @@ export default function PracticePage() {
                 )}
               </Col>
               
-              <Col>
-                <Button
-                  icon={<SkipNextOutlined />}
-                  onClick={handleNextQuestion}
-                  disabled={session.currentQuestionIndex === session.questions.length - 1}
-                >
-                  Next
-                </Button>
-              </Col>
+                             <Col>
+                 <Button
+                   icon={<RightOutlined />}
+                   onClick={handleNextQuestion}
+                   disabled={session.currentQuestionIndex === session.questions.length - 1}
+                 >
+                   Next
+                 </Button>
+               </Col>
             </Row>
           </Card>
         </Content>

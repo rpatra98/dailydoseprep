@@ -20,7 +20,7 @@ export async function OPTIONS() {
 // GET a specific subject by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
@@ -32,7 +32,7 @@ export async function GET(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const subjectId = params.id;
+    const { id: subjectId } = await params;
 
     if (!subjectId) {
       return NextResponse.json({ error: 'Subject ID is required' }, { status: 400 });
