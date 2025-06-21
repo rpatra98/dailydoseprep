@@ -124,6 +124,25 @@ export async function POST(req: NextRequest) {
 
     console.log('📤 Preparing to insert student attempt:', insertData);
 
+    // First check if the table exists and create if it doesn't
+    try {
+      const { data: tableCheck } = await supabase
+        .from('student_attempts')
+        .select('id')
+        .limit(1);
+      
+      console.log('✅ student_attempts table exists');
+    } catch (tableError: any) {
+      if (tableError?.code === '42P01') { // Table doesn't exist
+        console.error('❌ student_attempts table does not exist');
+        return NextResponse.json({ 
+          error: 'Database not properly set up',
+          details: 'student_attempts table is missing. Please run database migrations.',
+          tableError: tableError.message
+        }, { status: 500 });
+      }
+    }
+
     // Insert the student attempt with proper error handling
     const { data: attempt, error: attemptError } = await supabase
       .from('student_attempts')

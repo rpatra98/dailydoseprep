@@ -23,6 +23,7 @@ import {
 import { 
   ArrowLeftOutlined, 
   CheckCircleOutlined, 
+  CloseCircleOutlined,
   ClockCircleOutlined,
   QuestionCircleOutlined,
   PlayCircleOutlined,
@@ -507,23 +508,45 @@ export default function PracticePage() {
 
             {/* Explanation */}
             {showExplanation && isAnswered && (
-              <div style={{ marginTop: '24px', padding: '16px', backgroundColor: '#f6ffed', borderRadius: '6px', border: '1px solid #b7eb8f' }}>
-                <Title level={5} style={{ color: '#52c41a', marginBottom: '8px' }}>
-                  <CheckCircleOutlined style={{ marginRight: '8px' }} />
-                  Explanation
-                </Title>
-                <Paragraph style={{ margin: 0 }}>
-                  <strong>Correct Answer:</strong> {currentQuestion.correct_option}) {
-                    currentQuestion.correct_option === 'A' ? currentQuestion.option_a :
-                    currentQuestion.correct_option === 'B' ? currentQuestion.option_b :
-                    currentQuestion.correct_option === 'C' ? currentQuestion.option_c :
-                    currentQuestion.option_d
-                  }
-                </Paragraph>
-                <Paragraph style={{ margin: '8px 0 0 0' }}>
-                  {currentQuestion.explanation}
-                </Paragraph>
-              </div>
+              (() => {
+                const isCorrect = selectedAnswer === currentQuestion.correct_option;
+                const backgroundColor = isCorrect ? '#f6ffed' : '#fff2f0';
+                const borderColor = isCorrect ? '#b7eb8f' : '#ffccc7';
+                const textColor = isCorrect ? '#52c41a' : '#ff4d4f';
+                const icon = isCorrect ? <CheckCircleOutlined /> : <CloseCircleOutlined />;
+                
+                return (
+                  <div style={{ marginTop: '24px', padding: '16px', backgroundColor, borderRadius: '6px', border: `1px solid ${borderColor}` }}>
+                    <Title level={5} style={{ color: textColor, marginBottom: '8px' }}>
+                      {icon}
+                      <span style={{ marginLeft: '8px' }}>
+                        {isCorrect ? 'Correct! Great Job!' : 'Incorrect Answer'}
+                      </span>
+                    </Title>
+                    <Paragraph style={{ margin: 0 }}>
+                      <strong>Correct Answer:</strong> {currentQuestion.correct_option}) {
+                        currentQuestion.correct_option === 'A' ? currentQuestion.option_a :
+                        currentQuestion.correct_option === 'B' ? currentQuestion.option_b :
+                        currentQuestion.correct_option === 'C' ? currentQuestion.option_c :
+                        currentQuestion.option_d
+                      }
+                    </Paragraph>
+                    {!isCorrect && (
+                      <Paragraph style={{ margin: '8px 0', color: '#ff4d4f' }}>
+                        <strong>Your Answer:</strong> {selectedAnswer}) {
+                          selectedAnswer === 'A' ? currentQuestion.option_a :
+                          selectedAnswer === 'B' ? currentQuestion.option_b :
+                          selectedAnswer === 'C' ? currentQuestion.option_c :
+                          currentQuestion.option_d
+                        }
+                      </Paragraph>
+                    )}
+                    <Paragraph style={{ margin: '8px 0 0 0' }}>
+                      <strong>Explanation:</strong> {currentQuestion.explanation}
+                    </Paragraph>
+                  </div>
+                );
+              })()
             )}
           </Card>
 
