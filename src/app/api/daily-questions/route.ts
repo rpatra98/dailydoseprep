@@ -13,10 +13,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
     
-    // Check if user is a STUDENT and get their primary subject
+    // Check if user is a STUDENT
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('role, primarysubject')
+      .select('role')
       .eq('id', authData.session.user.id)
       .single();
     
@@ -28,14 +28,30 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Only students can access daily questions' }, { status: 403 });
     }
 
-    // Check if student has selected a primary subject
-    if (!userData.primarysubject) {
+    // Get student's primary subject from user_subjects table
+    const { data: primarySubjectData, error: primarySubjectError } = await supabase
+      .from('user_subjects')
+      .select(`
+        subject_id,
+        subjects (
+          id,
+          name
+        )
+      `)
+      .eq('user_id', authData.session.user.id)
+      .eq('is_primary', true)
+      .eq('is_active', true)
+      .single();
+
+    if (primarySubjectError || !primarySubjectData) {
       return NextResponse.json({ 
         error: 'No primary subject selected',
         message: 'Please select a primary subject in your dashboard to receive daily questions.',
         needsSubjectSelection: true
       }, { status: 400 });
     }
+
+    const primarySubjectId = primarySubjectData.subject_id;
     
     // Get today's date in YYYY-MM-DD format for consistency
     const today = new Date().toISOString().split('T')[0];
@@ -102,7 +118,7 @@ export async function GET(req: NextRequest) {
     // Filter questions by primary subject and exclude attempted ones
     let query = supabase.from('questions')
       .select('id, title, content, option_a, option_b, option_c, option_d')
-      .eq('subject_id', userData.primarysubject)  // Filter by primary subject
+      .eq('subject_id', primarySubjectId)  // Filter by primary subject
       .order('created_at', { ascending: true });
       
     // Exclude previously attempted questions

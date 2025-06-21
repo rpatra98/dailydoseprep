@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRouteHandlerClient, getServiceRoleClient } from '@/lib/supabase-server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 
 // OPTIONS handler for CORS preflight requests
 export async function OPTIONS() {
@@ -19,33 +20,44 @@ export async function OPTIONS() {
 // GET a specific subject by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-    console.log(`GET /api/subjects/${id}: Starting request`);
+    const supabase = createRouteHandlerClient({ cookies });
     
-    const supabase = getRouteHandlerClient();
+    // Check authentication
+    const { data: authData, error: authError } = await supabase.auth.getUser();
     
-    const { data, error } = await supabase
-      .from('subjects')
-      .select('*')
-      .eq('id', id)
-      .single();
-      
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
-      }
-      console.error(`Error fetching subject ${id}:`, error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (authError || !authData.user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
-    
-    return NextResponse.json(data);
-  } catch (err) {
-    console.error('Exception in subject GET by ID:', err);
-    const errorMessage = err instanceof Error ? err.message : 'Unknown server error';
-    return NextResponse.json({ error: 'Server error', details: errorMessage }, { status: 500 });
+
+    const subjectId = params.id;
+
+    if (!subjectId) {
+      return NextResponse.json({ error: 'Subject ID is required' }, { status: 400 });
+    }
+
+    // Fetch subject details
+    const { data: subject, error: subjectError } = await supabase
+      .from('subjects')
+      .select('id, name, examcategory, description, created_at')
+      .eq('id', subjectId)
+      .single();
+
+    if (subjectError) {
+      console.error('Error fetching subject:', subjectError);
+      return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(subject);
+
+  } catch (error) {
+    console.error('Error in subjects/[id] API:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 

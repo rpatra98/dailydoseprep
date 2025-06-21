@@ -314,7 +314,7 @@ const EnhancedStudentDashboard = ({ user }: EnhancedStudentDashboardProps) => {
       </Card>
 
       {/* Time Spent Analytics */}
-      <Card title="Time Spent Analytics" style={{ marginBottom: '24px' }}>
+      <Card title="Time Spent Analytics" style={{ marginBottom: '24px' }} data-analytics-section>
         <Tabs 
           defaultActiveKey="today" 
           onChange={setSelectedTimeRange}
@@ -398,22 +398,6 @@ const EnhancedStudentDashboard = ({ user }: EnhancedStudentDashboardProps) => {
         <Col xs={24} sm={12} md={8}>
           <Card>
             <div style={{ textAlign: 'center' }}>
-              <PlayCircleOutlined style={{ fontSize: '32px', color: '#1890ff', marginBottom: '12px' }} />
-              <Title level={4}>Start Practice</Title>
-              <Paragraph type="secondary">
-                Continue your learning journey with subject-based practice sessions.
-              </Paragraph>
-              <Link href="/practice">
-                <Button type="primary" size="large" block>
-                  Start Practicing
-                </Button>
-              </Link>
-            </div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Card>
-            <div style={{ textAlign: 'center' }}>
               <CalendarOutlined style={{ fontSize: '32px', color: '#52c41a', marginBottom: '12px' }} />
               <Title level={4}>Daily Questions</Title>
               <Paragraph type="secondary">
@@ -430,16 +414,38 @@ const EnhancedStudentDashboard = ({ user }: EnhancedStudentDashboardProps) => {
         <Col xs={24} sm={12} md={8}>
           <Card>
             <div style={{ textAlign: 'center' }}>
-              <BarChartOutlined style={{ fontSize: '32px', color: '#faad14', marginBottom: '12px' }} />
-              <Title level={4}>Performance</Title>
+              <BookOutlined style={{ fontSize: '32px', color: '#1890ff', marginBottom: '12px' }} />
+              <Title level={4}>Subject Selection</Title>
               <Paragraph type="secondary">
-                View detailed analytics and track your progress over time.
+                Add or modify your selected subjects for comprehensive exam preparation.
               </Paragraph>
-              <Link href="/analytics">
+              <Link href="/subjects/select">
                 <Button size="large" block>
-                  View Analytics
+                  Manage Subjects
                 </Button>
               </Link>
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8}>
+          <Card>
+            <div style={{ textAlign: 'center' }}>
+              <BarChartOutlined style={{ fontSize: '32px', color: '#faad14', marginBottom: '12px' }} />
+              <Title level={4}>Performance Analytics</Title>
+              <Paragraph type="secondary">
+                Your detailed performance analytics are displayed above in the Time Spent section.
+              </Paragraph>
+              <Button 
+                size="large" 
+                block
+                onClick={() => {
+                  // Scroll to Time Spent Analytics section
+                  const analyticsSection = document.querySelector('[data-analytics-section]');
+                  analyticsSection?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                View Analytics Above
+              </Button>
             </div>
           </Card>
         </Col>

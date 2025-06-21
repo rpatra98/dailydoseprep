@@ -562,9 +562,14 @@ export async function GET(req: NextRequest) {
     }
     const supabase = createRouteHandlerClient({ cookies });
     
-    // Simple health check for debugging
+    // Parse URL parameters
     const url = new URL(req.url);
-    if (url.searchParams.get('health') === 'true') {
+    const subjectId = url.searchParams.get('subject');
+    const limit = url.searchParams.get('limit');
+    const health = url.searchParams.get('health');
+    
+    // Simple health check for debugging
+    if (health === 'true') {
       return NextResponse.json({ 
         status: 'healthy',
         timestamp: new Date().toISOString(),
@@ -589,7 +594,7 @@ export async function GET(req: NextRequest) {
       console.log('✅ User authenticated:', authData.user.email);
     }
 
-    // Check user role - only SUPERADMIN can view all questions
+    // Check user role
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('role')
@@ -606,34 +611,87 @@ export async function GET(req: NextRequest) {
       }, { status: 403 });
     }
 
-    if (userData.role !== 'SUPERADMIN') {
-      if (isDev) {
-        console.log('❌ Access denied - user role:', userData.role);
+    // Different access rules based on role and filters
+    let questions, error;
+    
+    if (subjectId) {
+      // Subject-specific queries (for practice) - allow STUDENTS
+      if (!['STUDENT', 'QAUTHOR', 'SUPERADMIN'].includes(userData.role)) {
+        return NextResponse.json({ 
+          error: 'Access denied',
+          details: 'Insufficient permissions to access questions'
+        }, { status: 403 });
       }
-      return NextResponse.json({ 
-        error: 'Access denied',
-        details: 'Only SUPERADMIN can view all questions'
-      }, { status: 403 });
-    }
+      
+      if (isDev) {
+        console.log('🎯 Fetching questions for subject:', subjectId);
+      }
+      
+      // Build query for subject-specific questions
+      let subjectQuery = supabase
+        .from('questions')
+        .select(`
+          id,
+          title,
+          content,
+          option_a,
+          option_b,
+          option_c,
+          option_d,
+          correct_option,
+          explanation,
+          difficulty,
+          subject_id
+        `)
+        .eq('subject_id', subjectId)
+        .order('created_at', { ascending: false });
+        
+      // Add limit if specified
+      if (limit && !isNaN(parseInt(limit))) {
+        const limitNum = parseInt(limit);
+        if (limitNum > 0 && limitNum <= 100) { // Max 100 questions
+          subjectQuery = subjectQuery.limit(limitNum);
+        }
+      }
+      
+      const result = await subjectQuery;
+      questions = result.data;
+      error = result.error;
+      
+    } else {
+      // Full questions list - only SUPERADMIN
+      if (userData.role !== 'SUPERADMIN') {
+        if (isDev) {
+          console.log('❌ Access denied - user role:', userData.role);
+        }
+        return NextResponse.json({ 
+          error: 'Access denied',
+          details: 'Only SUPERADMIN can view all questions'
+        }, { status: 403 });
+      }
 
-    if (isDev) {
-      console.log('✅ SUPERADMIN access confirmed');
-    }
+      if (isDev) {
+        console.log('✅ SUPERADMIN access confirmed - fetching all questions');
+      }
 
-    // Fetch questions with proper column names from APPLICATION_SPECIFICATION.md
-    const { data: questions, error } = await supabase
-      .from('questions')
-      .select(`
-        *,
-        subjects (
-          name,
-          examcategory
-        ),
-        users (
-          email
-        )
-      `)
-      .order('created_at', { ascending: false });
+      // Fetch all questions with relations
+      const result = await supabase
+        .from('questions')
+        .select(`
+          *,
+          subjects (
+            name,
+            examcategory
+          ),
+          users (
+            email
+          )
+        `)
+        .order('created_at', { ascending: false });
+        
+      questions = result.data;
+      error = result.error;
+    }
 
     if (error) {
       if (isDev) {
@@ -647,13 +705,29 @@ export async function GET(req: NextRequest) {
 
     if (isDev) {
       console.log('✅ Questions fetched successfully:', questions?.length || 0, 'questions');
+      if (subjectId) {
+        console.log('🎯 Subject filter applied:', subjectId);
+      }
+      if (limit) {
+        console.log('📊 Limit applied:', limit);
+      }
     }
 
-    // Return in the format expected by the admin page
-    return NextResponse.json({ 
-      questions: questions || [],
-      total: questions?.length || 0
-    });
+    // Return appropriate format based on query type
+    if (subjectId) {
+      // For practice sessions - simple format
+      return NextResponse.json({ 
+        questions: questions || [],
+        total: questions?.length || 0,
+        subjectId: subjectId
+      });
+    } else {
+      // For admin view - detailed format
+      return NextResponse.json({ 
+        questions: questions || [],
+        total: questions?.length || 0
+      });
+    }
 
   } catch (error) {
     if (isDev) {
