@@ -220,12 +220,18 @@ export default function PracticePage() {
         const result = await response.json();
         console.log('Submit result:', result);
         
+        // Handle already attempted case
+        if (result.alreadyAttempted) {
+          console.log('Question was already attempted, using existing answer');
+          setCurrentAnswer(result.attempt.selectedOption);
+        }
+        
         // Update session state
         setSession(prev => prev ? {
           ...prev,
           selectedAnswers: {
             ...prev.selectedAnswers,
-            [currentQuestion.id]: currentAnswer
+            [currentQuestion.id]: result.alreadyAttempted ? result.attempt.selectedOption : currentAnswer
           }
         } : null);
 
@@ -268,12 +274,17 @@ export default function PracticePage() {
     if (!session) return;
 
     if (session.currentQuestionIndex < session.questions.length - 1) {
+      const nextIndex = session.currentQuestionIndex + 1;
       setSession(prev => prev ? {
         ...prev,
-        currentQuestionIndex: prev.currentQuestionIndex + 1
+        currentQuestionIndex: nextIndex
       } : null);
-      setCurrentAnswer('');
-      setShowExplanation(false);
+      
+      // Load next question's answer if it exists
+      const nextQuestion = session.questions[nextIndex];
+      const nextAnswer = session.selectedAnswers[nextQuestion.id] || '';
+      setCurrentAnswer(nextAnswer);
+      setShowExplanation(!!nextAnswer || submittedAnswers.has(nextQuestion.id));
     }
   };
 
@@ -290,7 +301,7 @@ export default function PracticePage() {
       const prevQuestion = session.questions[session.currentQuestionIndex - 1];
       const prevAnswer = session.selectedAnswers[prevQuestion.id] || '';
       setCurrentAnswer(prevAnswer);
-      setShowExplanation(!!prevAnswer);
+      setShowExplanation(!!prevAnswer || submittedAnswers.has(prevQuestion.id));
     }
   };
 

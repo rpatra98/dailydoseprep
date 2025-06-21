@@ -51,38 +51,67 @@ export async function POST(req: NextRequest) {
     // Check if student has already attempted this question
     const { data: existingAttempt, error: checkError } = await supabase
       .from('student_attempts')
-      .select('id')
+      .select('id, selectedOption, isCorrect, attemptedAt')
       .eq('studentId', authData.user.id)
       .eq('questionId', questionId)
-      .single();
+      .maybeSingle();
 
+    // If attempt already exists, return the existing data
     if (existingAttempt) {
-      return NextResponse.json({ 
-        error: 'Question already attempted',
-        details: 'You have already submitted an answer for this question' 
-      }, { status: 409 });
+      console.log(`Student ${authData.user.id} already attempted question ${questionId}`);
+      return NextResponse.json({
+        success: true,
+        alreadyAttempted: true,
+        attempt: {
+          id: existingAttempt.id,
+          questionId: questionId,
+          selectedOption: existingAttempt.selectedOption,
+          isCorrect: existingAttempt.isCorrect,
+          attemptedAt: existingAttempt.attemptedAt
+        }
+      });
     }
 
-    // Insert the student attempt
+    // Log the check error for debugging, but don't fail the request
+    if (checkError) {
+      console.warn('Warning checking existing attempts:', checkError);
+    }
+
+    // Prepare insert data
+    const insertData = {
+      studentId: authData.user.id,
+      questionId: questionId,
+      selectedOption: selectedOption,
+      isCorrect: isCorrect === true,
+      subject_id: subjectId,
+      time_spent_seconds: timeSpent || 0,
+      attemptedAt: new Date().toISOString()
+    };
+
+    console.log('Inserting student attempt:', insertData);
+
+    // Insert the student attempt (use upsert to handle race conditions)
     const { data: attempt, error: attemptError } = await supabase
       .from('student_attempts')
-      .insert({
-        studentId: authData.user.id,
-        questionId: questionId,
-        selectedOption: selectedOption,
-        isCorrect: isCorrect === true,
-        subject_id: subjectId,
-        time_spent_seconds: timeSpent || 0,
-        attemptedAt: new Date().toISOString()
+      .upsert(insertData, { 
+        onConflict: 'studentId,questionId',
+        ignoreDuplicates: false 
       })
       .select()
       .single();
 
     if (attemptError) {
-      console.error('Error inserting student attempt:', attemptError);
+      console.error('Error inserting student attempt:', {
+        error: attemptError,
+        insertData,
+        errorCode: attemptError.code,
+        errorMessage: attemptError.message,
+        errorDetails: attemptError.details
+      });
       return NextResponse.json({ 
         error: 'Failed to submit answer',
-        details: attemptError.message 
+        details: attemptError.message,
+        code: attemptError.code
       }, { status: 500 });
     }
 
