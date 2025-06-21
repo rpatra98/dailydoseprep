@@ -91,8 +91,8 @@ export async function GET(req: NextRequest) {
     // Get student attempts for score calculation
     const { data: attempts, error: attemptsError } = await supabase
       .from('student_attempts')
-      .select('questionId, isCorrect, subject_id')
-      .eq('studentId', authData.user.id);
+      .select('questionid, iscorrect, subject_id')
+      .eq('studentid', authData.user.id);
 
     if (attemptsError) {
       console.error('Error fetching attempts:', attemptsError);
@@ -131,7 +131,7 @@ export async function GET(req: NextRequest) {
 
       // Get attempts for this subject
       const subjectAttempts = attempts?.filter(a => a.subject_id === us.subject_id) || [];
-      const correctAttempts = subjectAttempts.filter(a => a.isCorrect).length;
+      const correctAttempts = subjectAttempts.filter(a => a.iscorrect).length;
       const score = subjectAttempts.length > 0 ? Math.round((correctAttempts / subjectAttempts.length) * 100) : 0;
 
       // Get time spent on this subject from database
@@ -154,7 +154,7 @@ export async function GET(req: NextRequest) {
 
     // Calculate overall score
     const totalAttempts = attempts?.length || 0;
-    const totalCorrect = attempts?.filter(a => a.isCorrect).length || 0;
+    const totalCorrect = attempts?.filter(a => a.iscorrect).length || 0;
     const overallScore = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : 0;
 
     // Return analytics data

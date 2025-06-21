@@ -83,9 +83,9 @@ export async function POST(req: NextRequest) {
     console.log('🔍 Checking for existing attempts...');
     const { data: existingAttempt, error: checkError } = await supabase
       .from('student_attempts')
-      .select('id, "selectedOption", "isCorrect", "attemptedAt"')
-      .eq('"studentId"', authData.user.id)
-      .eq('"questionId"', questionId)
+      .select('id, selectedoption, iscorrect, attemptedat')
+      .eq('studentid', authData.user.id)
+      .eq('questionid', questionId)
       .maybeSingle();
 
     console.log('🔍 Existing attempt check result:', { existingAttempt, checkError });
@@ -99,9 +99,9 @@ export async function POST(req: NextRequest) {
         attempt: {
           id: existingAttempt.id,
           questionId: questionId,
-          selectedOption: existingAttempt.selectedOption,
-          isCorrect: existingAttempt.isCorrect,
-          attemptedAt: existingAttempt.attemptedAt
+          selectedOption: existingAttempt.selectedoption,
+          isCorrect: existingAttempt.iscorrect,
+          attemptedAt: existingAttempt.attemptedat
         }
       });
     }
@@ -111,15 +111,15 @@ export async function POST(req: NextRequest) {
       console.warn('⚠️ Warning checking existing attempts:', checkError);
     }
 
-    // Prepare insert data according to APPLICATION_SPECIFICATION.md
+    // Prepare insert data according to actual database schema
     const insertData = {
-      studentId: authData.user.id,
-      questionId: questionId,
-      selectedOption: selectedOption,
-      isCorrect: isCorrect === true,
+      studentid: authData.user.id,
+      questionid: questionId,
+      selectedoption: selectedOption,
+      iscorrect: isCorrect === true,
       subject_id: subjectId,
       time_spent_seconds: timeSpent || 0,
-      attemptedAt: new Date().toISOString()
+      attemptedat: new Date().toISOString()
     };
 
     console.log('📤 Preparing to insert student attempt:', insertData);
@@ -165,9 +165,9 @@ export async function POST(req: NextRequest) {
         console.log('🔄 Duplicate attempt detected, fetching existing record...');
         const { data: existingRecord } = await supabase
           .from('student_attempts')
-          .select('id, "selectedOption", "isCorrect", "attemptedAt"')
-          .eq('"studentId"', authData.user.id)
-          .eq('"questionId"', questionId)
+          .select('id, selectedoption, iscorrect, attemptedat')
+          .eq('studentid', authData.user.id)
+          .eq('questionid', questionId)
           .single();
 
         if (existingRecord) {
@@ -178,9 +178,9 @@ export async function POST(req: NextRequest) {
             attempt: {
               id: existingRecord.id,
               questionId: questionId,
-              selectedOption: existingRecord.selectedOption,
-              isCorrect: existingRecord.isCorrect,
-              attemptedAt: existingRecord.attemptedAt
+              selectedOption: existingRecord.selectedoption,
+              isCorrect: existingRecord.iscorrect,
+              attemptedAt: existingRecord.attemptedat
             }
           });
         }
@@ -208,10 +208,10 @@ export async function POST(req: NextRequest) {
       success: true,
       attempt: {
         id: attempt.id,
-        questionId: attempt.questionId || questionId,
-        selectedOption: attempt.selectedOption || selectedOption,
-        isCorrect: attempt.isCorrect,
-        attemptedAt: attempt.attemptedAt
+        questionId: attempt.questionid || questionId,
+        selectedOption: attempt.selectedoption || selectedOption,
+        isCorrect: attempt.iscorrect,
+        attemptedAt: attempt.attemptedat
       }
     });
 
