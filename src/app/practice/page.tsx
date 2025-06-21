@@ -82,6 +82,7 @@ export default function PracticePage() {
   const [submittedAnswers, setSubmittedAnswers] = useState<Set<string>>(new Set());
   const [sessionTime, setSessionTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Timer effect
   useEffect(() => {
@@ -175,16 +176,28 @@ export default function PracticePage() {
   };
 
   const handleAnswerSelect = (option: string) => {
+    console.log('Answer selected:', option);
     setCurrentAnswer(option);
   };
 
   const handleSubmitAnswer = async () => {
-    if (!session || !currentAnswer) return;
+    if (!session || !currentAnswer) {
+      console.log('Cannot submit: missing session or answer', { session: !!session, currentAnswer });
+      return;
+    }
 
+    setSubmitting(true);
     const currentQuestion = session.questions[session.currentQuestionIndex];
     const isCorrect = currentAnswer === currentQuestion.correct_option;
 
     try {
+      console.log('Submitting answer:', {
+        questionId: currentQuestion.id,
+        selectedOption: currentAnswer,
+        isCorrect,
+        subjectId: currentQuestion.subject_id
+      });
+
       // Submit answer to backend
       const response = await fetch('/api/student/submit-answer', {
         method: 'POST',
@@ -201,8 +214,27 @@ export default function PracticePage() {
         }),
       });
 
+      console.log('Submit response status:', response.status);
+
       if (response.ok) {
+        const result = await response.json();
+        console.log('Submit result:', result);
+        
         // Update session state
+        setSession(prev => prev ? {
+          ...prev,
+          selectedAnswers: {
+            ...prev.selectedAnswers,
+            [currentQuestion.id]: currentAnswer
+          }
+        } : null);
+
+        setSubmittedAnswers(prev => new Set([...prev, currentQuestion.id]));
+        setShowExplanation(true);
+      } else {
+        const errorData = await response.json();
+        console.error('Submit failed:', errorData);
+        // Still allow local state update for better UX
         setSession(prev => prev ? {
           ...prev,
           selectedAnswers: {
@@ -216,6 +248,19 @@ export default function PracticePage() {
       }
     } catch (err) {
       console.error('Error submitting answer:', err);
+      // Still allow local state update for better UX
+      setSession(prev => prev ? {
+        ...prev,
+        selectedAnswers: {
+          ...prev.selectedAnswers,
+          [currentQuestion.id]: currentAnswer
+        }
+      } : null);
+
+      setSubmittedAnswers(prev => new Set([...prev, currentQuestion.id]));
+      setShowExplanation(true);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -366,7 +411,7 @@ export default function PracticePage() {
           </Button>
           
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <Title level={4} style={{ margin: 0 }}>
                 {session.subject.name} Practice
               </Title>
@@ -486,16 +531,22 @@ export default function PracticePage() {
               
               <Col flex="auto" style={{ textAlign: 'center' }}>
                 {!isAnswered ? (
-                  <Space>
+                  <Space direction="vertical">
                     <Button
                       type="primary"
                       size="large"
                       onClick={handleSubmitAnswer}
-                      disabled={!currentAnswer}
-                      icon={<CheckCircleOutlined />}
+                      disabled={!currentAnswer || submitting}
+                      loading={submitting}
+                      icon={!submitting ? <CheckCircleOutlined /> : undefined}
                     >
-                      Submit Answer
+                      {submitting ? 'Submitting...' : 'Submit Answer'}
                     </Button>
+                    {process.env.NODE_ENV === 'development' && (
+                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                        Debug: Selected={currentAnswer || 'none'}, Can Submit={!!currentAnswer}
+                      </Text>
+                    )}
                     <Button
                       onClick={handleSkipQuestion}
                       disabled={session.currentQuestionIndex === session.questions.length - 1}
