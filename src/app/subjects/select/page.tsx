@@ -97,9 +97,10 @@ export default function SubjectSelection() {
         const userSubjectsData = await userSubjectsResponse.json();
         setExistingSelections(userSubjectsData.subjects || []);
         
-        // Set current selections
-        const currentSelections = userSubjectsData.subjects?.map((us: UserSubject) => us.subject_id) || [];
-        setSelectedSubjects(currentSelections);
+        // Set current selections (ensure uniqueness)
+        const currentSelections: string[] = userSubjectsData.subjects?.map((us: UserSubject) => us.subject_id) || [];
+        const uniqueSelections = [...new Set(currentSelections)]; // Remove duplicates
+        setSelectedSubjects(uniqueSelections);
         
         // Set primary subject
         const primary = userSubjectsData.subjects?.find((us: UserSubject) => us.is_primary);
@@ -118,18 +119,27 @@ export default function SubjectSelection() {
 
   const handleSubjectToggle = (subjectId: string, checked: boolean) => {
     if (checked) {
-      setSelectedSubjects(prev => [...prev, subjectId]);
-      // If this is the first subject, make it primary
-      if (selectedSubjects.length === 0) {
-        setPrimarySubject(subjectId);
-      }
+      setSelectedSubjects(prev => {
+        // Prevent duplicates
+        if (prev.includes(subjectId)) {
+          return prev;
+        }
+        const newSelection = [...prev, subjectId];
+        // If this is the first subject, make it primary
+        if (prev.length === 0) {
+          setPrimarySubject(subjectId);
+        }
+        return newSelection;
+      });
     } else {
-      setSelectedSubjects(prev => prev.filter(id => id !== subjectId));
-      // If removing primary subject, set new primary
-      if (primarySubject === subjectId) {
-        const remaining = selectedSubjects.filter(id => id !== subjectId);
-        setPrimarySubject(remaining.length > 0 ? remaining[0] : '');
-      }
+      setSelectedSubjects(prev => {
+        const newSelection = prev.filter(id => id !== subjectId);
+        // If removing primary subject, set new primary
+        if (primarySubject === subjectId) {
+          setPrimarySubject(newSelection.length > 0 ? newSelection[0] : '');
+        }
+        return newSelection;
+      });
     }
   };
 
@@ -254,12 +264,21 @@ export default function SubjectSelection() {
                     cursor: 'pointer',
                     transition: 'all 0.3s ease'
                   }}
-                  onClick={() => handleSubjectToggle(subject.id, !isSelected)}
+                  onClick={(e) => {
+                    // Prevent double-triggering when clicking on checkbox
+                    if ((e.target as HTMLElement).closest('.ant-checkbox-wrapper')) {
+                      return;
+                    }
+                    handleSubjectToggle(subject.id, !isSelected);
+                  }}
                 >
                   <div style={{ textAlign: 'center', padding: '8px' }}>
                     <Checkbox
                       checked={isSelected}
-                      onChange={(e) => handleSubjectToggle(subject.id, e.target.checked)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        handleSubjectToggle(subject.id, e.target.checked);
+                      }}
                       style={{ marginBottom: '8px' }}
                     />
                     
